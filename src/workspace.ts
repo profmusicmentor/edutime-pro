@@ -37,6 +37,12 @@ export const LEGACY_DOC_ID = 'masterTimetable';
 
 const ALPHABET = 'abcdefghijkmnopqrstuvwxyz23456789';
 
+/**
+ * Lunghezza minima del codice scuola. Le regole di sicurezza Firestore
+ * rifiutano i codici più corti: un codice breve sarebbe indovinabile.
+ */
+export const MIN_CODE_LENGTH = 12;
+
 const randomChunk = (len: number) => {
   const bytes = new Uint8Array(len);
   crypto.getRandomValues(bytes);
@@ -102,7 +108,7 @@ export const codeFromUrl = (): string | null => {
     const value = new URLSearchParams(window.location.search).get('scuola');
     if (!value) return null;
     const code = normalizeCode(value);
-    return code || null;
+    return code.length >= MIN_CODE_LENGTH ? code : null;
   } catch {
     return null;
   }

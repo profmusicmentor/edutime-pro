@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   buildCode,
+  MIN_CODE_LENGTH,
   normalizeCode,
   shareUrl,
   type Workspace,
@@ -20,6 +21,7 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
   const [cloudName, setCloudName] = useState('');
   const [joinCode, setJoinCode] = useState(invitedCode || '');
   const [importError, setImportError] = useState('');
+  const [joinError, setJoinError] = useState('');
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -51,6 +53,13 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
   const joinCloud = () => {
     const code = normalizeCode(joinCode);
     if (!code) return;
+    if (code.length < MIN_CODE_LENGTH) {
+      setJoinError(
+        `Il codice scuola deve avere almeno ${MIN_CODE_LENGTH} caratteri: ricopialo esattamente come te l'hanno passato.`
+      );
+      return;
+    }
+    setJoinError('');
     onChoose({ mode: 'cloud', code, label: cloudName.trim() || 'Scuola' });
   };
 
@@ -273,6 +282,9 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
                   Entra
                 </button>
               </div>
+              {joinError && (
+                <p className="text-xs text-rose-600">{joinError}</p>
+              )}
             </div>
           </section>
         </div>

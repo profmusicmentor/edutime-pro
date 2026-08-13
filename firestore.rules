@@ -1,0 +1,52 @@
+rules_version = '2';
+
+// Regole di sicurezza per il progetto Firebase di EduTime Pro.
+//
+// Modello: un documento per scuola dentro la collezione eduTimeApp_v6.
+// L'id del documento è il "codice scuola" e funziona come una password:
+// per questo le regole permettono di leggere un documento di cui si conosce
+// già l'id, ma vietano di elencare la collezione (niente enumerazione dei
+// codici altrui) e vietano la cancellazione.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /eduTimeApp_v6/{codiceScuola} {
+
+      // Lettura del singolo documento: serve conoscere il codice esatto.
+      allow get: if request.auth != null
+                 && codiceScuola.size() >= 12;
+
+      // Nessuna query sulla collezione: i codici non sono scopribili.
+      allow list: if false;
+
+      // Scrittura: solo i campi previsti dall'app.
+      allow create, update: if request.auth != null
+        && codiceScuola.size() >= 12
+        && request.resource.data.keys().hasOnly([
+             'timetable',
+             'teachers',
+             'sostegno',
+             'sectionsConfig',
+             'generationRules',
+             'generateOptions',
+             'strumento',
+             'diurnalHours',
+             'afternoonHours',
+             'cellNotes',
+             'groupConstraints',
+             'mixedClasses',
+             'lastUpdatedAt',
+             'lastUpdatedBy'
+           ]);
+
+      // I dati non si cancellano dall'app.
+      allow delete: if false;
+    }
+
+    // Tutto il resto del database è chiuso.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
