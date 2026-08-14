@@ -64,6 +64,28 @@ const DEFAULT_RULES: any = {
 };
 const DEFAULT_GEN_OPTIONS = { materie: true, sostegno: true, strumento: true };
 const DEFAULT_MIXED_CLASSES: any[] = [];
+const DEFAULT_SEDI: any[] = [{ id: 'sede-principale', name: 'Sede Principale' }];
+/**
+ * Le aule/laboratori di default sono risorse condivise da tutte le classi
+ * (assegnate per materia, non per sezione): non hanno una sede propria di
+ * default, altrimenti il loro sedeId fisso vincerebbe sempre sul fallback
+ * "sede della sezione" e il vincolo multi-plesso classico (sezioni intere
+ * in edifici diversi) non scatterebbe mai. Chi vuole un laboratorio con una
+ * sede fissa (es. un vero laboratorio DADA in un edificio specifico) la
+ * imposta esplicitamente dalla Gestione Aule/Laboratori.
+ */
+const DEFAULT_ROOMS: any[] = [
+  { id: 'aula', name: 'Aula', subjects: [] },
+  { id: 'palestra', name: 'Palestra', subjects: ['ED. FISICA'] },
+  { id: 'lab-musica', name: 'Lab. Musica', subjects: ['MUSICA'] },
+  { id: 'lab-tecnologia', name: 'Lab. Tecnologia', subjects: ['TECNOLOGIA'] },
+  { id: 'lab-arte', name: 'Lab. Arte', subjects: ['ARTE'] },
+  {
+    id: 'lab-scienze',
+    name: 'Lab. Scienze',
+    subjects: ['SCIENZE', 'MATEM. SCI.'],
+  },
+];
 
 const DEFAULT_TEACHERS: any[] = [
   {
@@ -758,6 +780,12 @@ const DEFAULT_STRUMENTO: any[] = [
 ];
 const DAYS = ['LUNEDÌ', 'MARTEDÌ', 'MERCOLEDÌ', 'GIOVEDÌ', 'VENERDÌ', 'SABATO'];
 const DAY_INITIALS = ['L', 'Ma', 'Me', 'G', 'V', 'S'];
+
+/** Da 'AAAA-MM-GG' all'indice giorno usato in `timetable` (0=Lunedì..5=Sabato, -1=Domenica). */
+const getDayIndexFromDate = (dateStr: string) => {
+  const jsDay = new Date(`${dateStr}T00:00:00`).getDay();
+  return jsDay === 0 ? -1 : jsDay - 1;
+};
 const INITIAL_DIURNAL_HOURS = [
   { index: 0, label: '1ª', time: '08:00 - 09:00' },
   { index: 1, label: '2ª', time: '09:00 - 10:00' },
@@ -781,13 +809,33 @@ const getMaxDaysOffForHours = (hours: number) => {
   return 3;
 };
 
-const getRoomForSubject = (subject: string) => {
-  if (subject === 'ED. FISICA') return 'Palestra';
-  if (subject === 'MUSICA') return 'Lab. Musica';
-  if (subject === 'TECNOLOGIA') return 'Lab. Tecnologia';
-  if (subject === 'ARTE') return 'Lab. Arte';
-  if (subject === 'SCIENZE' || subject === 'MATEM. SCI.') return 'Lab. Scienze';
-  return 'Aula';
+const getRoomForSubject = (subject: string, rooms: any[]) => {
+  const match = (rooms || []).find((r) =>
+    (r.subjects || []).includes(subject)
+  );
+  return match ? match.name : 'Aula';
+};
+
+const getRoomSede = (roomName: string, rooms: any[]) =>
+  (rooms || []).find((r) => r.name === roomName)?.sedeId;
+
+/**
+ * Sede di una lezione: priorità all'aula/laboratorio (copre il caso DADA,
+ * dove ogni laboratorio ha la sua sede), altrimenti eredita dalla sede
+ * configurata sulla sezione della classe (copre il multi-plesso classico,
+ * dove è la classe intera ad essere in un edificio diverso).
+ */
+const getSedeForSlot = (
+  slot: { room?: string; classId?: string },
+  rooms: any[],
+  classesList: any[],
+  sectionsCfg: any
+) => {
+  const roomSede = getRoomSede(slot.room || '', rooms);
+  if (roomSede) return roomSede;
+  const classObj = classesList.find((c) => c.id === slot.classId);
+  const section = classObj ? sectionsCfg[classObj.section] : null;
+  return section && typeof section === 'object' ? section.sedeId : undefined;
 };
 
 export default function App() {
@@ -801,6 +849,20 @@ export default function App() {
   const [teachers, setTeachers] = useState<any[]>(DEFAULT_TEACHERS);
   const [sostegno, setSostegno] = useState<any[]>(DEFAULT_SOSTEGNO);
   const [strumento, setStrumento] = useState<any[]>(DEFAULT_STRUMENTO);
+  const [rooms, setRooms] = useState<any[]>(DEFAULT_ROOMS);
+  const [sedi, setSedi] = useState<any[]>(DEFAULT_SEDI);
+  const [absences, setAbsences] = useState<any[]>([]);
+  const [substitutions, setSubstitutions] = useState<any[]>([]);
+  const [substitutionsDate, setSubstitutionsDate] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10)
+  );
+  const [newAbsenceType, setNewAbsenceType] = useState('assenza');
+  const [newAbsenceTeacherId, setNewAbsenceTeacherId] = useState('');
+  const [newAbsenceClassId, setNewAbsenceClassId] = useState('');
+  const [newAbsenceFromHour, setNewAbsenceFromHour] = useState('');
+  const [newAbsenceToHour, setNewAbsenceToHour] = useState('');
+  const [newAbsenceNote, setNewAbsenceNote] = useState('');
+  const [absenceFormError, setAbsenceFormError] = useState('');
   const [timetable, setTimetable] = useState<any[]>([]);
   const [cellNotes, setCellNotes] = useState<any>({});
   const [cattedreSubTab, setCattedreSubTab] = useState('diurne');
@@ -832,6 +894,9 @@ export default function App() {
   const [newTeacherType, setNewTeacherType] = useState('materia');
   const [newTeacherColor, setNewTeacherColor] = useState('#4f46e5');
   const [newSectionName, setNewSectionName] = useState('');
+  const [newRoomName, setNewRoomName] = useState('');
+  const [newRoomSubjects, setNewRoomSubjects] = useState('');
+  const [newSedeName, setNewSedeName] = useState('');
   const [editingCell, setEditingCell] = useState<any>(null);
   const [editingNoteCell, setEditingNoteCell] = useState<any>(null);
   const [noteText, setNoteText] = useState('');
@@ -914,6 +979,10 @@ export default function App() {
     cellNotes: {},
     groupConstraints: [],
     mixedClasses: DEFAULT_MIXED_CLASSES,
+    rooms: DEFAULT_ROOMS,
+    sedi: DEFAULT_SEDI,
+    absences: [],
+    substitutions: [],
     lastUpdatedAt: new Date().toISOString(),
   });
 
@@ -955,6 +1024,10 @@ export default function App() {
           if (data.afternoonHours) setAfternoonHours(data.afternoonHours);
           if (data.groupConstraints) setGroupConstraints(data.groupConstraints);
           if (data.mixedClasses) setMixedClasses(data.mixedClasses);
+          if (data.rooms) setRooms(data.rooms);
+          if (data.sedi) setSedi(data.sedi);
+          if (data.absences) setAbsences(data.absences);
+          if (data.substitutions) setSubstitutions(data.substitutions);
   };
 
   /** Riapre l'ultimo spazio di lavoro usato (o quello del link di invito). */
@@ -1023,7 +1096,11 @@ export default function App() {
     newGenOptions: any,
     newCellNotes: any,
     newGroupConstraints: any[],
-    newMixedClasses: any[]
+    newMixedClasses: any[],
+    newRooms?: any[],
+    newSedi?: any[],
+    newAbsences?: any[],
+    newSubstitutions?: any[]
   ) => {
     if (!workspace || isInitialLoad) return;
     await persistWorkspace(
@@ -1045,6 +1122,11 @@ export default function App() {
             : groupConstraints,
         mixedClasses:
           newMixedClasses !== undefined ? newMixedClasses : mixedClasses,
+        rooms: newRooms !== undefined ? newRooms : rooms,
+        sedi: newSedi !== undefined ? newSedi : sedi,
+        absences: newAbsences !== undefined ? newAbsences : absences,
+        substitutions:
+          newSubstitutions !== undefined ? newSubstitutions : substitutions,
         lastUpdatedAt: new Date().toISOString(),
       },
       setCloudStatus
@@ -1066,6 +1148,10 @@ export default function App() {
       cellNotes,
       groupConstraints,
       mixedClasses,
+      rooms,
+      sedi,
+      absences,
+      substitutions,
       lastUpdatedAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -1348,6 +1434,48 @@ export default function App() {
           });
         }
       }
+      if (
+        teacherId &&
+        room &&
+        (type === 'materia' || type === 'pomeriggio_musica')
+      ) {
+        const currentSede = getSedeForSlot(slot, rooms, classes, sectionsConfig);
+        if (currentSede) {
+          const nextSlot = timetable.find(
+            (s) =>
+              s.teacherId === teacherId &&
+              s.day === day &&
+              s.hour === hour + 1 &&
+              (s.type === 'materia' || s.type === 'pomeriggio_musica')
+          );
+          if (nextSlot) {
+            const nextSede = getSedeForSlot(
+              nextSlot,
+              rooms,
+              classes,
+              sectionsConfig
+            );
+            if (nextSede && nextSede !== currentSede) {
+              const sedeName = (id: string) =>
+                sedi.find((s) => s.id === id)?.name || id;
+              conflicts.push({
+                type: 'error',
+                message: `Il docente ${
+                  allStaff.find((t) => t.id === teacherId)?.name
+                } passa dalla sede "${sedeName(
+                  currentSede
+                )}" alla sede "${sedeName(
+                  nextSede
+                )}" il ${DAYS[day]} tra le ore ${
+                  mergedHoursMap[hour]?.label
+                } e ${mergedHoursMap[hour + 1]?.label}, senza un'ora di buco per lo spostamento.`,
+                suggestion: `Lascia un'ora libera tra le due lezioni in sedi diverse, oppure assegna un altro docente.`,
+                slot,
+              });
+            }
+          }
+        }
+      }
       if (type === 'sostegno' && teacherId) {
         const key = `${day}_${hour}`;
         if (!sostegnoSchedules[teacherId]) sostegnoSchedules[teacherId] = {};
@@ -1424,6 +1552,8 @@ export default function App() {
     staffHoursPlanned,
     staffHoursActual,
     groupConstraints,
+    rooms,
+    sedi,
   ]);
 
   const handleRemoveSlot = (slotToRemove: any) => {
@@ -1581,7 +1711,7 @@ export default function App() {
                   slot.teacherId === candidate.teacherId
               );
               if (dailyClassLessons.length >= 3) continue;
-              const currentRoom = getRoomForSubject(candidate.subject);
+              const currentRoom = getRoomForSubject(candidate.subject, rooms);
               const roomBusy = newTimetable.some(
                 (s) =>
                   s.room &&
@@ -1591,6 +1721,24 @@ export default function App() {
                   s.hour === hour
               );
               if (roomBusy) continue;
+              const currentSede = getSedeForSlot(
+                { room: currentRoom, classId: cls.id },
+                rooms,
+                classes,
+                sectionsConfig
+              );
+              if (currentSede) {
+                const spostamentoSenzaBuco = newTimetable.some(
+                  (s) =>
+                    s.teacherId === candidate.teacherId &&
+                    s.day === day &&
+                    (s.hour === hour - 1 || s.hour === hour + 1) &&
+                    getSedeForSlot(s, rooms, classes, sectionsConfig) &&
+                    getSedeForSlot(s, rooms, classes, sectionsConfig) !==
+                      currentSede
+                );
+                if (spostamentoSenzaBuco) continue;
+              }
               if (day > 0) {
                 const hoursYesterday = newTimetable.filter(
                   (s) =>
@@ -1684,7 +1832,7 @@ export default function App() {
                 teacherId: lesson.teacherId,
                 subject: lesson.subject,
                 type: 'materia',
-                room: getRoomForSubject(lesson.subject),
+                room: getRoomForSubject(lesson.subject, rooms),
               });
               report.materie.assigned++;
 
@@ -1951,7 +2099,7 @@ export default function App() {
         type = isModelloA && hour === 5 ? 'pomeriggio_musica' : 'materia';
         subject =
           teachers.find((t) => t.id === teacherId)?.subject || 'Lezione';
-        room = getRoomForSubject(subject);
+        room = getRoomForSubject(subject, rooms);
       }
       filtered.push({
         classId: newClassId,
@@ -2443,7 +2591,7 @@ export default function App() {
       const isModelloA =
         classObj && getSectionModel(classObj.section) === 'modelloA';
       type = isModelloA && hour === 5 ? 'pomeriggio_musica' : 'materia';
-      room = getRoomForSubject(tDoc?.subject || '');
+      room = getRoomForSubject(tDoc?.subject || '', rooms);
     } else if (type === 'sostegno') {
       room = 'Aula';
     } else {
@@ -2884,10 +3032,13 @@ export default function App() {
         : currentConfig.years;
     const oldModel =
       typeof currentConfig === 'string' ? currentConfig : currentConfig.model;
+    const oldSedeId =
+      typeof currentConfig === 'string' ? undefined : currentConfig.sedeId;
     const newConfig = { ...sectionsConfig };
     newConfig[secName] = {
       model: field === 'model' ? value : oldModel,
       years: field === 'years' ? value : oldYears,
+      sedeId: field === 'sedeId' ? value || undefined : oldSedeId,
     };
     if (field === 'years') {
       const removedYears = oldYears.filter((y: number) => !value.includes(y));
@@ -2956,6 +3107,378 @@ export default function App() {
       cellNotes,
       groupConstraints,
       mixedClasses
+    );
+  };
+
+  const pushRooms = (newRooms: any[]) => {
+    pushDataToCloud(
+      timetable,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses,
+      newRooms
+    );
+  };
+
+  const parseSubjects = (text: string) =>
+    text
+      .split(',')
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
+
+  const handleAddRoom = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (readOnlyMode) return;
+    const name = newRoomName.trim();
+    if (!name || rooms.some((r) => r.name === name)) return;
+    const newRooms = [
+      ...rooms,
+      { id: `room_${Date.now()}`, name, subjects: parseSubjects(newRoomSubjects) },
+    ];
+    setRooms(newRooms);
+    pushRooms(newRooms);
+    setNewRoomName('');
+    setNewRoomSubjects('');
+  };
+
+  const handleDeleteRoom = (id: string) => {
+    if (readOnlyMode) return;
+    const newRooms = rooms.filter((r) => r.id !== id);
+    setRooms(newRooms);
+    pushRooms(newRooms);
+  };
+
+  const handleRenameRoom = (id: string, newName: string) => {
+    if (readOnlyMode || !newName.trim()) return;
+    const newRooms = rooms.map((r) =>
+      r.id === id ? { ...r, name: newName.trim() } : r
+    );
+    setRooms(newRooms);
+    pushRooms(newRooms);
+  };
+
+  const handleUpdateRoomSubjects = (id: string, subjectsText: string) => {
+    if (readOnlyMode) return;
+    const newRooms = rooms.map((r) =>
+      r.id === id ? { ...r, subjects: parseSubjects(subjectsText) } : r
+    );
+    setRooms(newRooms);
+    pushRooms(newRooms);
+  };
+
+  const handleUpdateRoomSede = (roomId: string, sedeId: string) => {
+    if (readOnlyMode) return;
+    const newRooms = rooms.map((r) =>
+      r.id === roomId ? { ...r, sedeId: sedeId || undefined } : r
+    );
+    setRooms(newRooms);
+    pushRooms(newRooms);
+  };
+
+  const pushSedi = (newSedi: any[]) => {
+    pushDataToCloud(
+      timetable,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses,
+      rooms,
+      newSedi
+    );
+  };
+
+  const handleAddSede = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (readOnlyMode) return;
+    const name = newSedeName.trim();
+    if (!name || sedi.some((s) => s.name === name)) return;
+    const newSedi = [...sedi, { id: `sede_${Date.now()}`, name }];
+    setSedi(newSedi);
+    pushSedi(newSedi);
+    setNewSedeName('');
+  };
+
+  const handleDeleteSede = (id: string) => {
+    if (readOnlyMode) return;
+    const newSedi = sedi.filter((s) => s.id !== id);
+    const newRooms = rooms.map((r) =>
+      r.sedeId === id ? { ...r, sedeId: undefined } : r
+    );
+    const newSectionsConfig: any = {};
+    Object.entries(sectionsConfig).forEach(([sec, cfg]: any) => {
+      newSectionsConfig[sec] =
+        cfg && cfg.sedeId === id ? { ...cfg, sedeId: undefined } : cfg;
+    });
+    setSedi(newSedi);
+    setRooms(newRooms);
+    setSectionsConfig(newSectionsConfig);
+    pushDataToCloud(
+      timetable,
+      teachers,
+      sostegno,
+      newSectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses,
+      newRooms,
+      newSedi
+    );
+  };
+
+  const handleRenameSede = (id: string, newName: string) => {
+    if (readOnlyMode || !newName.trim()) return;
+    const newSedi = sedi.map((s) =>
+      s.id === id ? { ...s, name: newName.trim() } : s
+    );
+    setSedi(newSedi);
+    pushSedi(newSedi);
+  };
+
+  const pushAbsencesSubs = (newAbsences: any[], newSubstitutions: any[]) => {
+    pushDataToCloud(
+      timetable,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses,
+      rooms,
+      sedi,
+      newAbsences,
+      newSubstitutions
+    );
+  };
+
+  /**
+   * Per un'assenza di tipo assenza/permesso: le ore della cattedra del
+   * docente in quel giorno, con stato di copertura (sostegno già presente,
+   * già assegnato un sostituto, o da coprire) e candidati sostituti
+   * ordinati per priorità (1: insegna già in quella classe, 2: stessa
+   * materia dell'assente, 3: altri disponibili).
+   */
+  const getSubstitutionSuggestions = (absence: any) => {
+    if (absence.type !== 'assenza' && absence.type !== 'permesso') return [];
+    const day = getDayIndexFromDate(absence.date);
+    if (day < 0) return [];
+    const absentTeacher = teachers.find((t) => t.id === absence.teacherId);
+    const teacherLessons = timetable
+      .filter(
+        (s) =>
+          s.teacherId === absence.teacherId &&
+          s.day === day &&
+          (s.type === 'materia' || s.type === 'pomeriggio_musica') &&
+          (absence.fromHour === undefined || s.hour >= absence.fromHour) &&
+          (absence.toHour === undefined || s.hour <= absence.toHour)
+      )
+      .sort((a, b) => a.hour - b.hour);
+
+    return teacherLessons.map((lesson) => {
+      const existingSub = substitutions.find(
+        (sub) =>
+          sub.absenceId === absence.id &&
+          sub.day === day &&
+          sub.hour === lesson.hour
+      );
+      const coveredBySostegno = timetable.some(
+        (s) =>
+          s.type === 'sostegno' &&
+          s.classId === lesson.classId &&
+          s.day === day &&
+          s.hour === lesson.hour
+      );
+      let candidates: any[] = [];
+      if (!coveredBySostegno && !existingSub) {
+        const busyTeacherIds = new Set(
+          timetable
+            .filter((s) => s.day === day && s.hour === lesson.hour)
+            .map((s) => s.teacherId)
+        );
+        candidates = teachers
+          .filter(
+            (t) =>
+              t.id !== absence.teacherId &&
+              t.availableForPaidSubstitution &&
+              !(generationRules.teacherDaysOff[t.id] || []).includes(day) &&
+              !busyTeacherIds.has(t.id)
+          )
+          .map((t) => {
+            const teachesThisClass = (t.assignments || []).some(
+              (a: any) => a.classId === lesson.classId
+            );
+            const sameSubject = t.subject === absentTeacher?.subject;
+            const priority = teachesThisClass ? 0 : sameSubject ? 1 : 2;
+            return {
+              teacherId: t.id,
+              name: t.name,
+              subject: t.subject,
+              priority,
+            };
+          })
+          .sort((a, b) => a.priority - b.priority);
+      }
+      return {
+        day,
+        hour: lesson.hour,
+        classId: lesson.classId,
+        subject: lesson.subject,
+        coveredBySostegno,
+        existingSub,
+        candidates,
+      };
+    });
+  };
+
+  const paidSubstitutionHoursByTeacher = useMemo(() => {
+    const counts: any = {};
+    substitutions.forEach((s) => {
+      if (s.paid && s.teacherSubstitute) {
+        counts[s.teacherSubstitute] = (counts[s.teacherSubstitute] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [substitutions]);
+
+  const handleAddAbsence = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (readOnlyMode) return;
+    setAbsenceFormError('');
+    const isClassBased =
+      newAbsenceType === 'entrata_posticipata' ||
+      newAbsenceType === 'uscita_anticipata';
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (isClassBased && substitutionsDate <= todayStr) {
+      setAbsenceFormError(
+        "Entrata posticipata/uscita anticipata va decisa almeno il giorno prima: le famiglie vanno avvisate per tempo. Seleziona una data futura."
+      );
+      return;
+    }
+    if (isClassBased && !newAbsenceClassId) {
+      setAbsenceFormError('Seleziona la classe.');
+      return;
+    }
+    if (!isClassBased && !newAbsenceTeacherId) {
+      setAbsenceFormError('Seleziona il docente.');
+      return;
+    }
+    const newAbsence = {
+      id: `absence_${Date.now()}`,
+      date: substitutionsDate,
+      type: newAbsenceType,
+      teacherId: isClassBased ? undefined : newAbsenceTeacherId,
+      classId: isClassBased ? newAbsenceClassId : undefined,
+      fromHour:
+        newAbsenceFromHour === '' ? undefined : Number(newAbsenceFromHour),
+      toHour: newAbsenceToHour === '' ? undefined : Number(newAbsenceToHour),
+      note: newAbsenceNote.trim(),
+    };
+    const newAbsences = [...absences, newAbsence];
+    setAbsences(newAbsences);
+    pushAbsencesSubs(newAbsences, substitutions);
+    setNewAbsenceTeacherId('');
+    setNewAbsenceClassId('');
+    setNewAbsenceFromHour('');
+    setNewAbsenceToHour('');
+    setNewAbsenceNote('');
+  };
+
+  const handleDeleteAbsence = (id: string) => {
+    if (readOnlyMode) return;
+    const newAbsences = absences.filter((a) => a.id !== id);
+    const newSubstitutions = substitutions.filter((s) => s.absenceId !== id);
+    setAbsences(newAbsences);
+    setSubstitutions(newSubstitutions);
+    pushAbsencesSubs(newAbsences, newSubstitutions);
+  };
+
+  const handleConfirmSubstitution = (
+    absence: any,
+    hour: number,
+    classId: string,
+    subject: string,
+    method: string,
+    teacherSubstitute?: string
+  ) => {
+    if (readOnlyMode) return;
+    const day = getDayIndexFromDate(absence.date);
+    const newSub = {
+      id: `sub_${Date.now()}`,
+      absenceId: absence.id,
+      date: absence.date,
+      day,
+      hour,
+      classId,
+      subjectOriginal: subject,
+      teacherOriginal: absence.teacherId,
+      teacherSubstitute: teacherSubstitute || undefined,
+      method,
+      paid: method === 'docente_disponibile',
+    };
+    const newSubstitutions = [...substitutions, newSub];
+    setSubstitutions(newSubstitutions);
+    pushAbsencesSubs(absences, newSubstitutions);
+  };
+
+  const handleRemoveSubstitution = (id: string) => {
+    if (readOnlyMode) return;
+    const newSubstitutions = substitutions.filter((s) => s.id !== id);
+    setSubstitutions(newSubstitutions);
+    pushAbsencesSubs(absences, newSubstitutions);
+  };
+
+  const handleToggleAvailableForSubstitution = (teacherId: string) => {
+    if (readOnlyMode) return;
+    const newTeachers = teachers.map((t) =>
+      t.id === teacherId
+        ? {
+            ...t,
+            availableForPaidSubstitution: !t.availableForPaidSubstitution,
+          }
+        : t
+    );
+    setTeachers(newTeachers);
+    pushDataToCloud(
+      timetable,
+      newTeachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses,
+      rooms,
+      sedi,
+      absences,
+      substitutions
     );
   };
 
@@ -3787,6 +4310,21 @@ export default function App() {
               {validationResult.conflicts.length > 0 && (
                 <span className="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
                   {validationResult.conflicts.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('sostituzioni')}
+              className={`py-4 px-1 border-b-2 font-bold text-sm relative transition-all whitespace-nowrap ${
+                activeTab === 'sostituzioni'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-slate-500'
+              }`}
+            >
+              🩹 Sostituzioni
+              {absences.length > 0 && (
+                <span className="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                  {absences.length}
                 </span>
               )}
             </button>
@@ -5147,6 +5685,12 @@ export default function App() {
                         <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700">
                           Totale
                         </th>
+                        <th
+                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-amber-700"
+                          title="Disponibile per supplenze retribuite nell'ora buca"
+                        >
+                          🩹
+                        </th>
                         {classes.map((c) => (
                           <th
                             key={c.id}
@@ -5175,7 +5719,7 @@ export default function App() {
                               {isNewDept && (
                                 <tr>
                                   <td
-                                    colSpan={4 + classes.length}
+                                    colSpan={5 + classes.length}
                                     className="h-1 bg-slate-800 border-y-2 border-slate-800"
                                   ></td>
                                 </tr>
@@ -5210,6 +5754,20 @@ export default function App() {
                                 </td>
                                 <td className="p-2 w-20 border-r border-slate-200 text-center font-bold text-indigo-700 bg-indigo-50/30">
                                   {totalHoursAssigned}h
+                                </td>
+                                <td className="p-2 w-16 border-r border-slate-200 text-center bg-white">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!teacher.availableForPaidSubstitution}
+                                    onChange={() =>
+                                      handleToggleAvailableForSubstitution(
+                                        teacher.id
+                                      )
+                                    }
+                                    disabled={readOnlyMode}
+                                    className="w-5 h-5 text-amber-600 rounded focus:ring-amber-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Disponibile per supplenze retribuite nell'ora buca"
+                                  />
                                 </td>
                                 {classes.map((cls) => {
                                   const currentAssignment =
@@ -6049,6 +6607,26 @@ export default function App() {
                               Modello B (5 Giorni)
                             </option>
                           </select>
+                          <select
+                            value={config.sedeId || ''}
+                            onChange={(e) =>
+                              handleUpdateSection(
+                                section,
+                                'sedeId',
+                                e.target.value
+                              )
+                            }
+                            disabled={readOnlyMode || sedi.length === 0}
+                            title="Sede della sezione (per il vincolo di spostamento multi-sede)"
+                            className="text-xs bg-white border border-slate-300 rounded-lg py-1 px-2 w-full focus:ring-1 focus:ring-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <option value="">📍 — Nessuna sede —</option>
+                            {sedi.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                📍 {s.name}
+                              </option>
+                            ))}
+                          </select>
                           <div className="flex justify-center gap-4 mt-1 bg-white py-2 rounded-lg border border-slate-100">
                             {[1, 2, 3].map((yr) => (
                               <label
@@ -6081,6 +6659,190 @@ export default function App() {
                     }
                   )}
                 </div>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <h2 className="text-xl font-bold text-slate-800 mb-2">
+                📍 Gestione Sedi
+              </h2>
+              <p className="text-sm text-slate-500 mb-6">
+                Per scuole con più sedi. Assegna ogni aula/laboratorio a una
+                sede qui sotto: l'Auto-Generazione lascerà automaticamente
+                un'ora di buco quando un docente deve spostarsi tra sedi
+                diverse in ore consecutive dello stesso giorno.
+              </p>
+              <form
+                onSubmit={handleAddSede}
+                className="flex gap-2 mb-4"
+              >
+                <input
+                  type="text"
+                  placeholder="Nuova sede (es. Plesso Via Roma)"
+                  value={newSedeName}
+                  onChange={(e) => setNewSedeName(e.target.value)}
+                  disabled={readOnlyMode}
+                  className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                />
+                <button
+                  type="submit"
+                  disabled={readOnlyMode}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Aggiungi
+                </button>
+              </form>
+              <div className="flex flex-wrap gap-2">
+                {sedi.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5"
+                  >
+                    <span className="text-sm font-bold text-slate-700">
+                      {s.name}
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (readOnlyMode) return;
+                        const newName = window
+                          .prompt(`Nuovo nome per "${s.name}":`, s.name)
+                          ?.trim();
+                        if (newName && newName !== s.name)
+                          handleRenameSede(s.id, newName);
+                      }}
+                      disabled={readOnlyMode}
+                      className="text-xs text-indigo-500 hover:text-indigo-700 cursor-pointer disabled:opacity-50"
+                      title="Rinomina"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDeleteSede(s.id)}
+                      disabled={readOnlyMode}
+                      className="text-xs text-rose-400 hover:text-rose-600 cursor-pointer disabled:opacity-50"
+                      title="Elimina"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))}
+                {sedi.length === 0 && (
+                  <p className="text-xs text-slate-400 italic">
+                    Nessuna sede configurata: la scuola è considerata a sede
+                    unica, nessun vincolo di spostamento attivo.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <h2 className="text-xl font-bold text-slate-800 mb-2">
+                🏫 Gestione Aule/Laboratori
+              </h2>
+              <p className="text-sm text-slate-500 mb-6">
+                Aggiungi, rinomina o rimuovi aule e laboratori. Utile per la
+                didattica DADA: ogni laboratorio ha la sua materia collegata
+                (usata per assegnare l'aula di default) ed è controllato per
+                conflitti di prenotazione. "Aula" resta lo spazio generico, non
+                soggetto a conflitti.
+              </p>
+              <form
+                onSubmit={handleAddRoom}
+                className="flex flex-col sm:flex-row gap-2 mb-6"
+              >
+                <input
+                  type="text"
+                  placeholder="Nome (es. Lab. Informatica)"
+                  value={newRoomName}
+                  onChange={(e) => setNewRoomName(e.target.value)}
+                  disabled={readOnlyMode}
+                  className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                />
+                <input
+                  type="text"
+                  placeholder="Materie collegate (es. TECNOLOGIA)"
+                  value={newRoomSubjects}
+                  onChange={(e) => setNewRoomSubjects(e.target.value)}
+                  disabled={readOnlyMode}
+                  className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 uppercase focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                />
+                <button
+                  type="submit"
+                  disabled={readOnlyMode}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Aggiungi
+                </button>
+              </form>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {rooms.map((r) => (
+                  <div
+                    key={r.id}
+                    className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col gap-2 relative shadow-sm"
+                  >
+                    <button
+                      onClick={() => handleDeleteRoom(r.id)}
+                      disabled={readOnlyMode}
+                      className="absolute top-3 right-3 text-rose-400 hover:text-rose-600 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Elimina"
+                    >
+                      🗑️
+                    </button>
+                    <div className="flex items-center gap-2 pr-6">
+                      <span className="text-base font-black text-slate-700">
+                        {r.name}
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (readOnlyMode) return;
+                          const newName = window
+                            .prompt(`Nuovo nome per "${r.name}":`, r.name)
+                            ?.trim();
+                          if (newName && newName !== r.name)
+                            handleRenameRoom(r.id, newName);
+                        }}
+                        disabled={readOnlyMode}
+                        className="text-xs text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        ✏️
+                      </button>
+                    </div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Materie collegate
+                    </label>
+                    <input
+                      type="text"
+                      defaultValue={(r.subjects || []).join(', ')}
+                      onBlur={(e) =>
+                        handleUpdateRoomSubjects(r.id, e.target.value)
+                      }
+                      disabled={readOnlyMode}
+                      placeholder="es. MUSICA"
+                      className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white uppercase focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                    />
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">
+                      Sede
+                    </label>
+                    <select
+                      value={r.sedeId || ''}
+                      onChange={(e) =>
+                        handleUpdateRoomSede(r.id, e.target.value)
+                      }
+                      disabled={readOnlyMode || sedi.length === 0}
+                      className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                    >
+                      <option value="">— Nessuna sede —</option>
+                      {sedi.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+                {rooms.length === 0 && (
+                  <p className="text-xs text-slate-400 italic text-center col-span-full">
+                    Nessuna aula/laboratorio configurato.
+                  </p>
+                )}
               </div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
@@ -6285,6 +7047,389 @@ export default function App() {
             </div>
           </div>
         )}
+        {activeTab === 'sostituzioni' && (
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800 mb-2">
+                    🩹 Sostituzioni e Assenze
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    Segnala un'assenza per l'emergenza della mattina, o
+                    seleziona domani per pianificare in anticipo. I docenti
+                    disponibili per supplenze retribuite si segnano nel
+                    Registro Cattedre.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Data
+                  </label>
+                  <input
+                    type="date"
+                    value={substitutionsDate}
+                    onChange={(e) => setSubstitutionsDate(e.target.value)}
+                    className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <form
+                onSubmit={handleAddAbsence}
+                className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3 mb-6"
+              >
+                <div className="flex flex-wrap gap-3 items-end">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Tipo
+                    </label>
+                    <select
+                      value={newAbsenceType}
+                      onChange={(e) => setNewAbsenceType(e.target.value)}
+                      disabled={readOnlyMode}
+                      className="text-sm border border-slate-300 rounded-lg p-2 bg-white disabled:opacity-50"
+                    >
+                      <option value="assenza">Assenza</option>
+                      <option value="permesso">Permesso</option>
+                      <option value="entrata_posticipata">
+                        Entrata posticipata (classe)
+                      </option>
+                      <option value="uscita_anticipata">
+                        Uscita anticipata (classe)
+                      </option>
+                    </select>
+                  </div>
+                  {newAbsenceType === 'assenza' ||
+                  newAbsenceType === 'permesso' ? (
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Docente
+                      </label>
+                      <select
+                        value={newAbsenceTeacherId}
+                        onChange={(e) =>
+                          setNewAbsenceTeacherId(e.target.value)
+                        }
+                        disabled={readOnlyMode}
+                        className="text-sm border border-slate-300 rounded-lg p-2 bg-white disabled:opacity-50"
+                      >
+                        <option value="">— Seleziona —</option>
+                        {teachers.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Classe
+                      </label>
+                      <select
+                        value={newAbsenceClassId}
+                        onChange={(e) => setNewAbsenceClassId(e.target.value)}
+                        disabled={readOnlyMode}
+                        className="text-sm border border-slate-300 rounded-lg p-2 bg-white disabled:opacity-50"
+                      >
+                        <option value="">— Seleziona —</option>
+                        {classes.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.id}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Da ora
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="11"
+                      placeholder="tutta"
+                      value={newAbsenceFromHour}
+                      onChange={(e) => setNewAbsenceFromHour(e.target.value)}
+                      disabled={readOnlyMode}
+                      className="w-20 text-sm border border-slate-300 rounded-lg p-2 bg-white disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      A ora
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="11"
+                      placeholder="tutta"
+                      value={newAbsenceToHour}
+                      onChange={(e) => setNewAbsenceToHour(e.target.value)}
+                      disabled={readOnlyMode}
+                      className="w-20 text-sm border border-slate-300 rounded-lg p-2 bg-white disabled:opacity-50"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[150px]">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Nota
+                    </label>
+                    <input
+                      type="text"
+                      value={newAbsenceNote}
+                      onChange={(e) => setNewAbsenceNote(e.target.value)}
+                      disabled={readOnlyMode}
+                      className="w-full text-sm border border-slate-300 rounded-lg p-2 bg-white disabled:opacity-50"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={readOnlyMode}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Segnala
+                  </button>
+                </div>
+                {absenceFormError && (
+                  <p className="text-xs text-rose-600 font-semibold">
+                    {absenceFormError}
+                  </p>
+                )}
+              </form>
+
+              <div className="space-y-4">
+                {absences.filter((a) => a.date === substitutionsDate)
+                  .length === 0 && (
+                  <p className="text-sm text-slate-400 italic text-center py-6">
+                    Nessuna assenza segnalata per il {substitutionsDate}.
+                  </p>
+                )}
+                {absences
+                  .filter((a) => a.date === substitutionsDate)
+                  .map((absence) => {
+                    const isClassBased =
+                      absence.type === 'entrata_posticipata' ||
+                      absence.type === 'uscita_anticipata';
+                    const teacher = teachers.find(
+                      (t) => t.id === absence.teacherId
+                    );
+                    const suggestions = isClassBased
+                      ? []
+                      : getSubstitutionSuggestions(absence);
+                    return (
+                      <div
+                        key={absence.id}
+                        className="p-4 border border-slate-200 rounded-xl bg-white"
+                      >
+                        <div className="flex justify-between items-start gap-3">
+                          <div>
+                            <span className="font-bold text-sm text-slate-800">
+                              {isClassBased
+                                ? `Classe ${absence.classId}`
+                                : teacher?.name || absence.teacherId}
+                            </span>
+                            <span className="ml-2 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                              {absence.type.replace('_', ' ')}
+                            </span>
+                            {absence.note && (
+                              <p className="text-xs text-slate-500 mt-1">
+                                {absence.note}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleDeleteAbsence(absence.id)}
+                            disabled={readOnlyMode}
+                            className="shrink-0 text-rose-400 hover:text-rose-600 text-xs font-bold disabled:opacity-50"
+                          >
+                            🗑️ Rimuovi
+                          </button>
+                        </div>
+
+                        {isClassBased ? (
+                          <p className="text-xs text-slate-600 mt-3 bg-sky-50 border border-sky-100 rounded-lg p-2">
+                            Nessuna supplenza da cercare: la classe{' '}
+                            {absence.type === 'entrata_posticipata'
+                              ? 'entra più tardi'
+                              : 'esce prima'}
+                            {absence.fromHour !== undefined ||
+                            absence.toHour !== undefined
+                              ? ` (ore coinvolte: ${
+                                  (absence.fromHour ?? 0) + 1
+                                }ª–${(absence.toHour ?? 11) + 1}ª)`
+                              : ''}
+                            .
+                          </p>
+                        ) : (
+                          <div className="mt-3 space-y-2">
+                            {suggestions.length === 0 && (
+                              <p className="text-xs text-slate-400 italic">
+                                Nessuna lezione trovata per questo docente in
+                                questo giorno (controlla l'orario o le ore
+                                indicate).
+                              </p>
+                            )}
+                            {suggestions.map((s) => (
+                              <div
+                                key={s.hour}
+                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100"
+                              >
+                                <div className="text-xs">
+                                  <span className="font-bold">
+                                    {mergedHoursMap[s.hour]?.label ||
+                                      `${s.hour + 1}ª`}
+                                  </span>{' '}
+                                  — Classe {s.classId} ({s.subject})
+                                </div>
+                                {s.coveredBySostegno ? (
+                                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded">
+                                    ✅ Coperta da sostegno
+                                  </span>
+                                ) : s.existingSub ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded">
+                                      {s.existingSub.method ===
+                                      'docente_disponibile'
+                                        ? `Sostituto: ${
+                                            teachers.find(
+                                              (t) =>
+                                                t.id ===
+                                                s.existingSub.teacherSubstitute
+                                            )?.name ||
+                                            s.existingSub.teacherSubstitute
+                                          }`
+                                        : s.existingSub.method ===
+                                          'sorveglianza'
+                                        ? 'Sorveglianza collaboratori'
+                                        : 'Alunni divisi tra le classi'}
+                                    </span>
+                                    <button
+                                      onClick={() =>
+                                        handleRemoveSubstitution(
+                                          s.existingSub.id
+                                        )
+                                      }
+                                      disabled={readOnlyMode}
+                                      className="text-xs text-rose-500 hover:text-rose-700 disabled:opacity-50"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-wrap gap-1.5 items-center">
+                                    {s.candidates.length === 0 && (
+                                      <span className="text-xs text-slate-400 italic mr-2">
+                                        Nessun docente disponibile —
+                                      </span>
+                                    )}
+                                    {s.candidates
+                                      .slice(0, 4)
+                                      .map((c: any) => (
+                                        <button
+                                          key={c.teacherId}
+                                          onClick={() =>
+                                            handleConfirmSubstitution(
+                                              absence,
+                                              s.hour,
+                                              s.classId,
+                                              s.subject,
+                                              'docente_disponibile',
+                                              c.teacherId
+                                            )
+                                          }
+                                          disabled={readOnlyMode}
+                                          title={
+                                            c.priority === 0
+                                              ? 'Insegna già in questa classe'
+                                              : c.priority === 1
+                                              ? 'Stessa materia'
+                                              : 'Disponibile'
+                                          }
+                                          className={`text-xs font-bold px-2 py-1 rounded-lg border cursor-pointer disabled:opacity-50 ${
+                                            c.priority === 0
+                                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                              : c.priority === 1
+                                              ? 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100'
+                                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                                          }`}
+                                        >
+                                          {c.name}
+                                        </button>
+                                      ))}
+                                    <button
+                                      onClick={() =>
+                                        handleConfirmSubstitution(
+                                          absence,
+                                          s.hour,
+                                          s.classId,
+                                          s.subject,
+                                          'sorveglianza'
+                                        )
+                                      }
+                                      disabled={readOnlyMode}
+                                      className="text-xs font-bold px-2 py-1 rounded-lg border bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 cursor-pointer disabled:opacity-50"
+                                    >
+                                      Sorveglianza
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleConfirmSubstitution(
+                                          absence,
+                                          s.hour,
+                                          s.classId,
+                                          s.subject,
+                                          'divisione_alunni'
+                                        )
+                                      }
+                                      disabled={readOnlyMode}
+                                      className="text-xs font-bold px-2 py-1 rounded-lg border bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 cursor-pointer disabled:opacity-50"
+                                    >
+                                      Dividi alunni
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <h2 className="text-lg font-bold text-slate-800 mb-4">
+                💰 Ore di supplenza retribuita per docente
+              </h2>
+              {Object.keys(paidSubstitutionHoursByTeacher).length === 0 ? (
+                <p className="text-xs text-slate-400 italic">
+                  Nessuna supplenza retribuita registrata finora.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {Object.entries(paidSubstitutionHoursByTeacher).map(
+                    ([tid, count]: any) => (
+                      <div
+                        key={tid}
+                        className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-center"
+                      >
+                        <div className="text-xs font-bold text-slate-700">
+                          {teachers.find((t) => t.id === tid)?.name || tid}
+                        </div>
+                        <div className="text-lg font-black text-indigo-600">
+                          {count}h
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
       {editingCell && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
@@ -6418,12 +7563,11 @@ export default function App() {
                   onChange={(e) => setTempRoom(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
                 >
-                  <option value="Aula">Aula Normale</option>
-                  <option value="Palestra">Palestra</option>
-                  <option value="Lab. Musica">Lab. Musica</option>
-                  <option value="Lab. Tecnologia">Lab. Tecnologia</option>
-                  <option value="Lab. Arte">Lab. Arte</option>
-                  <option value="Lab. Scienze">Lab. Scienze</option>
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.name}>
+                      {r.id === 'aula' ? 'Aula Normale' : r.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="pt-3 border-t border-slate-100 flex gap-2">
