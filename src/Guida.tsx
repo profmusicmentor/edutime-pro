@@ -812,7 +812,16 @@ const chapters: Chapter[] = [
         tag: 'sviluppo',
         body: (
           <>
-            EduTime Pro l'ho sviluppata io, <B>Walter Vitale</B>, insegnante e
+            EduTime Pro l'ho sviluppata io,{' '}
+            <a
+              href="https://www.facebook.com/profile.php?id=61556761432429"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-700 underline hover:text-indigo-900"
+            >
+              <B>Walter Vitale</B>
+            </a>
+            , insegnante e
             non un'azienda, usando Claude Code come assistente di sviluppo.
             Altri miei progetti su{' '}
             <a
