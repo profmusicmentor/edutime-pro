@@ -810,7 +810,22 @@ const chapters: Chapter[] = [
       {
         title: "Chi ha creato l'app",
         tag: 'sviluppo',
-        body: "EduTime Pro è stato sviluppato da un insegnante, non da un'azienda, usando Claude Code come assistente di sviluppo.",
+        body: (
+          <>
+            EduTime Pro l'ho sviluppata io, <B>Walter Vitale</B>, insegnante e
+            non un'azienda, usando Claude Code come assistente di sviluppo.
+            Altri miei progetti su{' '}
+            <a
+              href="https://biscottodigitale.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-700 underline hover:text-indigo-900"
+            >
+              biscottodigitale.com
+            </a>
+            .
+          </>
+        ),
       },
       {
         title: 'Dove vivono i dati',
