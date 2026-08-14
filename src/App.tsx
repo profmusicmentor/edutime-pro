@@ -8132,7 +8132,17 @@ export default function App() {
         </div>
       )}
       <footer className="bg-slate-100 border-t border-slate-200 py-3 px-6 text-center text-xs text-slate-500 mt-auto print:hidden shrink-0">
-        EduTime Pro • Gestione dell'orario scolastico •{' '}
+        EduTime Pro • Gestione dell'orario scolastico • Creata da Walter
+        Vitale •{' '}
+        <a
+          href="https://biscottodigitale.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-slate-700"
+        >
+          biscottodigitale.com
+        </a>{' '}
+        •{' '}
         <a href="/guida" className="underline hover:text-slate-700">
           Guida all'uso
         </a>{' '}
