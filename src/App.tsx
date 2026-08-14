@@ -3986,6 +3986,167 @@ export default function App() {
     }
   };
 
+  /** Foglio giornaliero di predisposizione supplenze, A4 orizzontale, stampabile/salvabile in PDF. */
+  const handlePrintSostituzioni = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      setPrintAlertOpen(true);
+      return;
+    }
+    const day = getDayIndexFromDate(substitutionsDate);
+    const [yyyy, mm, dd] = substitutionsDate.split('-');
+    const dateLabel =
+      day >= 0
+        ? `${DAYS[day]} ${dd}.${mm}.${yyyy.slice(2)}`
+        : substitutionsDate;
+    const schoolYearStart =
+      Number(mm) >= 9 ? Number(yyyy) : Number(yyyy) - 1;
+    const schoolYear = `${schoolYearStart}/${schoolYearStart + 1}`;
+
+    const dayAbsences = absences.filter((a) => a.date === substitutionsDate);
+    const teacherAbsences = dayAbsences.filter(
+      (a) => a.type === 'assenza' || a.type === 'permesso'
+    );
+    const classAbsences = dayAbsences.filter(
+      (a) =>
+        a.type === 'entrata_posticipata' || a.type === 'uscita_anticipata'
+    );
+    const daySubs = substitutions.filter(
+      (s) => s.date === substitutionsDate
+    );
+
+    const css = `@page { size: A4 landscape; margin: 8mm; } * { box-sizing: border-box; } body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; color: #111827; font-size: 8pt; } h1 { text-align: center; font-size: 13pt; margin: 0 0 1mm 0; color: #1e3a8a; } h2 { text-align: center; font-size: 10pt; margin: 0 0 4mm 0; text-decoration: underline; } h3 { font-size: 8.5pt; text-transform: uppercase; background: #1e3a8a; color: white; margin: 4mm 0 0 0; padding: 1.5mm 2mm; } table { width: 100%; border-collapse: collapse; margin-bottom: 2mm; } th, td { border: 0.5pt solid #64748b; padding: 1.5pt 2pt; text-align: center; vertical-align: middle; font-size: 7.5pt; } th { background: #e5e7eb; font-weight: bold; } td.name-cell { text-align: left; font-weight: bold; padding-left: 2mm; } td.motivo-cell, td.note-cell { text-align: left; font-size: 7pt; } td.empty-row { font-style: italic; color: #6b7280; text-align: left; padding-left: 2mm; } .legend { font-size: 7pt; margin-top: 2mm; color: #374151; }`;
+
+    let html = `<html><head><title>Foglio Supplenze ${escapeXml(
+      dateLabel
+    )}</title><style>${css}</style></head><body>`;
+    html += `<h1>PREDISPOSIZIONE GIORNALIERA SUPPLENZE DOCENTI — A.S. ${schoolYear}</h1>`;
+    html += `<h2>${escapeXml(dateLabel)}</h2>`;
+
+    html += `<h3>Titolari assenti (Ass.) o in permesso (P.B.)</h3>`;
+    html += `<table><thead><tr><th style="width:18pt;">#</th><th style="width:110pt;">Docente</th>`;
+    diurnalHours.forEach(
+      (dh) =>
+        (html += `<th>${escapeXml(dh.label)}<br/><span style="font-weight:normal;font-size:6pt;">${escapeXml(
+          dh.time
+        )}</span></th>`)
+    );
+    html += `<th style="width:70pt;">Motivo</th><th style="width:90pt;">Note</th></tr></thead><tbody>`;
+    if (teacherAbsences.length === 0) {
+      html += `<tr><td class="empty-row" colspan="${
+        3 + diurnalHours.length
+      }">Nessuna assenza segnalata per questa data.</td></tr>`;
+    }
+    teacherAbsences.forEach((absence, idx) => {
+      const teacher = teachers.find((t) => t.id === absence.teacherId);
+      const lessons = getSubstitutionSuggestions(absence);
+      html += `<tr><td>${idx + 1}</td><td class="name-cell">${escapeXml(
+        teacher?.name || absence.teacherId
+      )}</td>`;
+      diurnalHours.forEach((dh) => {
+        const l = lessons.find((x: any) => x.hour === dh.index);
+        html += `<td>${l ? escapeXml(l.classId) : ''}</td>`;
+      });
+      html += `<td class="motivo-cell">${
+        absence.type === 'assenza' ? 'Assenza' : 'Permesso'
+      }</td><td class="note-cell">${escapeXml(absence.note || '')}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+
+    html += `<h3>Supplenti (D = retribuita) / Sorveglianza / Alunni divisi</h3>`;
+    html += `<table><thead><tr><th style="width:18pt;">#</th><th style="width:110pt;">Docente supplente / Modalità</th>`;
+    diurnalHours.forEach(
+      (dh) => (html += `<th>${escapeXml(dh.label)}</th>`)
+    );
+    html += `<th style="width:120pt;">Note</th></tr></thead><tbody>`;
+
+    const subsByTeacher: Record<string, any[]> = {};
+    const sorveglianzaSubs: any[] = [];
+    const divisioneSubs: any[] = [];
+    daySubs.forEach((s) => {
+      if (s.method === 'docente_disponibile' && s.teacherSubstitute) {
+        if (!subsByTeacher[s.teacherSubstitute])
+          subsByTeacher[s.teacherSubstitute] = [];
+        subsByTeacher[s.teacherSubstitute].push(s);
+      } else if (s.method === 'sorveglianza') sorveglianzaSubs.push(s);
+      else if (s.method === 'divisione_alunni') divisioneSubs.push(s);
+    });
+
+    let rowIdx = 0;
+    Object.entries(subsByTeacher).forEach(([tid, subs]) => {
+      rowIdx++;
+      const teacher = teachers.find((t) => t.id === tid);
+      html += `<tr><td>${rowIdx}</td><td class="name-cell">${escapeXml(
+        teacher?.name || tid
+      )}</td>`;
+      diurnalHours.forEach((dh) => {
+        const s = subs.find((x: any) => x.hour === dh.index);
+        html += `<td>${s ? escapeXml(`${s.classId} (D)`) : ''}</td>`;
+      });
+      html += `<td class="note-cell"></td></tr>`;
+    });
+    if (sorveglianzaSubs.length > 0) {
+      rowIdx++;
+      html += `<tr><td>${rowIdx}</td><td class="name-cell">Collaboratori scolastici</td>`;
+      diurnalHours.forEach((dh) => {
+        const s = sorveglianzaSubs.find((x: any) => x.hour === dh.index);
+        html += `<td>${s ? escapeXml(s.classId) : ''}</td>`;
+      });
+      html += `<td class="note-cell">Sorveglianza</td></tr>`;
+    }
+    if (divisioneSubs.length > 0) {
+      rowIdx++;
+      html += `<tr><td>${rowIdx}</td><td class="name-cell">Alunni divisi tra le classi</td>`;
+      diurnalHours.forEach((dh) => {
+        const s = divisioneSubs.find((x: any) => x.hour === dh.index);
+        html += `<td>${s ? escapeXml(s.classId) : ''}</td>`;
+      });
+      html += `<td class="note-cell"></td></tr>`;
+    }
+    if (rowIdx === 0) {
+      html += `<tr><td class="empty-row" colspan="${
+        3 + diurnalHours.length
+      }">Nessuna sostituzione assegnata per questa data.</td></tr>`;
+    }
+    html += `</tbody></table>`;
+
+    html += `<h3>Comunicazione alle classi su entrate/uscite in orario diverso</h3>`;
+    html += `<table><thead><tr><th style="width:250pt;">Classe</th><th style="width:150pt;">Ore coinvolte</th><th>Note</th></tr></thead><tbody>`;
+    if (classAbsences.length === 0) {
+      html += `<tr><td class="empty-row" colspan="3">Nessuna comunicazione per questa data.</td></tr>`;
+    }
+    classAbsences.forEach((absence) => {
+      const action =
+        absence.type === 'entrata_posticipata'
+          ? 'ENTRA più tardi'
+          : 'ESCE prima';
+      const hoursLabel =
+        absence.fromHour !== undefined || absence.toHour !== undefined
+          ? `${(absence.fromHour ?? 0) + 1}ª – ${
+              (absence.toHour ?? diurnalHours.length - 1) + 1
+            }ª`
+          : 'Tutta la giornata';
+      html += `<tr><td class="name-cell">Classe ${escapeXml(
+        absence.classId
+      )} — ${escapeXml(action)}</td><td>${escapeXml(
+        hoursLabel
+      )}</td><td class="note-cell">${escapeXml(absence.note || '')}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+
+    html += `<p class="legend">Legenda: (D) supplenza retribuita nell'ora buca del docente disponibile. — Foglio generato da EduTime Pro il ${new Date().toLocaleDateString(
+      'it-IT'
+    )}.</p>`;
+    html += `</body></html>`;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    const script = printWindow.document.createElement('script');
+    script.innerHTML =
+      'window.onload = function() { window.print(); }';
+    printWindow.document.body.appendChild(script);
+  };
+
   if (!workspace) {
     return (
       <WorkspaceGate
@@ -7062,16 +7223,25 @@ export default function App() {
                     Registro Cattedre.
                   </p>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
-                    Data
-                  </label>
-                  <input
-                    type="date"
-                    value={substitutionsDate}
-                    onChange={(e) => setSubstitutionsDate(e.target.value)}
-                    className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500"
-                  />
+                <div className="flex items-end gap-2">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Data
+                    </label>
+                    <input
+                      type="date"
+                      value={substitutionsDate}
+                      onChange={(e) => setSubstitutionsDate(e.target.value)}
+                      className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <button
+                    onClick={handlePrintSostituzioni}
+                    className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                    title="Stampa o salva in PDF il foglio supplenze del giorno selezionato"
+                  >
+                    🖨️ Stampa foglio
+                  </button>
                 </div>
               </div>
 
