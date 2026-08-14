@@ -48,6 +48,13 @@ const getDeptColor = (subject: string) =>
   DEPARTMENT_COLORS[subject] || '#f1f5f9';
 const DAY_OFF_COLOR = '#fee2e2';
 
+/**
+ * Anni di corso che una sezione può contenere. Arriva fino al quinto per la
+ * scuola primaria: la secondaria di primo grado usa solo i primi tre e le
+ * sezioni già configurate restano com'erano.
+ */
+const SELECTABLE_YEARS = [1, 2, 3, 4, 5];
+
 const DEFAULT_SECTIONS_CONFIG: any = {
   A: { model: 'modelloA', years: [1, 2, 3] },
   B: { model: 'modelloA', years: [1, 2, 3] },
@@ -6818,8 +6825,8 @@ export default function App() {
                               </option>
                             ))}
                           </select>
-                          <div className="flex justify-center gap-4 mt-1 bg-white py-2 rounded-lg border border-slate-100">
-                            {[1, 2, 3].map((yr) => (
+                          <div className="flex justify-center gap-3 mt-1 bg-white py-2 rounded-lg border border-slate-100">
+                            {SELECTABLE_YEARS.map((yr) => (
                               <label
                                 key={yr}
                                 className="flex items-center gap-1.5 text-xs font-bold text-slate-600 cursor-pointer"
