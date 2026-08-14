@@ -299,9 +299,28 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
       </main>
 
       <footer className="bg-slate-100 border-t border-slate-200 py-4 px-6 text-center text-xs text-slate-500">
-        EduTime Pro • Gestione dell'orario scolastico •{' '}
+        EduTime Pro • Gestione dell'orario scolastico • Creata da Walter
+        Vitale •{' '}
+        <a
+          href="https://biscottodigitale.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-slate-700"
+        >
+          biscottodigitale.com
+        </a>{' '}
+        •{' '}
         <a href="/guida" className="underline hover:text-slate-700">
           Guida all'uso
+        </a>{' '}
+        •{' '}
+        <a
+          href="https://paypal.me/delfino0087"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-slate-700"
+        >
+          💛 Offrimi un caffè
         </a>
       </footer>
     </div>
