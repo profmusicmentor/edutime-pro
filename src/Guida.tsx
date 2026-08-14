@@ -796,6 +796,65 @@ const chapters: Chapter[] = [
       },
     ],
   },
+  {
+    id: 'trasparenza',
+    num: '12',
+    title: 'Trasparenza e privacy',
+    intro: (
+      <>
+        Chi sviluppa l'app, dove vivono i dati e come sono protetti, e cosa fa
+        davvero l'algoritmo di generazione: tutto spiegato in chiaro.
+      </>
+    ),
+    cards: [
+      {
+        title: "Chi ha creato l'app",
+        tag: 'sviluppo',
+        body: "EduTime Pro è stato sviluppato da un insegnante, non da un'azienda, usando Claude Code come assistente di sviluppo.",
+      },
+      {
+        title: 'Dove vivono i dati',
+        tag: 'hosting',
+        body: (
+          <>
+            Il frontend (l'app che stai usando) è ospitato su <B>Vercel</B>. Il
+            database — solo per chi sceglie la modalità condivisa — è{' '}
+            <B>Firebase / Google Cloud Firestore</B>. In modalità locale non
+            viene contattato nessun server.
+          </>
+        ),
+      },
+      {
+        title: 'Come sono protetti i dati',
+        tag: 'sicurezza',
+        body: "Le regole di sicurezza di Firestore permettono di leggere solo il documento di cui si conosce il codice scuola: non esiste un accesso libero al database, nessuno può sfogliare gli orari di scuole altrui.",
+      },
+      {
+        title: 'Nessuna registrazione',
+        tag: 'account',
+        body: "Non c'è creazione di account, non viene chiesta nessuna email né altri dati per usare l'app, in nessuna delle due modalità.",
+      },
+      {
+        title: 'Nomi e ruoli: etichette, non identità',
+        tag: 'dati inseriti',
+        body: "I nominativi che si inseriscono (docenti, classi) sono etichette libere scelte da chi usa l'app, non identità verificate. Restano visibili solo a chi conosce il codice scuola.",
+      },
+      {
+        title: "Non è intelligenza artificiale generativa",
+        tag: 'algoritmo',
+        body: (
+          <>
+            La generazione automatica non usa IA generativa: è un{' '}
+            <B>algoritmo euristico a regole/vincoli</B>. Assegna le ore
+            rispettando i paletti impostati (giorni liberi dei docenti, ore
+            massime al giorno, cattedre su più classi, laboratori) e segnala in
+            tempo reale sovrapposizioni e conflitti. Le celle già buone si
+            possono bloccare (🔒) e far rigenerare solo il resto.
+          </>
+        ),
+      },
+    ],
+  },
 ];
 
 const steps: { title: string; body: ReactNode }[] = [
