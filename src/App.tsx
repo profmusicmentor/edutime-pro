@@ -881,6 +881,14 @@ export default function App() {
   const [showWorkspacePanel, setShowWorkspacePanel] = useState(false);
   const [restoreError, setRestoreError] = useState('');
   const restoreInputRef = useRef<HTMLInputElement | null>(null);
+  /**
+   * Codice dello spazio di lavoro per cui sono già stati creati i dati
+   * iniziali. Serve a non riprovare all'infinito: se il salvataggio del
+   * primo documento fallisce (regole di sicurezza, rete), il cloud continua
+   * a segnalare "documento assente" e senza questa guardia l'app rientrerebbe
+   * in un ciclo di scrittura che azzera lo schermo di continuo.
+   */
+  const seededCodeRef = useRef<string | null>(null);
   const [viewType, setViewType] = useState('class');
   const [selectedClass, setSelectedClass] = useState('1A');
   const [selectedTeacherId, setSelectedTeacherId] = useState('t1');
@@ -1042,6 +1050,23 @@ export default function App() {
     if (stored) setWorkspace(stored);
   }, [invitedCode]);
 
+  /**
+   * Salva i dati iniziali di uno spazio di lavoro appena creato.
+   * Se il salvataggio fallisce riprova al massimo due volte, poi si ferma
+   * lasciando il badge su "errore": meglio un avviso che un ciclo infinito.
+   */
+  const seedWorkspace = (ws: Workspace, initial: any, attempt = 0) => {
+    persistWorkspace(ws, initial, (status) => {
+      setCloudStatus(status);
+      if (status === 'errore' && attempt < 2) {
+        window.setTimeout(
+          () => seedWorkspace(ws, initial, attempt + 1),
+          1500 * (attempt + 1)
+        );
+      }
+    });
+  };
+
   /** Ascolta i dati dello spazio di lavoro attivo. */
   useEffect(() => {
     if (!workspace) return;
@@ -1052,10 +1077,15 @@ export default function App() {
         setIsInitialLoad(false);
       },
       onEmpty: () => {
+        if (seededCodeRef.current === workspace.code) {
+          setIsInitialLoad(false);
+          return;
+        }
+        seededCodeRef.current = workspace.code;
         const initial = buildInitialData();
         applyData(initial);
         setIsInitialLoad(false);
-        persistWorkspace(workspace, initial, setCloudStatus);
+        seedWorkspace(workspace, initial);
       },
       onStatus: setCloudStatus,
     });

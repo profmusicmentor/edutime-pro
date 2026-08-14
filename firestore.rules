@@ -36,6 +36,10 @@ service cloud.firestore {
              'cellNotes',
              'groupConstraints',
              'mixedClasses',
+             'rooms',
+             'sedi',
+             'absences',
+             'substitutions',
              'lastUpdatedAt',
              'lastUpdatedBy'
            ]);
