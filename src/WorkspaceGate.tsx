@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import {
   buildCode,
+  codeFromInviteText,
+  looksLikeUrl,
   MIN_CODE_LENGTH,
   normalizeCode,
   shareUrl,
@@ -36,7 +38,24 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
     );
   };
 
+  /**
+   * Capita che al posto del nome della scuola venga incollato il link di
+   * invito ricevuto da un collega: in quel caso creare un orario nuovo è
+   * quasi sempre l'opposto di quello che serve, quindi si propone di
+   * entrare in quello esistente.
+   */
+  const cloudNameIsLink = looksLikeUrl(cloudName);
+  const cloudNameCode = codeFromInviteText(cloudName);
+  const joinCodeFromLink = codeFromInviteText(joinCode);
+  const effectiveJoinCode = joinCodeFromLink || normalizeCode(joinCode);
+
+  const openSharedWorkspace = (code: string) => {
+    setJoinError('');
+    onChoose({ mode: 'cloud', code, label: 'Scuola condivisa' });
+  };
+
   const createCloud = () => {
+    if (cloudNameIsLink) return;
     const code = buildCode(cloudName || 'scuola');
     setCreatedCode(code);
   };
@@ -51,7 +70,7 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
   };
 
   const joinCloud = () => {
-    const code = normalizeCode(joinCode);
+    const code = effectiveJoinCode;
     if (!code) return;
     if (code.length < MIN_CODE_LENGTH) {
       setJoinError(
@@ -254,9 +273,34 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
                     className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-normal"
                   />
                 </label>
+                {cloudNameIsLink && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex flex-col gap-2 text-sm text-amber-900">
+                    <p>
+                      Questo sembra un <strong>link di invito</strong>, non il
+                      nome di una scuola. Se te l'ha mandato un collega non
+                      creare un orario nuovo: entra in quello che esiste già,
+                      altrimenti vi ritrovate con due orari separati.
+                    </p>
+                    {cloudNameCode ? (
+                      <button
+                        onClick={() => openSharedWorkspace(cloudNameCode)}
+                        className="self-start bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-lg"
+                      >
+                        Entra nell'orario di questo link →
+                      </button>
+                    ) : (
+                      <p>
+                        Nel link non c'è nessun codice scuola: fattelo ripetere
+                        dal collega e incollalo qui sotto, in «Oppure entra con
+                        un codice esistente».
+                      </p>
+                    )}
+                  </div>
+                )}
                 <button
                   onClick={createCloud}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-lg"
+                  disabled={cloudNameIsLink}
+                  className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-lg"
                 >
                   Crea un nuovo orario condiviso
                 </button>
@@ -276,12 +320,18 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
                 />
                 <button
                   onClick={joinCloud}
-                  disabled={!normalizeCode(joinCode)}
+                  disabled={!effectiveJoinCode}
                   className="bg-slate-800 hover:bg-slate-900 disabled:opacity-40 text-white font-semibold py-2 px-4 rounded-lg text-sm"
                 >
                   Entra
                 </button>
               </div>
+              {joinCodeFromLink && (
+                <p className="text-xs text-slate-600">
+                  Hai incollato un link di invito: userò il codice{' '}
+                  <code className="font-mono">{joinCodeFromLink}</code>.
+                </p>
+              )}
               {joinError && (
                 <p className="text-xs text-rose-600">{joinError}</p>
               )}

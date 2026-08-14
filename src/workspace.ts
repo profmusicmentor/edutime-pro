@@ -114,6 +114,28 @@ export const codeFromUrl = (): string | null => {
   }
 };
 
+/**
+ * Estrae il codice scuola da un link di invito incollato per intero
+ * (es. https://edutimepro.vercel.app/?scuola=ic-pascoli-ab12-cd34).
+ * Restituisce null se nel testo non c'è un codice utilizzabile.
+ */
+export const codeFromInviteText = (raw: string): string | null => {
+  const match = raw.match(/[?&]scuola=([^&\s]+)/i);
+  if (!match) return null;
+  let value = match[1];
+  try {
+    value = decodeURIComponent(value);
+  } catch {
+    /* valore già leggibile così com'è */
+  }
+  const code = normalizeCode(value);
+  return code.length >= MIN_CODE_LENGTH ? code : null;
+};
+
+/** Vero se il testo sembra un indirizzo web invece che il nome di una scuola. */
+export const looksLikeUrl = (raw: string): boolean =>
+  /https?:\/\/|www\.|\.app\b|\.com\b|\.it\b|[?&]scuola=/i.test(raw.trim());
+
 export const shareUrl = (code: string) =>
   `${window.location.origin}${window.location.pathname}?scuola=${encodeURIComponent(code)}`;
 
