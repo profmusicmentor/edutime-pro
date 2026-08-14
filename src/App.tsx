@@ -8135,6 +8135,15 @@ export default function App() {
         EduTime Pro • Gestione dell'orario scolastico •{' '}
         <a href="/guida" className="underline hover:text-slate-700">
           Guida all'uso
+        </a>{' '}
+        •{' '}
+        <a
+          href="https://paypal.me/delfino0087"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-slate-700"
+        >
+          💛 Offrimi un caffè
         </a>
       </footer>
     </div>

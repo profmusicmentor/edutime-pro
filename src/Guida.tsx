@@ -832,7 +832,16 @@ const chapters: Chapter[] = [
             >
               biscottodigitale.com
             </a>
-            .
+            . L'app resta gratuita: se ti è utile e vuoi offrirmi un caffè,{' '}
+            <a
+              href="https://paypal.me/delfino0087"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-700 underline hover:text-indigo-900"
+            >
+              💛 puoi farlo qui
+            </a>
+            , senza nessun obbligo.
           </>
         ),
       },
