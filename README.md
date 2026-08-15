@@ -4,8 +4,11 @@ App web per costruire l'orario scolastico di un istituto (anche con indirizzo
 musicale): cattedre, generazione automatica, controllo dei conflitti, stampa A3
 ed export Excel. Interfaccia in italiano, nessuna registrazione richiesta.
 
-- App: `/`
-- Guida all'uso: `/guida`
+- App online: <https://edutimepro.vercel.app>
+- Guida all'uso: <https://edutimepro.vercel.app/guida>
+
+![La schermata iniziale di EduTime Pro: scelta fra lavorare solo sul proprio
+computer o collaborare online](docs/schermata-iniziale.png)
 
 ## Come funziona il salvataggio
 
