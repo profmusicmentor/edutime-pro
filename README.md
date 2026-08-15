@@ -7,12 +7,21 @@ ed export Excel. Interfaccia in italiano, nessuna registrazione richiesta.
 - App online: <https://edutimepro.vercel.app>
 - Guida all'uso: <https://edutimepro.vercel.app/guida>
 
-![La schermata iniziale di EduTime Pro: scelta fra lavorare solo sul proprio
-computer o collaborare online](docs/schermata-iniziale.png)
+![L'orario generale di EduTime Pro: una riga per docente, le sei ore di ogni
+giorno della settimana, le classi assegnate in evidenza e i giorni liberi
+tratteggiati](docs/orario-generato.png)
+
+L'orario qui sopra è quello prodotto dal pulsante **Auto-Genera Orario** sui
+dati di esempio, in pochi secondi: ogni riga è un docente, ogni colonna un'ora
+di lezione, le celle tratteggiate sono i giorni liberi richiesti e il contatore
+dei conflitti in alto segnala quello che resta da sistemare a mano.
 
 ## Come funziona il salvataggio
 
 Alla prima apertura l'utente sceglie uno **spazio di lavoro**:
+
+![La schermata iniziale di EduTime Pro: la scelta fra lavorare solo sul proprio
+computer e collaborare online con un codice scuola](docs/schermata-iniziale.png)
 
 | Modalità | Dove finiscono i dati | Quando usarla |
 | --- | --- | --- |
