@@ -793,6 +793,19 @@ const getDayIndexFromDate = (dateStr: string) => {
   const jsDay = new Date(`${dateStr}T00:00:00`).getDay();
   return jsDay === 0 ? -1 : jsDay - 1;
 };
+/**
+ * Durata di un'ora della griglia quando non è specificata. Le ore create
+ * prima di questa funzione non hanno il campo `duration`: valgono 60 minuti,
+ * così i conteggi restano identici a prima per le scuole già avviate.
+ */
+const HOUR_DEFAULT_MINUTES = 60;
+/** Durate selezionabili: l'ora piena e la mezz'ora della scuola primaria. */
+const HOUR_DURATION_OPTIONS = [60, 30];
+
+/** Ore in cifra leggibile: 20 resta "20", 20.5 diventa "20,5". */
+const formatHours = (value: number) =>
+  Number.isInteger(value) ? String(value) : value.toFixed(1).replace('.', ',');
+
 const INITIAL_DIURNAL_HOURS = [
   { index: 0, label: '1ª', time: '08:00 - 09:00' },
   { index: 1, label: '2ª', time: '09:00 - 10:00' },
@@ -965,6 +978,14 @@ export default function App() {
     });
     return map;
   }, [diurnalHours, afternoonHours]);
+
+  /**
+   * Quanto vale un'ora della griglia in ore di servizio: un'ora piena vale 1,
+   * una mezz'ora vale 0,5. Serve alle scuole (primaria) che hanno una lezione
+   * da 30 minuti al giorno: due mezze ore fanno un'ora sola di servizio.
+   */
+  const hourWeight = (index: number) =>
+    (mergedHoursMap[index]?.duration ?? HOUR_DEFAULT_MINUTES) / 60;
 
   const getSectionModel = (sec: string) => {
     if (!sectionsConfig) return 'modelloB';
@@ -1351,10 +1372,13 @@ export default function App() {
     });
     timetable.forEach((slot) => {
       if (slot.teacherId && hours[slot.teacherId] !== undefined)
-        hours[slot.teacherId]++;
+        hours[slot.teacherId] += hourWeight(slot.hour);
+    });
+    Object.keys(hours).forEach((id) => {
+      hours[id] = Math.round(hours[id] * 100) / 100;
     });
     return hours;
-  }, [allStaff, timetable]);
+  }, [allStaff, timetable, mergedHoursMap]);
 
   const validationResult = useMemo(() => {
     const conflicts: any[] = [];
@@ -1373,10 +1397,14 @@ export default function App() {
       if (actual > planned) {
         conflicts.push({
           type: 'error',
-          message: `Il docente ${staff.name} ha ${actual} ore in orario ma ne sono state assegnate solo ${planned}.`,
-          suggestion: `Rimuovi ${
+          message: `Il docente ${staff.name} ha ${formatHours(
+            actual
+          )} ore in orario ma ne sono state assegnate solo ${formatHours(
+            planned
+          )}.`,
+          suggestion: `Rimuovi ${formatHours(
             actual - planned
-          } ora/e dalla tabella Orario Generale oppure aggiungi ore nel Registro Cattedre.`,
+          )} ora/e dalla tabella Orario Generale oppure aggiungi ore nel Registro Cattedre.`,
           teacherId: staff.id,
         });
       }
@@ -1436,7 +1464,8 @@ export default function App() {
         (model === 'modelloA' && hour < 5) ||
         (model === 'modelloB' && hour < 6);
       if (type === 'materia' && isDiurnalClassHour)
-        classHourCounts[classId] = (classHourCounts[classId] || 0) + 1;
+        classHourCounts[classId] =
+          (classHourCounts[classId] || 0) + hourWeight(hour);
       if (type === 'materia' && teacherId) {
         const tcdKey = `${teacherId}_${classId}_${day}`;
         teacherDailyClassCounts[tcdKey] =
@@ -1575,7 +1604,9 @@ export default function App() {
       if (hrs !== 30 && hrs > 0)
         conflicts.push({
           type: 'warning',
-          message: `La classe ${c.id} ha assegnate ${hrs}/30 ore curricolari.`,
+          message: `La classe ${c.id} ha assegnate ${formatHours(
+            hrs
+          )}/30 ore curricolari.`,
         });
     });
     return { conflicts, classHourCounts };
@@ -2451,7 +2482,7 @@ export default function App() {
   const handleHourLabelChange = (
     index: number,
     field: string,
-    value: string,
+    value: string | number,
     isDiurnal = true
   ) => {
     if (readOnlyMode) return;
@@ -7094,9 +7125,35 @@ export default function App() {
                           placeholder="Fascia"
                           className="text-xs border border-slate-300 rounded p-1.5 bg-white flex-1 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                         />
+                        <select
+                          value={dh.duration ?? HOUR_DEFAULT_MINUTES}
+                          onChange={(e) =>
+                            handleHourLabelChange(
+                              dh.index,
+                              'duration',
+                              Number(e.target.value),
+                              true
+                            )
+                          }
+                          disabled={readOnlyMode}
+                          title="Durata della lezione. La mezz'ora conta 0,5 nel totale delle ore."
+                          className="text-xs border border-slate-300 rounded p-1.5 bg-white w-20 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 cursor-pointer"
+                        >
+                          {HOUR_DURATION_OPTIONS.map((m) => (
+                            <option key={m} value={m}>
+                              {m} min
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     ))}
                   </div>
+                  <p className="text-xs text-slate-500">
+                    La durata serve solo a chi ha lezioni più corte (per
+                    esempio la primaria, con una lezione da 30 minuti al
+                    giorno): due mezze ore contano come un'ora sola nel totale
+                    del docente. Lasciando 60 minuti non cambia nulla.
+                  </p>
                 </div>
                 <div className="space-y-4">
                   <h3 className="text-base font-bold text-purple-700 flex items-center gap-1.5">
@@ -7141,6 +7198,26 @@ export default function App() {
                           placeholder="Fascia"
                           className="text-xs border border-slate-300 rounded p-1.5 bg-white flex-1 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                         />
+                        <select
+                          value={ah.duration ?? HOUR_DEFAULT_MINUTES}
+                          onChange={(e) =>
+                            handleHourLabelChange(
+                              ah.index,
+                              'duration',
+                              Number(e.target.value),
+                              false
+                            )
+                          }
+                          disabled={readOnlyMode}
+                          title="Durata della lezione. La mezz'ora conta 0,5 nel totale delle ore."
+                          className="text-xs border border-slate-300 rounded p-1.5 bg-white w-20 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 cursor-pointer"
+                        >
+                          {HOUR_DURATION_OPTIONS.map((m) => (
+                            <option key={m} value={m}>
+                              {m} min
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     ))}
                   </div>
