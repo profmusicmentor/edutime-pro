@@ -48,24 +48,18 @@ VITE_FIREBASE_APP_ID
 Sono chiavi pubbliche lato client: la protezione dei dati dipende dalle regole
 di sicurezza Firestore del progetto, non dalla loro segretezza.
 
-### Regole Firestore consigliate
+### Regole Firestore
 
-Le regole attuali del progetto permettono lettura e scrittura anonima su tutta
-la base dati. Per limitare l'accesso alla sola collezione dell'app:
+Le regole in vigore sono quelle del file [`firestore.rules`](firestore.rules) di
+questo repository, ed è il file da pubblicare anche su un proprio progetto
+Firebase. In sintesi:
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /eduTimeApp_v6/{scuola} {
-      allow read, write: if request.auth != null;
-    }
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-```
+- `get` su un singolo documento solo conoscendone il codice scuola esatto, lungo
+  almeno 12 caratteri;
+- `list` sulla collezione vietato, quindi i codici altrui non sono scopribili;
+- `create` e `update` limitati ai soli campi previsti dall'app;
+- `delete` vietato: i dati non si cancellano dall'app;
+- tutto il resto del database chiuso in lettura e scrittura.
 
 Resta il fatto che chiunque conosca un codice scuola può leggere e modificare
 quel documento: il codice è l'unica barriera.
@@ -78,3 +72,22 @@ quel documento: il codice è l'unica barriera.
   cloud (Firebase caricato con import dinamico).
 - `src/WorkspaceGate.tsx` — schermata iniziale di scelta.
 - `src/Guida.tsx` — guida all'uso servita su `/guida`.
+
+## Licenza
+
+Copyright (C) 2026 Walter Vitale.
+
+EduTime Pro è software libero rilasciato sotto la **GNU Affero General Public
+License versione 3** (o, a scelta, una versione successiva). Il testo completo è
+nel file [`LICENSE`](LICENSE).
+
+In pratica: l'app si può usare, studiare, modificare e ridistribuire
+liberamente, ma chi ne mette online una versione modificata — anche solo come
+servizio, senza distribuire il programma — deve rendere disponibile il codice
+sorgente delle proprie modifiche con la stessa licenza.
+
+Il nome «EduTime Pro» non è coperto dalla licenza del codice: una versione
+derivata va pubblicata con un nome diverso.
+
+Per un uso che la AGPL non consente, si può chiedere una licenza commerciale
+separata all'autore.
