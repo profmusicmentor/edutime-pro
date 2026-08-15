@@ -365,6 +365,15 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
         </a>{' '}
         •{' '}
         <a
+          href="https://github.com/profmusicmentor/edutime-pro"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-slate-700"
+        >
+          Codice sorgente (AGPL-3.0)
+        </a>{' '}
+        •{' '}
+        <a
           href="https://paypal.me/delfino0087"
           target="_blank"
           rel="noopener noreferrer"

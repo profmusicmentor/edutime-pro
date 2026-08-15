@@ -1314,7 +1314,15 @@ export default function Guida() {
       </main>
 
       <footer className="bg-slate-100 border-t border-slate-200 py-6 px-6 text-center text-xs text-slate-500">
-        Guida a EduTime Pro · Manuale d'uso per l'orario scolastico
+        Guida a EduTime Pro · Manuale d'uso per l'orario scolastico ·{' '}
+        <a
+          href="https://github.com/profmusicmentor/edutime-pro"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-slate-700"
+        >
+          Codice sorgente (AGPL-3.0)
+        </a>
       </footer>
     </div>
   );
