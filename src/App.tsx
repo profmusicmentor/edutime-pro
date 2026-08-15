@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import WorkspaceGate from './WorkspaceGate';
 import {
+  buildXlsx,
+  type XlsxCell,
+  type XlsxRow,
+  type XlsxSheet,
+  type XlsxStyle,
+} from './xlsxWriter';
+import {
   codeFromUrl,
   forgetWorkspace,
   persistWorkspace,
@@ -3674,171 +3681,212 @@ export default function App() {
     );
   };
 
-  const handleExportExcelColor = () => {
-    const headerColor = '#1E3A8A';
-    const subHeaderColor = '#E5E7EB';
-    const activeColor = '#DBEAFE';
-    const activeTextColor = '#1E3A8A';
-    const borderColor = '#64748B';
-    const pmColumnsCount = 3 + 5 * afternoonHours.length;
-    const diurnalColumnsCount = 3 + DAYS.length * diurnalHours.length;
-    let deptStylesXml = '';
+  /** Stili condivisi dai due fogli dell'export Excel. */
+  const buildExcelStyles = (): Record<string, XlsxStyle> => {
+    const styles: Record<string, XlsxStyle> = {
+      Title: { bold: true, size: 14, color: '#1E3A8A', align: 'left' },
+      Header: {
+        bold: true,
+        color: '#FFFFFF',
+        fill: '#1E3A8A',
+        align: 'center',
+        wrap: true,
+        border: true,
+      },
+      SubHeader: {
+        bold: true,
+        size: 9,
+        color: '#374151',
+        fill: '#E5E7EB',
+        align: 'center',
+        border: true,
+      },
+      HoursCell: {
+        bold: true,
+        color: '#1E3A8A',
+        fill: '#F0F4FF',
+        align: 'center',
+        border: true,
+      },
+      ClassList: {
+        bold: true,
+        size: 9,
+        color: '#4F46E5',
+        fill: '#EEF2F6',
+        align: 'left',
+        wrap: true,
+        border: true,
+      },
+      ActiveLesson: {
+        bold: true,
+        color: '#1E3A8A',
+        fill: '#DBEAFE',
+        align: 'center',
+        border: true,
+      },
+      EmptySlot: { fill: '#FAFAFA', align: 'center', border: true },
+      DayOffSlot: {
+        bold: true,
+        italic: true,
+        size: 9,
+        color: '#991B1B',
+        fill: DAY_OFF_COLOR,
+        align: 'center',
+        border: true,
+      },
+      DeptSeparator: { fill: '#1E3A8A' },
+    };
     Object.entries(DEPARTMENT_COLORS).forEach(([dept, color]) => {
-      const safeId = dept.replace(/[^A-Za-z0-9]/g, '_');
-      deptStylesXml += `<Style ss:ID="Dept_${safeId}"><Font ss:FontName="Segoe UI" ss:Bold="1" ss:Size="10" ss:Color="#111827"/><Interior ss:Color="${color}" ss:Pattern="Solid"/><Alignment ss:Horizontal="Left" ss:Vertical="Center" ss:WrapText="1"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/></Borders></Style>\n`;
+      styles[`Dept_${dept.replace(/[^A-Za-z0-9]/g, '_')}`] = {
+        bold: true,
+        color: '#111827',
+        fill: color,
+        align: 'left',
+        wrap: true,
+        border: true,
+      };
     });
-    let xml = `<?xml version="1.0"?>\n<?mso-application progid="Excel.Sheet"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:html="http://www.w3.org/TR/REC-html40">\n<DocumentProperties xmlns="urn:schemas-microsoft-com:office:office"><Author>EduTime Pro</Author><Created>${new Date().toISOString()}</Created></DocumentProperties>\n<Styles>\n<Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center" ss:WrapText="1"/><Borders/><Font ss:FontName="Segoe UI" ss:Size="10" ss:Color="#1F2937"/><Interior/><NumberFormat/><Protection/></Style>\n<Style ss:ID="TitleStyle"><Font ss:FontName="Segoe UI" ss:Bold="1" ss:Size="14" ss:Color="#1E3A8A"/><Alignment ss:Horizontal="Left" ss:Vertical="Center"/></Style>\n<Style ss:ID="Header"><Font ss:FontName="Segoe UI" ss:Bold="1" ss:Color="#FFFFFF" ss:Size="10"/><Interior ss:Color="${headerColor}" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/></Borders></Style>\n<Style ss:ID="SubHeader"><Font ss:FontName="Segoe UI" ss:Bold="1" ss:Color="#374151" ss:Size="9"/><Interior ss:Color="${subHeaderColor}" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/></Borders></Style>\n<Style ss:ID="HoursCell"><Font ss:FontName="Segoe UI" ss:Bold="1" ss:Color="${activeTextColor}" ss:Size="10"/><Interior ss:Color="#F0F4FF" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/></Borders></Style>\n<Style ss:ID="ClassList"><Font ss:FontName="Segoe UI" ss:Bold="1" ss:Color="#4F46E5" ss:Size="9"/><Interior ss:Color="#EEF2F6" ss:Pattern="Solid"/><Alignment ss:Horizontal="Left" ss:Vertical="Center" ss:WrapText="1"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/></Borders></Style>\n<Style ss:ID="ActiveLesson"><Font ss:FontName="Segoe UI" ss:Bold="1" ss:Color="${activeTextColor}" ss:Size="10"/><Interior ss:Color="${activeColor}" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/></Borders></Style>\n<Style ss:ID="EmptySlot"><Interior ss:Color="#FAFAFA" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/></Borders></Style>\n<Style ss:ID="DayOffSlot"><Font ss:FontName="Segoe UI" ss:Bold="1" ss:Italic="1" ss:Color="#991B1B" ss:Size="9"/><Interior ss:Color="${DAY_OFF_COLOR}" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="${borderColor}"/></Borders></Style>\n<Style ss:ID="DeptSeparator"><Interior ss:Color="#1E3A8A" ss:Pattern="Solid"/><Borders/></Style>\n${deptStylesXml}\n</Styles>\n`;
-    xml += `  <Worksheet ss:Name="Orario Diurno">\n<Table ss:ExpandedColumnCount="${diurnalColumnsCount}" ss:DefaultRowHeight="30">\n<Column ss:Width="150"/>\n<Column ss:Width="40"/>\n<Column ss:Width="140"/>\n`;
-    for (let c = 0; c < DAYS.length * diurnalHours.length; c++)
-      xml += `    <Column ss:Width="55"/>\n`;
-    xml += `    <Row ss:Height="28">\n<Cell ss:MergeAcross="${
-      diurnalColumnsCount - 1
-    }" ss:StyleID="TitleStyle"><Data ss:Type="String">📋 ORARIO SCOLASTICO DIURNO</Data></Cell>\n</Row>\n`;
-    xml += `    <Row ss:Height="22">\n<Cell ss:StyleID="Header"><Data ss:Type="String">☀️ Orario Mattutino - Tutti i Docenti</Data></Cell>\n</Row>\n`;
-    xml += `    <Row ss:Height="26">\n<Cell ss:StyleID="Header" ss:MergeDown="1"><Data ss:Type="String">Docente</Data></Cell>\n<Cell ss:StyleID="Header" ss:MergeDown="1"><Data ss:Type="String">Ore</Data></Cell>\n<Cell ss:StyleID="Header" ss:MergeDown="1"><Data ss:Type="String">Classi Assegnate</Data></Cell>\n`;
-    DAYS.forEach(
-      (day) =>
-        (xml += `     <Cell ss:MergeAcross="${
-          diurnalHours.length - 1
-        }" ss:StyleID="Header"><Data ss:Type="String">${escapeXml(
-          day
-        )}</Data></Cell>\n`)
-    );
-    xml += `    </Row>\n<Row ss:Height="20">\n`;
-    DAYS.forEach(() =>
-      diurnalHours.forEach(
-        (dh) =>
-          (xml += `     <Cell ss:StyleID="SubHeader"><Data ss:Type="String">${escapeXml(
-            dh.label.split(' ')[0]
-          )}</Data></Cell>\n`)
-      )
-    );
-    xml += `    </Row>\n`;
+    return styles;
+  };
+
+  /**
+   * Costruisce un foglio dell'export: intestazioni, una riga per docente e
+   * una cella per ogni ora di ogni giorno.
+   */
+  const buildExcelSheet = (
+    name: string,
+    title: string,
+    subtitle: string,
+    thirdColumnHeader: string,
+    days: string[],
+    hours: any[],
+    staffList: any[]
+  ): XlsxSheet => {
+    const totalColumns = 3 + days.length * hours.length;
+    const rows: XlsxRow[] = [];
+
+    rows.push({
+      heightPx: 28,
+      cells: [{ value: title, style: 'Title', mergeAcross: totalColumns - 1 }],
+    });
+    rows.push({ heightPx: 22, cells: [{ value: subtitle, style: 'Header' }] });
+    // L'intestazione di ogni giorno copre tutte le sue ore, quindi va messa
+    // nella colonna in cui quel giorno comincia: le posizioni intermedie
+    // restano vuote perché sono assorbite dall'unione delle celle.
+    const dayHeaderCells: (XlsxCell | null)[] = [
+      { value: 'Docente', style: 'Header', mergeDown: 1 },
+      { value: 'Ore', style: 'Header', mergeDown: 1 },
+      { value: thirdColumnHeader, style: 'Header', mergeDown: 1 },
+    ];
+    days.forEach((day, dIdx) => {
+      dayHeaderCells[3 + dIdx * hours.length] = {
+        value: day,
+        style: 'Header',
+        mergeAcross: hours.length - 1,
+      };
+    });
+    rows.push({ heightPx: 26, cells: dayHeaderCells });
+    rows.push({
+      heightPx: 20,
+      cells: [
+        null,
+        null,
+        null,
+        ...days.flatMap(() =>
+          hours.map((h) => ({
+            value: h.label.split(' ')[0],
+            style: 'SubHeader',
+          }))
+        ),
+      ],
+    });
+
     let prevSubject = '';
-    filteredStaff.forEach((staff, idx) => {
-      if (staff.staffType === 'strumento') return;
-      const safeDeptId = staff.subject.replace(/[^A-Za-z0-9]/g, '_');
-      const deptStyle = `Dept_${safeDeptId}`;
-      const isNewDept = staff.subject !== prevSubject && idx > 0;
+    staffList.forEach((staff, idx) => {
+      const deptStyle = `Dept_${staff.subject.replace(/[^A-Za-z0-9]/g, '_')}`;
+      if (staff.subject !== prevSubject && idx > 0)
+        rows.push({
+          heightPx: 4,
+          cells: [{ style: 'DeptSeparator', mergeAcross: totalColumns - 1 }],
+        });
       prevSubject = staff.subject;
-      if (isNewDept)
-        xml += `    <Row ss:Height="4"><Cell ss:MergeAcross="${
-          diurnalColumnsCount - 1
-        }" ss:StyleID="DeptSeparator"><Data ss:Type="String"></Data></Cell></Row>\n`;
-      xml += `    <Row ss:Height="38">\n<Cell ss:StyleID="${deptStyle}"><Data ss:Type="String">${escapeXml(
-        staff.name
-      )}\n[${escapeXml(
-        staff.subject
-      )}]</Data></Cell>\n<Cell ss:StyleID="HoursCell"><Data ss:Type="String">${
-        staffHoursPlanned[staff.id]
-      }h</Data></Cell>\n<Cell ss:StyleID="ClassList"><Data ss:Type="String">${escapeXml(
-        staffClassSummary[staff.id]
-      )}</Data></Cell>\n`;
-      DAYS.forEach((_, dIdx) => {
+
+      const cells: (XlsxCell | null)[] = [
+        { value: `${staff.name}\n[${staff.subject}]`, style: deptStyle },
+        { value: `${staffHoursPlanned[staff.id]}h`, style: 'HoursCell' },
+        { value: staffClassSummary[staff.id], style: 'ClassList' },
+      ];
+      days.forEach((_, dIdx) => {
         const isDayOff = (
           generationRules.teacherDaysOff[staff.id] || []
         ).includes(dIdx);
-        diurnalHours.forEach((dh) => {
-          if (isDayOff)
-            xml += `     <Cell ss:StyleID="DayOffSlot"><Data ss:Type="String">LIBERO</Data></Cell>\n`;
-          else {
-            const occupied = timetable.find(
-              (slot) =>
-                slot.teacherId === staff.id &&
-                slot.day === dIdx &&
-                slot.hour === dh.index
-            );
-            xml += occupied
-              ? `     <Cell ss:StyleID="ActiveLesson"><Data ss:Type="String">${escapeXml(
-                  occupied.classId
-                )}</Data></Cell>\n`
-              : `     <Cell ss:StyleID="EmptySlot"><Data ss:Type="String">-</Data></Cell>\n`;
+        hours.forEach((h) => {
+          if (isDayOff) {
+            cells.push({ value: 'LIBERO', style: 'DayOffSlot' });
+            return;
           }
+          const occupied = timetable.find(
+            (slot) =>
+              slot.teacherId === staff.id &&
+              slot.day === dIdx &&
+              slot.hour === h.index
+          );
+          cells.push(
+            occupied
+              ? { value: occupied.classId, style: 'ActiveLesson' }
+              : { value: '-', style: 'EmptySlot' }
+          );
         });
       });
-      xml += `    </Row>\n`;
+      rows.push({ heightPx: 38, cells });
     });
-    xml += `   </Table>\n</Worksheet>\n`;
-    xml += `  <Worksheet ss:Name="Orario Pomeridiano">\n<Table ss:ExpandedColumnCount="${pmColumnsCount}" ss:DefaultRowHeight="30">\n<Column ss:Width="150"/>\n<Column ss:Width="40"/>\n<Column ss:Width="140"/>\n`;
-    for (let c = 0; c < 5 * afternoonHours.length; c++)
-      xml += `    <Column ss:Width="55"/>\n`;
-    xml += `    <Row ss:Height="28">\n<Cell ss:MergeAcross="${
-      pmColumnsCount - 1
-    }" ss:StyleID="TitleStyle"><Data ss:Type="String">🎵 ORARIO POMERIDIANO - INDIRIZZO MUSICALE</Data></Cell>\n</Row>\n`;
-    xml += `    <Row ss:Height="22">\n<Cell ss:StyleID="Header"><Data ss:Type="String">Strumenti Musicali</Data></Cell>\n</Row>\n`;
-    xml += `    <Row ss:Height="26">\n<Cell ss:StyleID="Header" ss:MergeDown="1"><Data ss:Type="String">Docente</Data></Cell>\n<Cell ss:StyleID="Header" ss:MergeDown="1"><Data ss:Type="String">Ore</Data></Cell>\n<Cell ss:StyleID="Header" ss:MergeDown="1"><Data ss:Type="String">Strumento</Data></Cell>\n`;
-    DAYS.slice(0, 5).forEach(
-      (day) =>
-        (xml += `     <Cell ss:MergeAcross="${
-          afternoonHours.length - 1
-        }" ss:StyleID="Header"><Data ss:Type="String">${escapeXml(
-          day
-        )}</Data></Cell>\n`)
-    );
-    xml += `    </Row>\n<Row ss:Height="20">\n`;
-    DAYS.slice(0, 5).forEach(() =>
-      afternoonHours.forEach(
-        (ah) =>
-          (xml += `     <Cell ss:StyleID="SubHeader"><Data ss:Type="String">${escapeXml(
-            ah.label.split(' ')[0]
-          )}</Data></Cell>\n`)
-      )
-    );
-    xml += `    </Row>\n`;
-    let prevSubjPM = '';
-    filteredInstrumentStaff.forEach((staff, idx) => {
-      const safeDeptId = staff.subject.replace(/[^A-Za-z0-9]/g, '_');
-      const deptStyle = `Dept_${safeDeptId}`;
-      const isNewDept = staff.subject !== prevSubjPM && idx > 0;
-      prevSubjPM = staff.subject;
-      if (isNewDept)
-        xml += `    <Row ss:Height="4"><Cell ss:MergeAcross="${
-          pmColumnsCount - 1
-        }" ss:StyleID="DeptSeparator"><Data ss:Type="String"></Data></Cell></Row>\n`;
-      xml += `    <Row ss:Height="38">\n<Cell ss:StyleID="${deptStyle}"><Data ss:Type="String">${escapeXml(
-        staff.name
-      )}\n[${escapeXml(
-        staff.subject
-      )}]</Data></Cell>\n<Cell ss:StyleID="HoursCell"><Data ss:Type="String">${
-        staffHoursPlanned[staff.id]
-      }h</Data></Cell>\n<Cell ss:StyleID="ClassList"><Data ss:Type="String">${escapeXml(
-        staffClassSummary[staff.id]
-      )}</Data></Cell>\n`;
-      DAYS.slice(0, 5).forEach((_, dIdx) => {
-        const isDayOff = (
-          generationRules.teacherDaysOff[staff.id] || []
-        ).includes(dIdx);
-        afternoonHours.forEach((ah) => {
-          if (isDayOff)
-            xml += `     <Cell ss:StyleID="DayOffSlot"><Data ss:Type="String">LIBERO</Data></Cell>\n`;
-          else {
-            const occupied = timetable.find(
-              (slot) =>
-                slot.teacherId === staff.id &&
-                slot.day === dIdx &&
-                slot.hour === ah.index
-            );
-            xml += occupied
-              ? `     <Cell ss:StyleID="ActiveLesson"><Data ss:Type="String">${escapeXml(
-                  occupied.classId
-                )}</Data></Cell>\n`
-              : `     <Cell ss:StyleID="EmptySlot"><Data ss:Type="String">-</Data></Cell>\n`;
-          }
-        });
-      });
-      xml += `    </Row>\n`;
-    });
-    xml += `   </Table>\n</Worksheet>\n</Workbook>`;
-    const blob = new Blob([xml], {
-      type: 'application/vnd.ms-excel;charset=utf-8',
+
+    return {
+      name,
+      colWidthsPx: [
+        150,
+        40,
+        140,
+        ...Array(days.length * hours.length).fill(55),
+      ],
+      rows,
+    };
+  };
+
+  const handleExportExcel = () => {
+    const sheets: XlsxSheet[] = [
+      buildExcelSheet(
+        'Orario Diurno',
+        '📋 ORARIO SCOLASTICO DIURNO',
+        '☀️ Orario Mattutino - Tutti i Docenti',
+        'Classi Assegnate',
+        DAYS,
+        diurnalHours,
+        filteredStaff.filter((s) => s.staffType !== 'strumento')
+      ),
+      buildExcelSheet(
+        'Orario Pomeridiano',
+        '🎵 ORARIO POMERIDIANO - INDIRIZZO MUSICALE',
+        'Strumenti Musicali',
+        'Strumento',
+        DAYS.slice(0, 5),
+        afternoonHours,
+        filteredInstrumentStaff
+      ),
+    ];
+
+    const data = buildXlsx(sheets, buildExcelStyles());
+    const blob = new Blob([data as BlobPart], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `orario_scolastico.xls`);
+    link.setAttribute('download', 'orario_scolastico.xlsx');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handlePrintBypass = (
@@ -4482,7 +4530,7 @@ export default function App() {
               Stampa A3 📄
             </button>
             <button
-              onClick={handleExportExcelColor}
+              onClick={handleExportExcel}
               className="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors shadow-xs text-sm cursor-pointer"
             >
               <svg
