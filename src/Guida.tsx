@@ -552,10 +552,21 @@ const chapters: Chapter[] = [
             </p>
             <p className="mt-2">
               Per ogni sezione puoi cambiare modello, attivare o disattivare gli
-              anni (1ª/2ª/3ª), rinominarla (✏️) o eliminarla (🗑️). Eliminare
-              una sezione rimuove tutte le classi collegate da docenti,
-              sostegno, strumento e orario. Per aggiungerne una usa il form
-              «Nuova Sezione (es. H)».
+              anni (dalla 1ª alla 5ª, così la scuola primaria può avere tutte le
+              sue classi), rinominarla (✏️) o eliminarla (🗑️). Eliminare una
+              sezione rimuove tutte le classi collegate da docenti, sostegno,
+              strumento e orario. Per aggiungerne una usa il form «Nuova Sezione
+              (es. H)».
+            </p>
+            <p className="mt-2">
+              Sotto gli anni c'è il <B>monte ore</B> della sezione: quante ore
+              curricolari ci si aspetta in una settimana. Serve alla scheda
+              Conflitti, che segnala le classi lontane da quel numero. Se non lo
+              tocchi vale 30, il tempo normale della secondaria di primo grado;
+              alla primaria di solito è 24, 27 o 30, il tempo prolungato arriva
+              a 36 o 40. Sta sulla singola sezione proprio perché la stessa
+              scuola può averne alcune a tempo normale e altre a tempo
+              prolungato, e il campo accetta qualsiasi numero.
             </p>
           </>
         ),
@@ -563,7 +574,27 @@ const chapters: Chapter[] = [
       {
         title: '⏰ Orari e Campanella',
         tag: 'personalizzazione',
-        body: "Due colonne affiancate: ☀️ Ore Diurne (1ª–6ª) e 🌙 Ore Pomeridiane (1ªP–6ªP). Per ogni ora puoi modificare l'etichetta e la fascia oraria: le modifiche si riflettono su tutte le viste, sulla stampa A3 e sull'export Excel.",
+        body: (
+          <>
+            <p>
+              Due colonne affiancate: ☀️ Ore Diurne (1ª–6ª) e 🌙 Ore
+              Pomeridiane (1ªP–6ªP). Per ogni ora puoi modificare l'etichetta e
+              la fascia oraria: le modifiche si riflettono su tutte le viste,
+              sulla stampa A3 e sull'export Excel.
+            </p>
+            <p className="mt-2">
+              Accanto c'è la <B>durata</B>, 60 o 30 minuti. Serve a chi ha
+              lezioni più corte: alla primaria capita di avere una lezione da
+              mezz'ora al giorno (per esempio un orario 8:00-13:30, cinque ore
+              piene più una da 30 minuti). Impostando 30 minuti quella lezione
+              conta mezz'ora nei totali del docente e della classe, quindi due
+              mezze ore fanno un'ora sola. La durata vale per la colonna, cioè
+              per quell'ora in tutti i giorni: dove la lezione non c'è, la cella
+              resta vuota. Lasciando 60 minuti non cambia nulla rispetto a
+              prima.
+            </p>
+          </>
+        ),
       },
     ],
   },
@@ -587,7 +618,7 @@ const chapters: Chapter[] = [
       {
         title: 'Warning (⚠️)',
         tag: 'da controllare',
-        body: 'Situazioni non bloccanti: classe con meno di 30 ore curricolari, vincoli di accorpamento non rispettati.',
+        body: 'Situazioni non bloccanti: classe con un totale di ore curricolari diverso dal monte ore della sua sezione, vincoli di accorpamento non rispettati.',
       },
       {
         title: '👁️ Vai alla cella / 🛠️ Rimuovi cella',
@@ -607,7 +638,7 @@ const chapters: Chapter[] = [
               'Classe Modello A che supera le 13:00 (5ª ora).',
               'Più di 3 ore giornaliere dello stesso docente nella stessa classe.',
               'Aula speciale occupata da più classi.',
-              'Totale ore curricolari della classe diverso da 30.',
+              'Totale ore curricolari della classe diverso dal monte ore della sezione.',
               'Ore assegnate superiori a quelle previste dalla cattedra.',
               'Troppi giorni liberi rispetto alle ore assegnate.',
               'Vincoli di accorpamento non rispettati.',
@@ -777,7 +808,7 @@ const chapters: Chapter[] = [
               'Max 10 ore in due giorni consecutivi per docente.',
               'Vietate due ore buche di fila.',
               'Giorni liberi: ≥18h → 1, ≥12h → 2, altri → 3.',
-              'Ogni classe deve totalizzare 30 ore curricolari settimanali.',
+              'La generazione piazza le ore dichiarate nel Registro Cattedre: il totale settimanale della classe non è un vincolo dell\'algoritmo, ma viene confrontato con il monte ore della sezione nella scheda Conflitti.',
             ]}
           />
         ),
