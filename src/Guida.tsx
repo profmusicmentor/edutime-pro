@@ -45,6 +45,18 @@ const chapters: Chapter[] = [
         assegnate. È pensato per il collaboratore del Dirigente Scolastico o per
         il responsabile dell'orario che deve distribuire le ore dei docenti di
         materia, di sostegno e di strumento sulle classi.
+        <span className="block mt-3">
+          <B>Insegni alla scuola primaria?</B> L'app funziona anche per te, ma
+          tre impostazioni vanno cambiate all'inizio: le trovi tutte insieme nel
+          capitolo{' '}
+          <a
+            href="#primaria"
+            className="text-indigo-700 font-semibold underline"
+          >
+            11 · Se lavori alla scuola primaria
+          </a>
+          .
+        </span>
       </>
     ),
     cards: [
@@ -746,8 +758,134 @@ const chapters: Chapter[] = [
     ),
   },
   {
-    id: 'concetti',
+    id: 'primaria',
     num: '11',
+    title: 'Se lavori alla scuola primaria',
+    intro: (
+      <>
+        L'app è nata per la secondaria di primo grado, ma tutto quello che serve
+        alla primaria c'è: va solo impostato, ed è sparso in punti diversi.
+        Questo capitolo mette in fila le tre cose da fare la prima volta, e dice
+        con franchezza cosa l'app ancora non sa fare.
+      </>
+    ),
+    cards: [
+      {
+        title: 'Le classi fino alla 5ª',
+        tag: 'da fare per primo',
+        body: (
+          <>
+            <p>
+              In <B>Sezioni & Regole → Gestione Sezioni</B>, per ogni sezione
+              spunta gli anni che ti servono: le caselle arrivano fino alla 5ª.
+            </p>
+            <p className="mt-2">
+              Le classi si chiamano anno + sezione, quindi spuntando 4ª e 5ª
+              nella sezione A compaiono <B>4A</B> e <B>5A</B> in tutte le viste,
+              nelle stampe e nell'export.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: 'La lezione da mezz\'ora',
+        tag: 'durata delle ore',
+        body: (
+          <>
+            <p>
+              In <B>Sezioni & Regole → Orari e Campanella</B>, accanto a ogni ora
+              c'è la durata: <B>60</B> o <B>30 minuti</B>.
+            </p>
+            <p className="mt-2">
+              Esempio di una giornata 8:00-13:30: lasci a 60 minuti le prime
+              cinque ore e metti la sesta a 30 minuti, scrivendo "13:00 - 13:30"
+              nella fascia oraria. Da quel momento due mezze ore contano come
+              un'ora sola nel totale del docente e della classe.
+            </p>
+            <p className="mt-2">
+              La durata vale per la colonna, cioè per quell'ora in tutti i
+              giorni. Nei giorni in cui la mezz'ora non c'è, lasci le celle
+              vuote: non serve nessuna impostazione per giorno.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: 'Il monte ore settimanale',
+        tag: '24 / 27 / 30',
+        body: (
+          <>
+            <p>
+              Sempre in <B>Gestione Sezioni</B>, sotto gli anni, c'è il monte ore
+              atteso per una settimana. Di base vale 30, che è il tempo normale
+              della secondaria: se non lo cambi, l'app segnalerà come "mancanti"
+              ore che alla primaria non esistono.
+            </p>
+            <p className="mt-2">
+              Mettici il vostro: alla primaria di solito 24, 27 o fino a 30
+              (tempo pieno 40). Il campo accetta qualsiasi numero, mezze ore
+              comprese, perché la ripartizione la decide ogni istituto in
+              autonomia.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: 'Cosa cambia rispetto alla secondaria',
+        tag: 'da sapere',
+        body: (
+          <Ul
+            items={[
+              <>
+                <B>Modello A e Modello B</B> non sono il monte ore: dicono solo
+                come si distribuisce la settimana. A = 6 giorni con 5 ore, B = 5
+                giorni con 6 ore. Scegli quello che somiglia alla vostra
+                settimana, poi regola le ore con la durata e il monte ore.
+              </>,
+              <>
+                L'app ragiona per <B>cattedre</B>: ogni docente ha le sue ore su
+                una o più classi. Il maestro prevalente si inserisce allo stesso
+                modo, indicando le ore che fa in ciascuna classe.
+              </>,
+              <>
+                Le voci legate all'indirizzo musicale (strumento, allinea
+                sostegno per lo strumento) semplicemente non ti servono: puoi
+                ignorarle senza effetti.
+              </>,
+            ]}
+          />
+        ),
+      },
+      {
+        title: 'Cosa non c\'è ancora',
+        tag: 'trasparenza',
+        body: (
+          <Ul
+            items={[
+              <>
+                Le <B>ore di programmazione</B> fuori dalla classe non sono
+                previste: l'app conta solo le ore che stanno in una casella
+                dell'orario.
+              </>,
+              <>
+                La <B>generazione automatica</B> ragiona in caselle e non in
+                minuti: se usi le mezze ore, controlla la scheda Conflitti, che
+                ti segnala se il totale in ore non torna. La compilazione a mano
+                è invece già corretta.
+              </>,
+            ]}
+          />
+        ),
+      },
+    ],
+    note: {
+      title: 'Manca qualcosa?',
+      body: "Queste funzioni sono nate dalle segnalazioni di maestre e maestri che hanno provato l'app e hanno scritto cosa non tornava. Se la tua scuola è organizzata in un modo che qui non entra, scrivilo: è così che l'app è arrivata fin qui.",
+    },
+  },
+  {
+    id: 'concetti',
+    num: '12',
     title: 'Concetti chiave',
     intro: <>Il bignami da tenere sotto mano mentre lavori.</>,
     cards: [
@@ -829,7 +967,7 @@ const chapters: Chapter[] = [
   },
   {
     id: 'trasparenza',
-    num: '12',
+    num: '13',
     title: 'Trasparenza e privacy',
     intro: (
       <>
