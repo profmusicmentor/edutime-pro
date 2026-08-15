@@ -802,6 +802,21 @@ const HOUR_DEFAULT_MINUTES = 60;
 /** Durate selezionabili: l'ora piena e la mezz'ora della scuola primaria. */
 const HOUR_DURATION_OPTIONS = [60, 30];
 
+/**
+ * Monte ore curricolare settimanale atteso per una sezione, quando non è
+ * stato impostato: 30 ore, il tempo normale della secondaria di primo grado.
+ * È il valore con cui l'app è nata, quindi le scuole già avviate non vedono
+ * cambiare i propri avvisi.
+ */
+const DEFAULT_WEEKLY_HOURS = 30;
+/**
+ * Valori tipici, offerti come scorciatoia. Non sono un vincolo: l'autonomia
+ * scolastica fa variare i monte ore, quindi il campo accetta qualsiasi numero.
+ * 24 / 27 / 30 primaria (DPR 89/2009), 30 secondaria tempo normale,
+ * 36 tempo prolungato, 40 tempo pieno.
+ */
+const COMMON_WEEKLY_HOURS = [24, 27, 30, 36, 40];
+
 /** Ore in cifra leggibile: 20 resta "20", 20.5 diventa "20,5". */
 const formatHours = (value: number) =>
   Number.isInteger(value) ? String(value) : value.toFixed(1).replace('.', ',');
@@ -986,6 +1001,15 @@ export default function App() {
    */
   const hourWeight = (index: number) =>
     (mergedHoursMap[index]?.duration ?? HOUR_DEFAULT_MINUTES) / 60;
+
+  /** Monte ore curricolare settimanale atteso per le classi di una sezione. */
+  const getSectionWeeklyHours = (sec: string) => {
+    const conf = sectionsConfig?.[sec];
+    if (!conf || typeof conf === 'string') return DEFAULT_WEEKLY_HOURS;
+    return Number(conf.weeklyHours) > 0
+      ? Number(conf.weeklyHours)
+      : DEFAULT_WEEKLY_HOURS;
+  };
 
   const getSectionModel = (sec: string) => {
     if (!sectionsConfig) return 'modelloB';
@@ -1601,12 +1625,13 @@ export default function App() {
 
     classes.forEach((c) => {
       const hrs = classHourCounts[c.id] || 0;
-      if (hrs !== 30 && hrs > 0)
+      const expected = getSectionWeeklyHours(c.section);
+      if (hrs !== expected && hrs > 0)
         conflicts.push({
           type: 'warning',
           message: `La classe ${c.id} ha assegnate ${formatHours(
             hrs
-          )}/30 ore curricolari.`,
+          )}/${formatHours(expected)} ore curricolari.`,
         });
     });
     return { conflicts, classHourCounts };
@@ -3102,11 +3127,15 @@ export default function App() {
       typeof currentConfig === 'string' ? currentConfig : currentConfig.model;
     const oldSedeId =
       typeof currentConfig === 'string' ? undefined : currentConfig.sedeId;
+    const oldWeeklyHours =
+      typeof currentConfig === 'string' ? undefined : currentConfig.weeklyHours;
     const newConfig = { ...sectionsConfig };
     newConfig[secName] = {
       model: field === 'model' ? value : oldModel,
       years: field === 'years' ? value : oldYears,
       sedeId: field === 'sedeId' ? value || undefined : oldSedeId,
+      weeklyHours:
+        field === 'weeklyHours' ? value || undefined : oldWeeklyHours,
     };
     if (field === 'years') {
       const removedYears = oldYears.filter((y: number) => !value.includes(y));
@@ -6883,10 +6912,45 @@ export default function App() {
                               </label>
                             ))}
                           </div>
+                          <label className="flex items-center justify-between gap-2 mt-1 bg-white py-1.5 px-2 rounded-lg border border-slate-100 text-xs font-bold text-slate-600">
+                            <span title="Ore curricolari attese in una settimana. Serve solo all'avviso nella scheda Conflitti.">
+                              Monte ore
+                            </span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={60}
+                              step={0.5}
+                              value={getSectionWeeklyHours(section)}
+                              onChange={(e) =>
+                                handleUpdateSection(
+                                  section,
+                                  'weeklyHours',
+                                  Number(e.target.value)
+                                )
+                              }
+                              disabled={readOnlyMode}
+                              list="monte-ore-tipici"
+                              className="w-16 text-center border border-slate-300 rounded p-1 font-normal focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                            />
+                          </label>
                         </div>
                       );
                     }
                   )}
+                  <datalist id="monte-ore-tipici">
+                    {COMMON_WEEKLY_HOURS.map((h) => (
+                      <option key={h} value={h} />
+                    ))}
+                  </datalist>
+                  <p className="text-xs text-slate-500 col-span-full">
+                    Il <strong>monte ore</strong> è il totale delle ore
+                    curricolari attese in una settimana, e serve solo
+                    all'avviso nella scheda Conflitti. Valori tipici: 24, 27 o
+                    30 alla primaria, 30 alla secondaria di primo grado a tempo
+                    normale, 36 (fino a 40) a tempo prolungato. Ogni scuola può
+                    metterci il proprio.
+                  </p>
                 </div>
               </div>
             </div>
