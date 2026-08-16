@@ -14,20 +14,19 @@ export default function Guida() {
 
   // Il browser cerca l'ancora del link (/guida#conflitti) mentre la pagina è
   // ancora vuota, perché i capitoli li disegna React subito dopo: senza questo
-  // salto manuale si arriva in cima alla guida invece che al capitolo giusto.
-  // Il salto va ripetuto per qualche decimo di secondo perché il ripristino
-  // automatico della posizione, fatto dal browser dopo il caricamento,
-  // riporterebbe in cima.
+  // salto manuale si resta dove capita invece di arrivare al capitolo giusto.
+  // Il ripristino automatico della posizione è già spento da main.tsx.
   useEffect(() => {
     const id = decodeURIComponent(window.location.hash.slice(1));
     if (!id) return;
 
-    const ripristinoOriginale = window.history.scrollRestoration;
-    window.history.scrollRestoration = 'manual';
-
     let timer = 0;
-    let tentativi = 0;
     let annullato = false;
+    // Il ripristino della posizione fatto dal browser può arrivare parecchio
+    // dopo il primo disegno, quindi si ricontrolla a intervalli crescenti
+    // fino a un secondo e mezzo.
+    const attese = [0, 100, 250, 500, 900, 1500];
+    let prossima = 0;
 
     const salta = () => {
       if (annullato) return;
@@ -36,8 +35,11 @@ export default function Guida() {
       const distanza = sezione.getBoundingClientRect().top;
       // Tolleranza: il capitolo ha già uno stacco dal bordo (scroll-mt-6).
       if (Math.abs(distanza) > 40) sezione.scrollIntoView({ block: 'start' });
-      tentativi += 1;
-      if (tentativi < 6) timer = window.setTimeout(salta, 80);
+      if (prossima < attese.length) {
+        const attesa = attese[prossima] - (attese[prossima - 1] ?? 0);
+        prossima += 1;
+        timer = window.setTimeout(salta, attesa);
+      }
     };
 
     // Se l'utente scorre di suo, smettiamo subito di inseguire l'ancora.
@@ -53,7 +55,6 @@ export default function Guida() {
 
     return () => {
       window.clearTimeout(timer);
-      window.history.scrollRestoration = ripristinoOriginale;
       ['wheel', 'touchstart', 'keydown'].forEach((evento) =>
         window.removeEventListener(evento, annulla)
       );
