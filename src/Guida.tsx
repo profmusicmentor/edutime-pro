@@ -12,6 +12,54 @@ export default function Guida() {
     document.title = 'Guida a EduTime Pro';
   }, []);
 
+  // Il browser cerca l'ancora del link (/guida#conflitti) mentre la pagina è
+  // ancora vuota, perché i capitoli li disegna React subito dopo: senza questo
+  // salto manuale si arriva in cima alla guida invece che al capitolo giusto.
+  // Il salto va ripetuto per qualche decimo di secondo perché il ripristino
+  // automatico della posizione, fatto dal browser dopo il caricamento,
+  // riporterebbe in cima.
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (!id) return;
+
+    const ripristinoOriginale = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+
+    let timer = 0;
+    let tentativi = 0;
+    let annullato = false;
+
+    const salta = () => {
+      if (annullato) return;
+      const sezione = document.getElementById(id);
+      if (!sezione) return;
+      const distanza = sezione.getBoundingClientRect().top;
+      // Tolleranza: il capitolo ha già uno stacco dal bordo (scroll-mt-6).
+      if (Math.abs(distanza) > 40) sezione.scrollIntoView({ block: 'start' });
+      tentativi += 1;
+      if (tentativi < 6) timer = window.setTimeout(salta, 80);
+    };
+
+    // Se l'utente scorre di suo, smettiamo subito di inseguire l'ancora.
+    const annulla = () => {
+      annullato = true;
+      window.clearTimeout(timer);
+    };
+    ['wheel', 'touchstart', 'keydown'].forEach((evento) =>
+      window.addEventListener(evento, annulla, { once: true, passive: true })
+    );
+
+    timer = window.setTimeout(salta, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.history.scrollRestoration = ripristinoOriginale;
+      ['wheel', 'touchstart', 'keydown'].forEach((evento) =>
+        window.removeEventListener(evento, annulla)
+      );
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
       <header className="bg-gradient-to-r from-blue-700 via-indigo-800 to-purple-950 text-white">

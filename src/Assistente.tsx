@@ -38,24 +38,30 @@ export default function Assistente({ inGuida = false }: Props) {
     return () => window.removeEventListener('keydown', chiudiConEsc);
   }, [aperto]);
 
-  const vaiAlCapitolo = (capitoloId: string) => {
-    if (inGuida) {
-      const sezione = document.getElementById(capitoloId);
-      if (sezione) {
-        const menoMovimento = window.matchMedia(
-          '(prefers-reduced-motion: reduce)'
-        ).matches;
-        sezione.scrollIntoView({
-          behavior: menoMovimento ? 'auto' : 'smooth',
-          block: 'start',
-        });
-        window.history.replaceState(null, '', `#${capitoloId}`);
-        setAperto(false);
-        return;
-      }
-    }
-    window.open(`/guida#${capitoloId}`, '_blank', 'noopener,noreferrer');
+  /**
+   * Nella pagina della guida il capitolo è già a schermo: si scorre e basta.
+   * Dall'app invece si lascia lavorare il link, che apre /guida sull'ancora
+   * giusta in una nuova scheda.
+   */
+  const vaiAlCapitolo = (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    capitoloId: string
+  ) => {
+    if (!inGuida) return;
+    const sezione = document.getElementById(capitoloId);
+    if (!sezione) return;
+    e.preventDefault();
+    // Salto secco e non animato: lo scorrimento morbido su una pagina lunga
+    // come la guida viene interrotto da alcuni browser e lascia il lettore
+    // dove si trovava.
+    sezione.scrollIntoView({ block: 'start' });
+    window.history.replaceState(null, '', `#${capitoloId}`);
+    setAperto(false);
   };
+
+  const propsLink = inGuida
+    ? {}
+    : { target: '_blank', rel: 'noopener noreferrer' };
 
   if (!aperto) {
     return (
@@ -135,13 +141,14 @@ export default function Assistente({ inGuida = false }: Props) {
               Prova con parole diverse (per esempio «cattedre», «conflitti»,
               «stampa», «backup») oppure sfoglia la guida completa.
             </p>
-            <button
-              type="button"
-              onClick={() => vaiAlCapitolo('introduzione')}
-              className="mt-3 text-indigo-700 font-semibold underline"
+            <a
+              href="/guida#introduzione"
+              {...propsLink}
+              onClick={(e) => vaiAlCapitolo(e, 'introduzione')}
+              className="inline-block mt-3 text-indigo-700 font-semibold underline"
             >
               Apri la guida completa →
-            </button>
+            </a>
           </div>
         )}
 
@@ -164,13 +171,14 @@ export default function Assistente({ inGuida = false }: Props) {
               <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
                 {r.estratto}
               </p>
-              <button
-                type="button"
-                onClick={() => vaiAlCapitolo(r.voce.capitoloId)}
-                className="mt-2 text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline"
+              <a
+                href={`/guida#${r.voce.capitoloId}`}
+                {...propsLink}
+                onClick={(e) => vaiAlCapitolo(e, r.voce.capitoloId)}
+                className="inline-block mt-2 text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline"
               >
                 Capitolo {r.voce.capitoloNum} · {r.voce.capitoloTitolo} →
-              </button>
+              </a>
             </div>
           ))}
       </div>
