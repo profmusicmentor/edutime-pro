@@ -880,6 +880,300 @@ const getSedeForSlot = (
   return section && typeof section === 'object' ? section.sedeId : undefined;
 };
 
+/**
+ * Una lezione curricolare appartiene a una coppia di classi abbinate per la
+ * seconda lingua? Quelle lezioni hanno un vincolo incrociato fra due classi:
+ * la fase di riparazione le lascia stare, sia come ora da recuperare sia come
+ * lezione da spostare.
+ */
+const isMixedLesson = (
+  lesson: { subject: string; classId: string },
+  mixedClassesList: any[]
+) =>
+  (mixedClassesList || []).some(
+    (m: any) =>
+      m.subject === lesson.subject &&
+      (m.c1 === lesson.classId || m.c2 === lesson.classId)
+  );
+
+/**
+ * Vincoli rigidi per piazzare un'ora curricolare in una cella.
+ *
+ * ATTENZIONE: questi controlli rispecchiano uno per uno i filtri scritti
+ * dentro generateTimetable. Se aggiungi o cambi una regola là, cambiala anche
+ * qui, altrimenti la fase di riparazione piazza ore che il generatore avrebbe
+ * rifiutato. L'unico controllo in più è quello sulla cella della classe già
+ * occupata: la riparazione lavora su una griglia piena, il generatore no.
+ */
+const canPlaceMateriaHard = (
+  tt: any[],
+  lesson: any,
+  classId: string,
+  day: number,
+  hour: number,
+  ctx: any
+) => {
+  const { rules, rooms, classes: classesList, sectionsConfig: sectionsCfg } = ctx;
+
+  const daysOff = (rules.teacherDaysOff || {})[lesson.teacherId] || [];
+  if (daysOff.includes(day)) return false;
+
+  const classCellBusy = tt.some(
+    (s) =>
+      s.classId === classId &&
+      s.day === day &&
+      s.hour === hour &&
+      s.type !== 'sostegno'
+  );
+  if (classCellBusy) return false;
+
+  const teacherBusy = tt.some(
+    (s) => s.day === day && s.hour === hour && s.teacherId === lesson.teacherId
+  );
+  if (teacherBusy) return false;
+
+  const sameTeacherToday = tt.filter(
+    (s) =>
+      s.classId === classId && s.day === day && s.teacherId === lesson.teacherId
+  );
+  if (sameTeacherToday.length >= 3) return false;
+
+  const room = getRoomForSubject(lesson.subject, rooms);
+  const roomBusy = tt.some(
+    (s) =>
+      s.room &&
+      s.room !== 'Aula' &&
+      s.room === room &&
+      s.day === day &&
+      s.hour === hour
+  );
+  if (roomBusy) return false;
+
+  const sede = getSedeForSlot(
+    { room, classId },
+    rooms,
+    classesList,
+    sectionsCfg
+  );
+  if (sede) {
+    const spostamentoSenzaBuco = tt.some(
+      (s) =>
+        s.teacherId === lesson.teacherId &&
+        s.day === day &&
+        (s.hour === hour - 1 || s.hour === hour + 1) &&
+        getSedeForSlot(s, rooms, classesList, sectionsCfg) &&
+        getSedeForSlot(s, rooms, classesList, sectionsCfg) !== sede
+    );
+    if (spostamentoSenzaBuco) return false;
+  }
+
+  const hoursToday = tt.filter(
+    (s) => s.teacherId === lesson.teacherId && s.day === day
+  ).length;
+  if (day > 0) {
+    const hoursYesterday = tt.filter(
+      (s) => s.teacherId === lesson.teacherId && s.day === day - 1
+    ).length;
+    if (hoursYesterday + hoursToday + 1 > 10) return false;
+  }
+  const hoursTomorrow = tt.filter(
+    (s) => s.teacherId === lesson.teacherId && s.day === day + 1
+  ).length;
+  if (hoursToday + hoursTomorrow + 1 > 10) return false;
+
+  return true;
+};
+
+/**
+ * Punteggio morbido di una collocazione: stessa formula del generatore
+ * (buchi, buco lungo, prime ore, ore consecutive), senza il pizzico di
+ * casualità, perché qui serve una scelta ripetibile.
+ */
+const materiaPlacementPenalty = (
+  tt: any[],
+  lesson: any,
+  classId: string,
+  day: number,
+  hour: number,
+  maxGapAllowed: number
+) => {
+  let penalty = 0;
+  const dailyLessons = tt.filter(
+    (s) => s.teacherId === lesson.teacherId && s.day === day
+  );
+
+  if (dailyLessons.length > 0) {
+    const minHour = Math.min(...dailyLessons.map((l) => l.hour), hour);
+    const maxHour = Math.max(...dailyLessons.map((l) => l.hour), hour);
+    const gaps = maxHour - minHour + 1 - (dailyLessons.length + 1);
+    if (gaps > maxGapAllowed) penalty += 50 + gaps * 5;
+    else penalty += gaps * 5;
+
+    const dayHours = [...dailyLessons.map((l) => l.hour), hour].sort(
+      (a, b) => a - b
+    );
+    for (let j = 0; j < dayHours.length - 1; j++) {
+      if (dayHours[j + 1] - dayHours[j] >= 3) {
+        penalty += 9999;
+        break;
+      }
+    }
+  } else {
+    penalty += hour * 2;
+  }
+
+  const sameClassToday = tt.filter(
+    (s) =>
+      s.teacherId === lesson.teacherId &&
+      s.classId === classId &&
+      s.day === day
+  );
+  if (sameClassToday.length > 0) {
+    const isAdjacent = sameClassToday.some(
+      (s) => Math.abs(s.hour - hour) === 1
+    );
+    if (lesson.preferConsecutive) penalty += isAdjacent ? -100 : 50;
+    else if (isAdjacent) penalty += 30;
+  }
+
+  return penalty;
+};
+
+/**
+ * Fase di riparazione a profondità 1, ispirata al recursive swapping di FET
+ * ma fermata al primo livello.
+ *
+ * Per ogni ora rimasta fuori dalla passata greedy: prima cerca una cella
+ * libera; se non ce n'è, prova a sfrattare una lezione già piazzata nella
+ * stessa classe e a ricollocarla altrove. Se lo sfrattato non trova casa la
+ * mossa viene annullata e la griglia torna esattamente com'era.
+ *
+ * Non tocca mai le celle bloccate col lucchetto e non sposta le lezioni delle
+ * classi abbinate. Ha un tetto di tempo: scaduto quello, le ore che restano
+ * finiscono nell'elenco delle mancanti come prima.
+ */
+const repairUnplacedLessons = (
+  tt: any[],
+  unplaced: any[],
+  ctx: any,
+  budgetMs = 2000
+) => {
+  const deadline = Date.now() + budgetMs;
+  const stillMissing: any[] = [];
+  let recovered = 0;
+  let swaps = 0;
+
+  const maxGapFor = (teacherId: string) =>
+    ctx.rules.teacherMaxGapHours &&
+    ctx.rules.teacherMaxGapHours[teacherId] !== undefined
+      ? ctx.rules.teacherMaxGapHours[teacherId]
+      : ctx.rules.globalMaxGapHours || 1;
+
+  const asLesson = (slot: any) => ({
+    teacherId: slot.teacherId,
+    subject: slot.subject,
+    classId: slot.classId,
+    preferConsecutive: !!(ctx.teachers || []).find(
+      (t: any) => t.id === slot.teacherId
+    )?.preferConsecutive,
+  });
+
+  const bestFreeCell = (lesson: any, cells: any[], skipCell?: any) => {
+    let best: any = null;
+    for (const cell of cells) {
+      if (skipCell && cell.day === skipCell.day && cell.hour === skipCell.hour)
+        continue;
+      if (!canPlaceMateriaHard(tt, lesson, lesson.classId, cell.day, cell.hour, ctx))
+        continue;
+      const penalty = materiaPlacementPenalty(
+        tt,
+        lesson,
+        lesson.classId,
+        cell.day,
+        cell.hour,
+        maxGapFor(lesson.teacherId)
+      );
+      if (!best || penalty < best.penalty) best = { ...cell, penalty };
+    }
+    return best;
+  };
+
+  const makeSlot = (lesson: any, cell: any) => ({
+    classId: lesson.classId,
+    day: cell.day,
+    hour: cell.hour,
+    teacherId: lesson.teacherId,
+    subject: lesson.subject,
+    type: 'materia',
+    room: getRoomForSubject(lesson.subject, ctx.rooms),
+  });
+
+  for (const lesson of unplaced) {
+    if (Date.now() > deadline || isMixedLesson(lesson, ctx.mixedClasses)) {
+      stillMissing.push(lesson);
+      continue;
+    }
+
+    const cells: any[] = [];
+    for (let d = 0; d < lesson.totalDays; d++)
+      for (let h = 0; h < lesson.maxHoursPerDay; h++)
+        cells.push({ day: d, hour: h });
+
+    const free = bestFreeCell(lesson, cells);
+    if (free) {
+      tt.push(makeSlot(lesson, free));
+      recovered++;
+      continue;
+    }
+
+    let placed = false;
+    for (const cell of cells) {
+      if (Date.now() > deadline) break;
+
+      const victimIndex = tt.findIndex(
+        (s) =>
+          s.classId === lesson.classId &&
+          s.day === cell.day &&
+          s.hour === cell.hour &&
+          s.type === 'materia' &&
+          !s.locked
+      );
+      if (victimIndex === -1) continue;
+
+      const victim = tt[victimIndex];
+      if (isMixedLesson(victim, ctx.mixedClasses)) continue;
+
+      tt.splice(victimIndex, 1);
+      if (
+        !canPlaceMateriaHard(tt, lesson, lesson.classId, cell.day, cell.hour, ctx)
+      ) {
+        tt.splice(victimIndex, 0, victim);
+        continue;
+      }
+
+      const newSlot = makeSlot(lesson, cell);
+      tt.push(newSlot);
+
+      const home = bestFreeCell(asLesson(victim), cells, cell);
+      if (home) {
+        tt.push({ ...victim, day: home.day, hour: home.hour });
+        recovered++;
+        swaps++;
+        placed = true;
+        break;
+      }
+
+      const undoIndex = tt.indexOf(newSlot);
+      if (undoIndex !== -1) tt.splice(undoIndex, 1);
+      tt.splice(victimIndex, 0, victim);
+    }
+
+    if (!placed) stillMissing.push(lesson);
+  }
+
+  return { stillMissing, recovered, swaps };
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('master-view');
   const [sectionsConfig, setSectionsConfig] = useState<any>(
@@ -1457,7 +1751,17 @@ export default function App() {
       if (!classObj) return;
       const model = getSectionModel(classObj.section);
 
-      if (room && room !== 'Aula' && room !== 'Classe') {
+      // "Lab. Musica" sulle lezioni di strumento e' solo un'etichetta di
+      // comodo quando in "Aule" non c'e' un'aula dedicata a quello strumento:
+      // le lezioni sono individuali e ogni docente ha il suo spazio. Segnalare
+      // un conflitto d'aula li' vorrebbe dire dare al collega un allarme che
+      // non puo' risolvere. Se invece l'aula e' configurata, vale come tutte
+      // le altre.
+      const isEtichettaDiComodo =
+        slot.type === 'pomeriggio_musica' &&
+        getRoomForSubject(slot.subject, rooms) === 'Aula';
+
+      if (room && room !== 'Aula' && room !== 'Classe' && !isEtichettaDiComodo) {
         const rKey = `${room}_${day}_${hour}`;
         if (!roomSchedules[rKey]) roomSchedules[rKey] = [];
         roomSchedules[rKey].push(classId);
@@ -1732,10 +2036,17 @@ export default function App() {
     setGenerationRules(newRules);
 
     const report = {
-      materie: { requested: 0, assigned: 0, missing: [] as any[] },
+      materie: {
+        requested: 0,
+        assigned: 0,
+        recovered: 0,
+        swaps: 0,
+        missing: [] as any[],
+      },
     };
 
     if (generateOptions.materie) {
+      const unplacedLessons: any[] = [];
       classes.forEach((cls) => {
         const classObj = classes.find((c) => c.id === cls.id);
         const sectionModel = classObj
@@ -1765,6 +2076,20 @@ export default function App() {
         for (let day = 0; day < totalDays; day++) {
           for (let hour = 0; hour < maxHoursPerDay; hour++) {
             if (pool.length === 0) break;
+
+            // La cella potrebbe essere gia' occupata da una lezione col
+            // lucchetto: in quel caso si salta, altrimenti la classe si
+            // ritrova due materie nella stessa ora. Il sostegno invece sta
+            // in compresenza sulla materia, quindi non occupa la cella.
+            const cellBusy = newTimetable.some(
+              (s) =>
+                s.classId === cls.id &&
+                s.day === day &&
+                s.hour === hour &&
+                s.type !== 'sostegno'
+            );
+            if (cellBusy) continue;
+
             let selectedLessonIndex = -1;
             let bestCandidateGapPenalty = 9999;
 
@@ -1955,13 +2280,36 @@ export default function App() {
           }
         }
         pool.forEach((lesson) =>
-          report.materie.missing.push({
+          unplacedLessons.push({
+            ...lesson,
             classId: cls.id,
-            teacherName: lesson.teacherName,
-            subject: lesson.subject,
+            totalDays,
+            maxHoursPerDay,
           })
         );
       });
+
+      // Seconda passata: prova a recuperare le ore rimaste fuori sfrattando
+      // una lezione già piazzata e ricollocandola. Se non ci riesce, la
+      // griglia resta identica a quella della passata greedy.
+      const repair = repairUnplacedLessons(newTimetable, unplacedLessons, {
+        rules: newRules,
+        rooms,
+        classes,
+        sectionsConfig,
+        mixedClasses,
+        teachers,
+      });
+      report.materie.assigned += repair.recovered;
+      report.materie.recovered = repair.recovered;
+      report.materie.swaps = repair.swaps;
+      repair.stillMissing.forEach((lesson) =>
+        report.materie.missing.push({
+          classId: lesson.classId,
+          teacherName: lesson.teacherName,
+          subject: lesson.subject,
+        })
+      );
     }
 
     if (generateOptions.sostegno) {
@@ -2023,6 +2371,20 @@ export default function App() {
       strumento.forEach((str, strIdx) => {
         const assigns = str.assignments || [];
         const daysOff = newRules.teacherDaysOff[str.id] || [];
+        // Se in "Aule" c'e' un'aula dedicata a questo strumento la si usa e la
+        // si tratta come occupata; altrimenti resta l'etichetta generica
+        // "Lab. Musica", che e' solo un nome sul tabellone: le lezioni di
+        // strumento sono individuali e ogni docente ha il suo spazio.
+        const configuredRoom = getRoomForSubject(str.subject, rooms);
+        const strumentoRoom =
+          configuredRoom !== 'Aula' ? configuredRoom : 'Lab. Musica';
+        const roomIsExclusive = configuredRoom !== 'Aula';
+        const roomTaken = (day: number, hour: number) =>
+          roomIsExclusive &&
+          newTimetable.some(
+            (s) =>
+              s.room === strumentoRoom && s.day === day && s.hour === hour
+          );
         if (assigns.length > 0) {
           assigns.forEach((assign: any) => {
             const targetClassId = assign.classId;
@@ -2049,7 +2411,7 @@ export default function App() {
                   s.day === slot.day &&
                   s.hour === slot.hour
               );
-              if (!isBusy && !classBusy) {
+              if (!isBusy && !classBusy && !roomTaken(slot.day, slot.hour)) {
                 newTimetable.push({
                   classId: targetClassId,
                   day: slot.day,
@@ -2057,7 +2419,7 @@ export default function App() {
                   teacherId: str.id,
                   subject: str.subject,
                   type: 'pomeriggio_musica',
-                  room: 'Lab. Musica',
+                  room: strumentoRoom,
                 });
                 assignedHours++;
               }
@@ -2069,6 +2431,16 @@ export default function App() {
             const day = (strIdx + index) % 5;
             if (daysOff.includes(day)) return;
             const hour = 6 + ((strIdx + index) % afternoonHours.length);
+            // Anche la distribuzione automatica deve guardare dove mette le
+            // ore: prima spingeva la lezione nella cella qualunque cosa ci
+            // fosse dentro, docente o classe gia' occupati compresi.
+            const teacherBusy = newTimetable.some(
+              (s) => s.teacherId === str.id && s.day === day && s.hour === hour
+            );
+            const classBusy = newTimetable.some(
+              (s) => s.classId === cId && s.day === day && s.hour === hour
+            );
+            if (teacherBusy || classBusy || roomTaken(day, hour)) return;
             newTimetable.push({
               classId: cId,
               day,
@@ -2076,7 +2448,7 @@ export default function App() {
               teacherId: str.id,
               subject: `${str.subject}`,
               type: 'pomeriggio_musica',
-              room: 'Lab. Musica',
+              room: strumentoRoom,
             });
           });
         }
@@ -8302,6 +8674,15 @@ export default function App() {
                     </span>
                   </div>
                 </div>
+                {generationReport.materie.recovered > 0 && (
+                  <p className="text-xs text-emerald-700 mt-3">
+                    🔧 {generationReport.materie.recovered} ore recuperate dalla
+                    seconda passata
+                    {generationReport.materie.swaps > 0 &&
+                      ` (${generationReport.materie.swaps} spostando un'altra lezione)`}
+                    .
+                  </p>
+                )}
                 {generationReport.materie.missing.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-indigo-200">
                     <p className="text-xs text-rose-700 font-semibold mb-2">
