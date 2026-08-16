@@ -17,44 +17,52 @@ export default function Guida() {
   // salto manuale si resta dove capita invece di arrivare al capitolo giusto.
   // Il ripristino automatico della posizione è già spento da main.tsx.
   useEffect(() => {
-    const id = decodeURIComponent(window.location.hash.slice(1));
-    if (!id) return;
-
-    let timer = 0;
-    let annullato = false;
-    // Il ripristino della posizione fatto dal browser può arrivare parecchio
-    // dopo il primo disegno, quindi si ricontrolla a intervalli crescenti
-    // fino a un secondo e mezzo.
-    const attese = [0, 100, 250, 500, 900, 1500];
-    let prossima = 0;
-
-    const salta = () => {
-      if (annullato) return;
+    // Tolleranza: il capitolo ha già uno stacco dal bordo (scroll-mt-6).
+    const saltaAlCapitolo = () => {
+      const id = decodeURIComponent(window.location.hash.slice(1));
+      if (!id) return;
       const sezione = document.getElementById(id);
       if (!sezione) return;
-      const distanza = sezione.getBoundingClientRect().top;
-      // Tolleranza: il capitolo ha già uno stacco dal bordo (scroll-mt-6).
-      if (Math.abs(distanza) > 40) sezione.scrollIntoView({ block: 'start' });
-      if (prossima < attese.length) {
-        const attesa = attese[prossima] - (attese[prossima - 1] ?? 0);
-        prossima += 1;
-        timer = window.setTimeout(salta, attesa);
+      if (Math.abs(sezione.getBoundingClientRect().top) > 40) {
+        sezione.scrollIntoView({ block: 'start' });
       }
     };
 
-    // Se l'utente scorre di suo, smettiamo subito di inseguire l'ancora.
+    // Cambio di ancora a pagina già aperta: un salto solo, subito.
+    window.addEventListener('hashchange', saltaAlCapitolo);
+
+    let timer = 0;
+    let annullato = false;
     const annulla = () => {
       annullato = true;
       window.clearTimeout(timer);
     };
-    ['wheel', 'touchstart', 'keydown'].forEach((evento) =>
-      window.addEventListener(evento, annulla, { once: true, passive: true })
-    );
 
-    timer = window.setTimeout(salta, 0);
+    if (window.location.hash) {
+      // Il ripristino della posizione fatto dal browser può arrivare parecchio
+      // dopo il primo disegno, quindi in apertura si ricontrolla a intervalli
+      // crescenti fino a un secondo e mezzo.
+      const attese = [0, 100, 250, 500, 900, 1500];
+      let prossima = 0;
+      const insisti = () => {
+        if (annullato) return;
+        saltaAlCapitolo();
+        if (prossima < attese.length) {
+          const attesa = attese[prossima] - (attese[prossima - 1] ?? 0);
+          prossima += 1;
+          timer = window.setTimeout(insisti, attesa);
+        }
+      };
+      // Se il lettore scorre di suo, smettiamo subito di inseguire l'ancora.
+      ['wheel', 'touchstart', 'keydown'].forEach((evento) =>
+        window.addEventListener(evento, annulla, { once: true, passive: true })
+      );
+      timer = window.setTimeout(insisti, 0);
+    }
 
     return () => {
       window.clearTimeout(timer);
+      window.removeEventListener('hashchange', saltaAlCapitolo);
       ['wheel', 'touchstart', 'keydown'].forEach((evento) =>
         window.removeEventListener(evento, annulla)
       );
