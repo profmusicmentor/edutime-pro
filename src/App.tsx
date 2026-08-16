@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import Assistente from './Assistente';
 import WorkspaceGate from './WorkspaceGate';
 import {
   buildXlsx,
@@ -3953,15 +3954,32 @@ export default function App() {
       setAbsenceFormError('Seleziona il docente.');
       return;
     }
+    // Nel modulo le ore si scrivono come si leggono in tutta l'app (1 = 1ª
+    // ora), mentre nell'orario sono indicizzate da 0.
+    const toHourIndex = (value: string) =>
+      value === '' ? undefined : Number(value) - 1;
+    const fromHour = toHourIndex(newAbsenceFromHour);
+    const toHour = toHourIndex(newAbsenceToHour);
+    const isValidHour = (h: number | undefined) =>
+      h === undefined || (Number.isInteger(h) && h >= 0);
+    if (!isValidHour(fromHour) || !isValidHour(toHour)) {
+      setAbsenceFormError(
+        'Le ore si contano come nell\'orario: 1 è la prima ora. Lascia vuoto per tutta la giornata.'
+      );
+      return;
+    }
+    if (fromHour !== undefined && toHour !== undefined && toHour < fromHour) {
+      setAbsenceFormError('«A ora» non può essere precedente a «Da ora».');
+      return;
+    }
     const newAbsence = {
       id: `absence_${Date.now()}`,
       date: substitutionsDate,
       type: newAbsenceType,
       teacherId: isClassBased ? undefined : newAbsenceTeacherId,
       classId: isClassBased ? newAbsenceClassId : undefined,
-      fromHour:
-        newAbsenceFromHour === '' ? undefined : Number(newAbsenceFromHour),
-      toHour: newAbsenceToHour === '' ? undefined : Number(newAbsenceToHour),
+      fromHour,
+      toHour,
       note: newAbsenceNote.trim(),
     };
     const newAbsences = [...absences, newAbsence];
@@ -8250,9 +8268,10 @@ export default function App() {
                     </label>
                     <input
                       type="number"
-                      min="0"
-                      max="11"
+                      min="1"
+                      max="12"
                       placeholder="tutta"
+                      title="1 = prima ora. Lascia vuoto per tutta la giornata."
                       value={newAbsenceFromHour}
                       onChange={(e) => setNewAbsenceFromHour(e.target.value)}
                       disabled={readOnlyMode}
@@ -8265,9 +8284,10 @@ export default function App() {
                     </label>
                     <input
                       type="number"
-                      min="0"
-                      max="11"
+                      min="1"
+                      max="12"
                       placeholder="tutta"
+                      title="1 = prima ora. Lascia vuoto per tutta la giornata."
                       value={newAbsenceToHour}
                       onChange={(e) => setNewAbsenceToHour(e.target.value)}
                       disabled={readOnlyMode}
@@ -9117,6 +9137,8 @@ export default function App() {
           💛 Offrimi un caffè
         </a>
       </footer>
+
+      <Assistente />
     </div>
   );
 }

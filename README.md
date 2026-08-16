@@ -35,6 +35,28 @@ link di invito è `https://<dominio>/?scuola=<codice>`.
 Da **🏫 Scuola & Backup** si scarica un backup `.json` completo e lo si
 ripristina, anche per passare da una modalità all'altra.
 
+## Assistente della guida
+
+In basso a destra, sia nell'app sia nella pagina `/guida`, c'è il pulsante
+**💬 Serve aiuto?**: apre un pannello in cui si scrive una domanda in italiano
+e si ottengono i due-quattro pezzi di guida più pertinenti, con il link al
+capitolo completo.
+
+Non c'è nessun modello linguistico e nessuna chiamata di rete: la domanda non
+lascia il browser. I contenuti stanno in `src/guidaContenuti.tsx` (condivisi
+con la pagina della guida), l'indice e il punteggio in `src/guidaIndice.ts`,
+il pannello in `src/Assistente.tsx`.
+
+La ricerca appiattisce il JSX della guida in testo, pesa titoli e tag più del
+corpo, corregge il peso con la rarità della parola nella guida, tollera la
+morfologia italiana per prefisso comune (*stampo* trova *stampa*) e ha una
+tabella di sinonimi con cui i docenti pongono le domande (*maestra* →
+*primaria*, *perso* → *backup*).
+
+**Aggiungere contenuti**: basta aggiungere capitoli o card in
+`src/guidaContenuti.tsx`, l'indice si ricostruisce da solo. Se una funzione
+dell'app non è documentata nella guida, l'assistente non può rispondere.
+
 ## Sviluppo
 
 ```bash
