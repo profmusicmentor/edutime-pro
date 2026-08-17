@@ -548,6 +548,11 @@ export const chapters: Chapter[] = [
         ),
       },
       {
+        title: '📆 Massimo ore al giorno',
+        tag: 'distribuzione',
+        body: "Quante ore può fare un docente in una giornata: 4, 5 (predefinito), 6 oppure nessun limite. Serve a evitare le giornate da sei ore di fila e la settimana schiacciata su pochi giorni. Insieme al tetto l'algoritmo spinge a spalmare la cattedra sui giorni disponibili. Attenzione al compromesso: più il tetto è basso, più l'orario si distribuisce ma più ore buca compaiono, e con cattedre pesanti qualche ora può restare fuori — se il tetto rende la cattedra impossibile, la scheda Conflitti lo dice.",
+      },
+      {
         title: '🌴 Indisponibilità',
         tag: 'per docente',
         body: "Premi le lettere L · Ma · Me · G · V · S per segnare i giorni liberi di ciascun docente. Il numero massimo dipende dalle ore assegnate; se un docente non ha giorni liberi, l'algoritmo gliene assegna uno.",

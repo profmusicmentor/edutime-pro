@@ -76,6 +76,12 @@ const DEFAULT_SECTIONS_CONFIG: any = {
 };
 const DEFAULT_RULES: any = {
   globalMaxGapHours: 1,
+  /**
+   * Tetto di ore in un giorno per un docente. Senza, il generatore riempiva
+   * classe per classe partendo dal lunedì e ammassava giornate da 6 ore su
+   * quattro giorni. 0 = nessun limite.
+   */
+  globalMaxHoursPerDay: 5,
   teacherMaxGapHours: {},
   teacherDaysOff: {},
   /**
@@ -911,6 +917,18 @@ const getMaxDaysOffForHours = (hours: number) => {
   return 3;
 };
 
+/**
+ * Quante ore può fare un docente in un giorno. 0 (o assente) = nessun limite.
+ */
+const maxHoursPerDayFor = (rules: any) => {
+  const v = rules?.globalMaxHoursPerDay;
+  return v === undefined || v === null ? 5 : v;
+};
+
+/** Ore già assegnate a un docente in un giorno, sostegno compreso. */
+const hoursOfTeacherOnDay = (tt: any[], teacherId: string, day: number) =>
+  tt.filter((s) => s.teacherId === teacherId && s.day === day).length;
+
 /** Chiave di una cella di indisponibilità oraria dentro teacherHoursOff. */
 const hourOffKey = (day: number, hour: number) => `${day}_${hour}`;
 
@@ -1005,6 +1023,13 @@ const canPlaceMateriaHard = (
   const { rules, rooms, classes: classesList, sectionsConfig: sectionsCfg } = ctx;
 
   if (isTeacherOff(rules, lesson.teacherId, day, hour)) return false;
+
+  const maxPerDay = maxHoursPerDayFor(rules);
+  if (
+    maxPerDay > 0 &&
+    hoursOfTeacherOnDay(tt, lesson.teacherId, day) >= maxPerDay
+  )
+    return false;
 
   const classCellBusy = tt.some(
     (s) =>
@@ -1512,6 +1537,7 @@ export default function App() {
             }
             setGenerationRules({
               globalMaxGapHours: rules.globalMaxGapHours ?? 1,
+              globalMaxHoursPerDay: rules.globalMaxHoursPerDay ?? 5,
               teacherMaxGapHours: rules.teacherMaxGapHours || {},
               teacherDaysOff: safeDaysOff,
               teacherHoursOff: safeHoursOff,
@@ -1925,6 +1951,27 @@ export default function App() {
           });
         }
       }
+      // Il tetto di ore al giorno può rendere la cattedra impossibile da
+      // piazzare: meglio dirlo qui che lasciare ore fuori dall'orario senza
+      // spiegazione.
+      const capPerDay = maxHoursPerDayFor(generationRules);
+      if (planned > 0 && capPerDay > 0 && staff.staffType !== 'strumento') {
+        let workDays = 0;
+        DAYS.slice(0, maxGridDays).forEach((_, d) => {
+          if (!daysOff.includes(d)) workDays++;
+        });
+        const capacity = workDays * capPerDay;
+        if (capacity < planned) {
+          conflicts.push({
+            type: 'error',
+            message: `Il docente ${staff.name} ha ${formatHours(
+              planned
+            )} ore pianificate ma con il tetto di ${capPerDay} ore al giorno su ${workDays} giorni ne entrano al massimo ${capacity}.`,
+            suggestion: `Alza il tetto di ore al giorno in "Sezioni & Regole", togli un giorno libero oppure riduci le ore in cattedra.`,
+            teacherId: staff.id,
+          });
+        }
+      }
       const maxAllowed = getMaxDaysOffForHours(planned);
       if (planned > 0 && daysOff.length > maxAllowed) {
         conflicts.push({
@@ -2259,6 +2306,19 @@ export default function App() {
       },
     };
 
+    const maxPerDayRule = maxHoursPerDayFor(newRules);
+
+    // Quota giornaliera ideale di ogni docente: le sue ore spalmate sui giorni
+    // in cui è a scuola. Oltre quella quota la cella costa cara, così la
+    // cattedra si distribuisce invece di ammassarsi sui primi giorni.
+    const idealPerDay: Record<string, number> = {};
+    allStaff.forEach((staff) => {
+      const planned = staffHoursPlanned[staff.id] || 0;
+      const daysOff = newRules.teacherDaysOff[staff.id] || [];
+      const workDays = Math.max(1, maxGridDays - daysOff.length);
+      idealPerDay[staff.id] = Math.max(1, Math.ceil(planned / workDays));
+    });
+
     if (generateOptions.materie) {
       const unplacedLessons: any[] = [];
       classes.forEach((cls) => {
@@ -2341,6 +2401,19 @@ export default function App() {
                   slot.teacherId === candidate.teacherId
               );
               if (isTeacherBusy) continue;
+              // Tetto di ore al giorno: senza, riempiendo classe per classe
+              // dal lunedì, lo stesso docente si ritrovava giornate da sei ore
+              // e la settimana schiacciata su quattro giorni.
+              const hoursTodayForCandidate = hoursOfTeacherOnDay(
+                newTimetable,
+                candidate.teacherId,
+                day
+              );
+              if (
+                maxPerDayRule > 0 &&
+                hoursTodayForCandidate >= maxPerDayRule
+              )
+                continue;
               const dailyClassLessons = newTimetable.filter(
                 (slot) =>
                   slot.classId === cls.id &&
@@ -2395,6 +2468,15 @@ export default function App() {
                   slot.teacherId === candidate.teacherId && slot.day === day
               );
               let penalty = 0;
+
+              // Spinta a distribuire: più ore ha già oggi, meno conviene
+              // dargliene un'altra, e oltre la quota giornaliera ideale la
+              // cella costa parecchio. Resta una penalità, non un divieto:
+              // se non c'è altro posto la lezione si piazza lo stesso.
+              penalty += dailyLessons.length * 4;
+              const quota = idealPerDay[candidate.teacherId] || 99;
+              if (dailyLessons.length >= quota)
+                penalty += (dailyLessons.length - quota + 1) * 60;
 
               if (dailyLessons.length > 0) {
                 const minHour = Math.min(
@@ -2556,6 +2638,7 @@ export default function App() {
               ).length;
             if (hYest + hTod + 1 > 10) continue;
             if (hTod + hTom + 1 > 10) continue;
+            if (maxPerDayRule > 0 && hTod >= maxPerDayRule) continue;
             const isSostegnoBusy = newTimetable.some(
               (slot) =>
                 slot.day === baseSlot.day &&
@@ -7131,6 +7214,10 @@ export default function App() {
                 <li>
                   Eviterà assegnazioni &gt; 10 ore in 2 giorni consecutivi.
                 </li>
+                <li>
+                  Rispetterà il <strong>massimo ore al giorno</strong> per
+                  docente e distribuirà le ore sui giorni disponibili.
+                </li>
                 <li>Compatterà le lezioni al mattino.</li>
                 <li>
                   <strong>Vietato avere due ore buche di fila</strong>{' '}
@@ -7226,6 +7313,31 @@ export default function App() {
                     <div className="text-xs font-medium text-slate-600">
                       Limite{' '}
                       <span className="font-bold underline">predefinito</span>
+                    </div>
+                  </div>
+                  <h3 className="font-bold text-slate-800 mt-5 mb-3 flex items-center gap-2">
+                    📆 Massimo Ore al Giorno
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={maxHoursPerDayFor(generationRules)}
+                      onChange={(e) =>
+                        handleUpdateRules(
+                          'globalMaxHoursPerDay',
+                          parseInt(e.target.value)
+                        )
+                      }
+                      disabled={readOnlyMode}
+                      className="text-sm bg-white border border-indigo-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700 cursor-pointer disabled:opacity-50"
+                    >
+                      <option value={4}>4 ore</option>
+                      <option value={5}>5 ore</option>
+                      <option value={6}>6 ore</option>
+                      <option value={0}>Nessun limite</option>
+                    </select>
+                    <div className="text-xs font-medium text-slate-600">
+                      Per docente, così la settimana non si schiaccia su pochi
+                      giorni
                     </div>
                   </div>
                 </div>
