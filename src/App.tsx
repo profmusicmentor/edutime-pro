@@ -54,6 +54,8 @@ const DEPARTMENT_COLORS: Record<string, string> = {
 const getDeptColor = (subject: string) =>
   DEPARTMENT_COLORS[subject] || '#f1f5f9';
 const DAY_OFF_COLOR = '#fee2e2';
+/** Cella di un'ora bloccata: ambra, per distinguerla dal giorno libero. */
+const HOUR_OFF_COLOR = '#fef3c7';
 
 /**
  * Anni di corso che una sezione può contenere. Arriva fino al quinto per la
@@ -75,6 +77,13 @@ const DEFAULT_RULES: any = {
   globalMaxGapHours: 1,
   teacherMaxGapHours: {},
   teacherDaysOff: {},
+  /**
+   * Indisponibilità della singola ora, per il docente in comune con un altro
+   * istituto ("il lunedì può esserci solo dopo le 11"). Mappa id docente →
+   * elenco di chiavi "giorno_ora". Affianca teacherDaysOff, che resta il
+   * modo di dichiarare un giorno intero.
+   */
+  teacherHoursOff: {},
 };
 const DEFAULT_GEN_OPTIONS = { materie: true, sostegno: true, strumento: true };
 const DEFAULT_MIXED_CLASSES: any[] = [];
@@ -851,6 +860,35 @@ const getMaxDaysOffForHours = (hours: number) => {
   return 3;
 };
 
+/** Chiave di una cella di indisponibilità oraria dentro teacherHoursOff. */
+const hourOffKey = (day: number, hour: number) => `${day}_${hour}`;
+
+/**
+ * Il docente è indisponibile in questa cella? Vale sia per il giorno intero
+ * (teacherDaysOff) sia per la singola ora (teacherHoursOff). Il tetto di
+ * getMaxDaysOffForHours riguarda solo i giorni interi: le ore singole servono
+ * a chi divide la cattedra con un'altra scuola e non vanno contate come
+ * giorno libero.
+ */
+const isTeacherOff = (
+  rules: any,
+  teacherId: string,
+  day: number,
+  hour: number
+) => {
+  if (!teacherId) return false;
+  const daysOff = (rules?.teacherDaysOff || {})[teacherId] || [];
+  if (daysOff.includes(day)) return true;
+  const hoursOff = (rules?.teacherHoursOff || {})[teacherId] || [];
+  return hoursOff.includes(hourOffKey(day, hour));
+};
+
+/** Il docente ha bloccato almeno un'ora in questo giorno? */
+const hasHoursOffOnDay = (rules: any, teacherId: string, day: number) =>
+  ((rules?.teacherHoursOff || {})[teacherId] || []).some(
+    (k: string) => k.split('_')[0] === String(day)
+  );
+
 const getRoomForSubject = (subject: string, rooms: any[]) => {
   const match = (rooms || []).find((r) =>
     (r.subjects || []).includes(subject)
@@ -915,8 +953,7 @@ const canPlaceMateriaHard = (
 ) => {
   const { rules, rooms, classes: classesList, sectionsConfig: sectionsCfg } = ctx;
 
-  const daysOff = (rules.teacherDaysOff || {})[lesson.teacherId] || [];
-  if (daysOff.includes(day)) return false;
+  if (isTeacherOff(rules, lesson.teacherId, day, hour)) return false;
 
   const classCellBusy = tt.some(
     (s) =>
@@ -1233,6 +1270,8 @@ export default function App() {
   const [selectedDepartment, setSelectedDepartment] = useState('LETTERE');
   const [masterSearch, setMasterSearch] = useState('');
   const [masterHourFilter, setMasterHourFilter] = useState('diurno');
+  /** Docente di cui è aperta la griglia delle ore di indisponibilità. */
+  const [hoursOffEditorId, setHoursOffEditorId] = useState<string | null>(null);
   const [newTeacherName, setNewTeacherName] = useState('');
   const [newTeacherSubject, setNewTeacherSubject] = useState('');
   const [newTeacherType, setNewTeacherType] = useState('materia');
@@ -1373,10 +1412,20 @@ export default function App() {
                   : [rules.teacherDaysOff[k]];
               });
             }
+            // I file salvati prima dell'indisponibilità oraria non hanno
+            // teacherHoursOff: parte vuoto e l'orario resta com'era.
+            const safeHoursOff: any = {};
+            if (rules.teacherHoursOff) {
+              Object.keys(rules.teacherHoursOff).forEach((k) => {
+                const v = rules.teacherHoursOff[k];
+                safeHoursOff[k] = Array.isArray(v) ? v.map(String) : [];
+              });
+            }
             setGenerationRules({
               globalMaxGapHours: rules.globalMaxGapHours ?? 1,
               teacherMaxGapHours: rules.teacherMaxGapHours || {},
               teacherDaysOff: safeDaysOff,
+              teacherHoursOff: safeHoursOff,
             });
           }
           if (data.generateOptions) setGenerateOptions(data.generateOptions);
@@ -1734,6 +1783,31 @@ export default function App() {
         });
       }
       const daysOff = generationRules.teacherDaysOff[staff.id] || [];
+      // Le ore bloccate non hanno un tetto come i giorni liberi: il freno è
+      // che restino abbastanza celle per le ore di cattedra.
+      const hoursOff = (generationRules.teacherHoursOff || {})[staff.id] || [];
+      if (planned > 0 && hoursOff.length > 0) {
+        const staffHours =
+          staff.staffType === 'strumento' ? afternoonHours : diurnalHours;
+        let freeCells = 0;
+        DAYS.forEach((_, d) => {
+          if (daysOff.includes(d)) return;
+          if (staff.staffType === 'strumento' && d === 5) return;
+          staffHours.forEach((h: any) => {
+            if (!hoursOff.includes(hourOffKey(d, h.index))) freeCells++;
+          });
+        });
+        if (freeCells < planned) {
+          conflicts.push({
+            type: 'error',
+            message: `Il docente ${staff.name} ha ${formatHours(
+              planned
+            )} ore pianificate ma solo ${freeCells} celle disponibili dopo giorni e ore di indisponibilità.`,
+            suggestion: `Libera qualche ora nella griglia di indisponibilità oppure riduci le ore in cattedra.`,
+            teacherId: staff.id,
+          });
+        }
+      }
       const maxAllowed = getMaxDaysOffForHours(planned);
       if (planned > 0 && daysOff.length > maxAllowed) {
         conflicts.push({
@@ -1777,6 +1851,19 @@ export default function App() {
             } è stato assegnato in un giorno di indisponibilità (${
               DAYS[day]
             }).`,
+            slot,
+          });
+        } else if (isTeacherOff(generationRules, teacherId, day, hour)) {
+          const hourLabel =
+            [...diurnalHours, ...afternoonHours].find((h) => h.index === hour)
+              ?.label || `${hour + 1}ª`;
+          conflicts.push({
+            type: 'error',
+            message: `Il docente ${
+              allStaff.find((t) => t.id === teacherId)?.name
+            } è stato assegnato in un'ora di indisponibilità (${
+              DAYS[day]
+            }, ${hourLabel}).`,
             slot,
           });
         }
@@ -1958,6 +2045,8 @@ export default function App() {
     groupConstraints,
     rooms,
     sedi,
+    diurnalHours,
+    afternoonHours,
   ]);
 
   const handleRemoveSlot = (slotToRemove: any) => {
@@ -1985,6 +2074,7 @@ export default function App() {
     let newTimetable = timetable.filter((s) => s.locked);
     let newRules = { ...generationRules };
     if (!newRules.teacherDaysOff) newRules.teacherDaysOff = {};
+    if (!newRules.teacherHoursOff) newRules.teacherHoursOff = {};
 
     allStaff.forEach((staff) => {
       const plannedHours = staffHoursPlanned[staff.id] || 0;
@@ -2095,9 +2185,8 @@ export default function App() {
 
             for (let i = 0; i < pool.length; i++) {
               const candidate = pool[i];
-              const daysOff =
-                newRules.teacherDaysOff[candidate.teacherId] || [];
-              if (daysOff.includes(day)) continue;
+              if (isTeacherOff(newRules, candidate.teacherId, day, hour))
+                continue;
 
               let mixPairClassId = null;
               if (
@@ -2315,7 +2404,6 @@ export default function App() {
     if (generateOptions.sostegno) {
       sostegno.forEach((sos) => {
         const assigns = sos.assignments || [];
-        const daysOff = newRules.teacherDaysOff[sos.id] || [];
         assigns.forEach((assign: any) => {
           const targetClassId = assign.classId;
           const targetHours = assign.hours;
@@ -2327,7 +2415,8 @@ export default function App() {
           for (let i = 0; i < occupiedSlots.length; i++) {
             if (assignedHours >= targetHours) break;
             const baseSlot = occupiedSlots[i];
-            if (daysOff.includes(baseSlot.day)) continue;
+            if (isTeacherOff(newRules, sos.id, baseSlot.day, baseSlot.hour))
+              continue;
             let hYest = 0,
               hTod = 0,
               hTom = 0;
@@ -2370,7 +2459,6 @@ export default function App() {
     if (generateOptions.strumento) {
       strumento.forEach((str, strIdx) => {
         const assigns = str.assignments || [];
-        const daysOff = newRules.teacherDaysOff[str.id] || [];
         // Se in "Aule" c'e' un'aula dedicata a questo strumento la si usa e la
         // si tratta come occupata; altrimenti resta l'etichetta generica
         // "Lab. Musica", che e' solo un nome sul tabellone: le lezioni di
@@ -2398,7 +2486,7 @@ export default function App() {
             for (let i = 0; i < possibleSlots.length; i++) {
               if (assignedHours >= targetHours) break;
               const slot = possibleSlots[i];
-              if (daysOff.includes(slot.day)) continue;
+              if (isTeacherOff(newRules, str.id, slot.day, slot.hour)) continue;
               const isBusy = newTimetable.some(
                 (s) =>
                   s.teacherId === str.id &&
@@ -2429,8 +2517,8 @@ export default function App() {
           const targetClasses = classes.map((c) => c.id).slice(0, 7);
           targetClasses.forEach((cId, index) => {
             const day = (strIdx + index) % 5;
-            if (daysOff.includes(day)) return;
             const hour = 6 + ((strIdx + index) % afternoonHours.length);
+            if (isTeacherOff(newRules, str.id, day, hour)) return;
             // Anche la distribuzione automatica deve guardare dove mette le
             // ore: prima spingeva la lezione nella cella qualunque cosa ci
             // fosse dentro, docente o classe gia' occupati compresi.
@@ -2837,10 +2925,13 @@ export default function App() {
     if (readOnlyMode) return;
     let newRules = { ...generationRules };
     if (!newRules.teacherDaysOff) newRules.teacherDaysOff = {};
+    if (!newRules.teacherHoursOff) newRules.teacherHoursOff = {};
     if (!newRules.teacherMaxGapHours) newRules.teacherMaxGapHours = {};
     if (teacherId) {
       if (field === 'teacherDaysOff')
         newRules.teacherDaysOff[teacherId] = value;
+      else if (field === 'teacherHoursOff')
+        newRules.teacherHoursOff[teacherId] = value;
       else if (value === -1) delete newRules[field][teacherId];
       else newRules[field][teacherId] = value;
     } else {
@@ -3800,7 +3891,7 @@ export default function App() {
             (t) =>
               t.id !== absence.teacherId &&
               t.availableForPaidSubstitution &&
-              !(generationRules.teacherDaysOff[t.id] || []).includes(day) &&
+              !isTeacherOff(generationRules, t.id, day, lesson.hour) &&
               !busyTeacherIds.has(t.id)
           )
           .map((t) => {
@@ -4197,6 +4288,10 @@ export default function App() {
             cells.push({ value: 'LIBERO', style: 'DayOffSlot' });
             return;
           }
+          if (isTeacherOff(generationRules, staff.id, dIdx, h.index)) {
+            cells.push({ value: 'N.D.', style: 'DayOffSlot' });
+            return;
+          }
           const occupied = timetable.find(
             (slot) =>
               slot.teacherId === staff.id &&
@@ -4323,6 +4418,10 @@ export default function App() {
             const borderClass = isLastHour && isLastDay ? 'day-sep' : '';
             if (isDayOff)
               contentHtml += `<td class="day-off ${borderClass}">LIBERO</td>`;
+            else if (
+              isTeacherOff(generationRules, staff.id, dIdx, dh.index)
+            )
+              contentHtml += `<td class="day-off ${borderClass}">N.D.</td>`;
             else {
               const occupied = timetable.find(
                 (slot) =>
@@ -4390,6 +4489,10 @@ export default function App() {
             const borderClass = isLastHour && isLastDay ? 'day-sep' : '';
             if (isDayOff)
               contentHtml += `<td class="day-off ${borderClass}">LIBERO</td>`;
+            else if (
+              isTeacherOff(generationRules, staff.id, dIdx, ah.index)
+            )
+              contentHtml += `<td class="day-off ${borderClass}">N.D.</td>`;
             else {
               const occupied = timetable.find(
                 (slot) =>
@@ -4480,6 +4583,8 @@ export default function App() {
                 generationRules.teacherDaysOff[staff?.id] || []
               ).includes(dIdx);
               if (isDayOff) return `<td class="dayoff">LIBERO</td>`;
+              if (isTeacherOff(generationRules, staff?.id, dIdx, dh.index))
+                return `<td class="dayoff">N.D.</td>`;
               const l = timetable.find(
                 (slot) =>
                   slot.teacherId === staff?.id &&
@@ -5241,19 +5346,35 @@ export default function App() {
                                   const borderClass = isLastHourOfDay
                                     ? 'border-r-4 border-slate-300'
                                     : 'border-r border-slate-200';
-                                  if (isDayOff)
+                                  const isHourOff =
+                                    !isDayOff &&
+                                    isTeacherOff(
+                                      generationRules,
+                                      staff.id,
+                                      dIdx,
+                                      currentHour
+                                    );
+                                  if (isDayOff || isHourOff)
                                     return (
                                       <td
                                         key={`${dIdx}_${currentHour}`}
                                         className={`p-1 align-middle ${borderClass}`}
                                         style={{
-                                          backgroundColor: DAY_OFF_COLOR,
+                                          backgroundColor: isHourOff
+                                            ? HOUR_OFF_COLOR
+                                            : DAY_OFF_COLOR,
                                           backgroundImage:
                                             'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(153, 27, 27, 0.1) 8px, rgba(153, 27, 27, 0.1) 16px)',
                                         }}
                                       >
-                                        <div className="w-full text-center text-[10px] font-bold text-red-800 py-1 rounded select-none cursor-not-allowed">
-                                          LIBERO
+                                        <div
+                                          className={`w-full text-center text-[10px] font-bold py-1 rounded select-none cursor-not-allowed ${
+                                            isHourOff
+                                              ? 'text-amber-800'
+                                              : 'text-red-800'
+                                          }`}
+                                        >
+                                          {isHourOff ? 'N.D.' : 'LIBERO'}
                                         </div>
                                       </td>
                                     );
@@ -5833,19 +5954,37 @@ export default function App() {
                                     selectedTeacherId
                                   ] || []
                                 ).includes(dIdx);
-                                if (isDayOff)
+                                const isHourOff =
+                                  !isDayOff &&
+                                  isTeacherOff(
+                                    generationRules,
+                                    selectedTeacherId,
+                                    dIdx,
+                                    hIdx
+                                  );
+                                if (isDayOff || isHourOff)
                                   return (
                                     <td
                                       key={dIdx}
                                       className="p-3 border-r border-slate-200 text-center h-24 align-middle"
                                       style={{
-                                        backgroundColor: DAY_OFF_COLOR,
+                                        backgroundColor: isHourOff
+                                          ? HOUR_OFF_COLOR
+                                          : DAY_OFF_COLOR,
                                         backgroundImage:
                                           'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(153, 27, 27, 0.1) 10px, rgba(153, 27, 27, 0.1) 20px)',
                                       }}
                                     >
-                                      <span className="text-red-800 font-bold text-xs select-none">
-                                        LIBERO
+                                      <span
+                                        className={`font-bold text-xs select-none ${
+                                          isHourOff
+                                            ? 'text-amber-800'
+                                            : 'text-red-800'
+                                        }`}
+                                      >
+                                        {isHourOff
+                                          ? 'NON DISPONIBILE'
+                                          : 'LIBERO'}
                                       </span>
                                     </td>
                                   );
@@ -5888,19 +6027,37 @@ export default function App() {
                                     selectedSostegnoId
                                   ] || []
                                 ).includes(dIdx);
-                                if (isDayOff)
+                                const isHourOff =
+                                  !isDayOff &&
+                                  isTeacherOff(
+                                    generationRules,
+                                    selectedSostegnoId,
+                                    dIdx,
+                                    hIdx
+                                  );
+                                if (isDayOff || isHourOff)
                                   return (
                                     <td
                                       key={dIdx}
                                       className="p-3 border-r border-slate-200 text-center h-24 align-middle"
                                       style={{
-                                        backgroundColor: DAY_OFF_COLOR,
+                                        backgroundColor: isHourOff
+                                          ? HOUR_OFF_COLOR
+                                          : DAY_OFF_COLOR,
                                         backgroundImage:
                                           'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(153, 27, 27, 0.1) 10px, rgba(153, 27, 27, 0.1) 20px)',
                                       }}
                                     >
-                                      <span className="text-red-800 font-bold text-xs select-none">
-                                        LIBERO
+                                      <span
+                                        className={`font-bold text-xs select-none ${
+                                          isHourOff
+                                            ? 'text-amber-800'
+                                            : 'text-red-800'
+                                        }`}
+                                      >
+                                        {isHourOff
+                                          ? 'NON DISPONIBILE'
+                                          : 'LIBERO'}
                                       </span>
                                     </td>
                                   );
@@ -5939,19 +6096,37 @@ export default function App() {
                                     selectedStrumentoId
                                   ] || []
                                 ).includes(dIdx);
-                                if (isDayOff)
+                                const isHourOff =
+                                  !isDayOff &&
+                                  isTeacherOff(
+                                    generationRules,
+                                    selectedStrumentoId,
+                                    dIdx,
+                                    hIdx
+                                  );
+                                if (isDayOff || isHourOff)
                                   return (
                                     <td
                                       key={dIdx}
                                       className="p-3 border-r border-slate-200 text-center h-24 align-middle"
                                       style={{
-                                        backgroundColor: DAY_OFF_COLOR,
+                                        backgroundColor: isHourOff
+                                          ? HOUR_OFF_COLOR
+                                          : DAY_OFF_COLOR,
                                         backgroundImage:
                                           'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(153, 27, 27, 0.1) 10px, rgba(153, 27, 27, 0.1) 20px)',
                                       }}
                                     >
-                                      <span className="text-red-800 font-bold text-xs select-none">
-                                        LIBERO
+                                      <span
+                                        className={`font-bold text-xs select-none ${
+                                          isHourOff
+                                            ? 'text-amber-800'
+                                            : 'text-red-800'
+                                        }`}
+                                      >
+                                        {isHourOff
+                                          ? 'NON DISPONIBILE'
+                                          : 'LIBERO'}
                                       </span>
                                     </td>
                                   );
@@ -6084,19 +6259,37 @@ export default function App() {
                                     selectedStrumentoId
                                   ] || []
                                 ).includes(dIdx);
-                                if (isDayOff)
+                                const isHourOff =
+                                  !isDayOff &&
+                                  isTeacherOff(
+                                    generationRules,
+                                    selectedStrumentoId,
+                                    dIdx,
+                                    hIdx
+                                  );
+                                if (isDayOff || isHourOff)
                                   return (
                                     <td
                                       key={dIdx}
                                       className="p-2 border-r border-slate-200 h-20 text-center align-middle"
                                       style={{
-                                        backgroundColor: DAY_OFF_COLOR,
+                                        backgroundColor: isHourOff
+                                          ? HOUR_OFF_COLOR
+                                          : DAY_OFF_COLOR,
                                         backgroundImage:
                                           'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(153, 27, 27, 0.1) 10px, rgba(153, 27, 27, 0.1) 20px)',
                                       }}
                                     >
-                                      <span className="text-red-800 font-bold text-xs select-none">
-                                        LIBERO
+                                      <span
+                                        className={`font-bold text-xs select-none ${
+                                          isHourOff
+                                            ? 'text-amber-800'
+                                            : 'text-red-800'
+                                        }`}
+                                      >
+                                        {isHourOff
+                                          ? 'NON DISPONIBILE'
+                                          : 'LIBERO'}
                                       </span>
                                     </td>
                                   );
@@ -6247,18 +6440,32 @@ export default function App() {
                                   const borderStyle = isLast
                                     ? 'border-r-4 border-slate-300'
                                     : 'border-r border-slate-100';
-                                  if (isDayOff)
+                                  const isHourOff =
+                                    !isDayOff &&
+                                    isTeacherOff(
+                                      generationRules,
+                                      teacher.id,
+                                      dIdx,
+                                      dh.index
+                                    );
+                                  if (isDayOff || isHourOff)
                                     return (
                                       <td
                                         key={`${dIdx}_${dh.index}`}
-                                        className={`p-2 text-[10px] text-red-800 italic font-bold text-center ${borderStyle}`}
+                                        className={`p-2 text-[10px] italic font-bold text-center ${borderStyle} ${
+                                          isHourOff
+                                            ? 'text-amber-800'
+                                            : 'text-red-800'
+                                        }`}
                                         style={{
-                                          backgroundColor: DAY_OFF_COLOR,
+                                          backgroundColor: isHourOff
+                                            ? HOUR_OFF_COLOR
+                                            : DAY_OFF_COLOR,
                                           backgroundImage:
                                             'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(153,27,27,0.08) 10px, rgba(153,27,27,0.08) 20px)',
                                         }}
                                       >
-                                        LIBERO
+                                        {isHourOff ? 'N.D.' : 'LIBERO'}
                                       </td>
                                     );
                                   const occupied = timetable.find(
@@ -6778,7 +6985,8 @@ export default function App() {
               </h2>
               <ul className="text-sm text-slate-600 mb-6 list-disc pl-5">
                 <li>
-                  L'algoritmo escluderà i <strong>Giorni Liberi</strong>.
+                  L'algoritmo escluderà i <strong>Giorni Liberi</strong> e le{' '}
+                  <strong>ore bloccate</strong> di ogni docente.
                 </li>
                 <li>
                   Eviterà assegnazioni &gt; 10 ore in 2 giorni consecutivi.
@@ -6930,76 +7138,202 @@ export default function App() {
                 </div>
                 <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 flex flex-col h-80">
                   <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2 shrink-0">
-                    🌴 Giorni di Indisponibilità
+                    🌴 Indisponibilità
                   </h3>
                   <p className="text-xs text-slate-500 mb-4 shrink-0">
                     Se il docente non ha giorni liberi,{' '}
                     <strong>
                       il sistema gliene assegnerà uno in automatico
                     </strong>
-                    .
+                    . Con ⏰ blocchi le singole ore, per chi è in comune con
+                    un altro istituto.
                   </p>
                   <div className="space-y-2 overflow-y-auto pr-2 flex-1">
                     {allStaff.map((staff) => {
                       const daysOffArr =
                         generationRules.teacherDaysOff[staff.id] || [];
+                      const hoursOffArr =
+                        (generationRules.teacherHoursOff || {})[staff.id] || [];
                       const deptColor = getDeptColor(staff.subject);
                       const plannedHours = staffHoursPlanned[staff.id] || 0;
                       const maxDays = getMaxDaysOffForHours(plannedHours);
                       const isLimitReached = daysOffArr.length >= maxDays;
+                      const isHoursOpen = hoursOffEditorId === staff.id;
+                      const staffHoursList =
+                        staff.staffType === 'strumento'
+                          ? afternoonHours
+                          : diurnalHours;
+                      const toggleHour = (day: number, hour: number) => {
+                        if (readOnlyMode) return;
+                        const key = hourOffKey(day, hour);
+                        const nextArr = hoursOffArr.includes(key)
+                          ? hoursOffArr.filter((k: string) => k !== key)
+                          : [...hoursOffArr, key];
+                        handleUpdateRules(
+                          'teacherHoursOff',
+                          nextArr,
+                          staff.id
+                        );
+                      };
                       return (
                         <div
                           key={staff.id}
-                          className="flex items-center justify-between p-2 rounded border border-slate-100"
+                          className="p-2 rounded border border-slate-100"
                           style={{ backgroundColor: deptColor }}
                         >
-                          <div className="flex flex-col w-1/2">
-                            <span
-                              className="text-xs font-bold text-slate-700 truncate"
-                              title={staff.name}
-                            >
-                              {staff.name}
-                            </span>
-                            <span className="text-[9px] text-slate-500">
-                              Max {maxDays} gg libero/i ({plannedHours}h)
-                            </span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col w-1/2">
+                              <span
+                                className="text-xs font-bold text-slate-700 truncate"
+                                title={staff.name}
+                              >
+                                {staff.name}
+                              </span>
+                              <span className="text-[9px] text-slate-500">
+                                Max {maxDays} gg libero/i ({plannedHours}h)
+                                {hoursOffArr.length > 0
+                                  ? ` · ${hoursOffArr.length} ore bloccate`
+                                  : ''}
+                              </span>
+                            </div>
+                            <div className="flex gap-1 items-center">
+                              {DAYS.map((dName, idx) => {
+                                const isOff = daysOffArr.includes(idx);
+                                const isDisabled =
+                                  readOnlyMode || (!isOff && isLimitReached);
+                                const hasPartial =
+                                  !isOff &&
+                                  hasHoursOffOnDay(
+                                    generationRules,
+                                    staff.id,
+                                    idx
+                                  );
+                                return (
+                                  <button
+                                    key={idx}
+                                    onClick={() => {
+                                      if (readOnlyMode) return;
+                                      const nextArr = isOff
+                                        ? daysOffArr.filter((x) => x !== idx)
+                                        : [...daysOffArr, idx];
+                                      handleUpdateRules(
+                                        'teacherDaysOff',
+                                        nextArr,
+                                        staff.id
+                                      );
+                                    }}
+                                    disabled={isDisabled}
+                                    className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold transition-all border ${
+                                      isOff
+                                        ? 'bg-red-600 border-red-700 text-white shadow-inner'
+                                        : hasPartial
+                                        ? 'bg-amber-100 border-amber-400 text-amber-700'
+                                        : 'bg-white/80 border-slate-200 text-slate-400 hover:bg-white hover:border-slate-300'
+                                    } ${
+                                      isDisabled && !isOff
+                                        ? 'opacity-30 cursor-not-allowed'
+                                        : ''
+                                    } disabled:cursor-not-allowed`}
+                                    title={
+                                      hasPartial
+                                        ? `${dName} — alcune ore bloccate`
+                                        : dName
+                                    }
+                                  >
+                                    {DAY_INITIALS[idx]}
+                                  </button>
+                                );
+                              })}
+                              <button
+                                onClick={() =>
+                                  setHoursOffEditorId(
+                                    isHoursOpen ? null : staff.id
+                                  )
+                                }
+                                className={`w-6 h-6 flex items-center justify-center rounded text-[10px] border transition-all ${
+                                  isHoursOpen
+                                    ? 'bg-indigo-600 border-indigo-700 text-white'
+                                    : 'bg-white/80 border-slate-200 hover:bg-white hover:border-indigo-300'
+                                }`}
+                                title="Blocca singole ore"
+                              >
+                                ⏰
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex gap-1">
-                            {DAYS.map((dName, idx) => {
-                              const isOff = daysOffArr.includes(idx);
-                              const isDisabled =
-                                readOnlyMode || (!isOff && isLimitReached);
-                              return (
-                                <button
-                                  key={idx}
-                                  onClick={() => {
-                                    if (readOnlyMode) return;
-                                    const nextArr = isOff
-                                      ? daysOffArr.filter((x) => x !== idx)
-                                      : [...daysOffArr, idx];
-                                    handleUpdateRules(
-                                      'teacherDaysOff',
-                                      nextArr,
-                                      staff.id
-                                    );
-                                  }}
-                                  disabled={isDisabled}
-                                  className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold transition-all border ${
-                                    isOff
-                                      ? 'bg-red-600 border-red-700 text-white shadow-inner'
-                                      : 'bg-white/80 border-slate-200 text-slate-400 hover:bg-white hover:border-slate-300'
-                                  } ${
-                                    isDisabled && !isOff
-                                      ? 'opacity-30 cursor-not-allowed'
-                                      : ''
-                                  } disabled:cursor-not-allowed`}
-                                  title={dName}
-                                >
-                                  {DAY_INITIALS[idx]}
-                                </button>
-                              );
-                            })}
-                          </div>
+                          {isHoursOpen && (
+                            <div className="mt-2 pt-2 border-t border-white/70">
+                              <p className="text-[9px] text-slate-500 mb-1">
+                                Clicca le ore in cui il docente non è a scuola
+                                (es. impegnato in un altro istituto). I giorni
+                                interi restano segnati con i tasti sopra.
+                              </p>
+                              <div className="overflow-x-auto">
+                                <table className="text-[9px] border-collapse">
+                                  <thead>
+                                    <tr>
+                                      <th className="p-0.5"></th>
+                                      {DAYS.map((dName, dIdx) => (
+                                        <th
+                                          key={dIdx}
+                                          className="p-0.5 font-bold text-slate-600"
+                                          title={dName}
+                                        >
+                                          {DAY_INITIALS[dIdx]}
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {staffHoursList.map((h: any) => (
+                                      <tr key={h.index}>
+                                        <td
+                                          className="p-0.5 font-bold text-slate-600 whitespace-nowrap"
+                                          title={h.time}
+                                        >
+                                          {h.label}
+                                        </td>
+                                        {DAYS.map((dName, dIdx) => {
+                                          const dayIsOff =
+                                            daysOffArr.includes(dIdx);
+                                          const isBlocked =
+                                            hoursOffArr.includes(
+                                              hourOffKey(dIdx, h.index)
+                                            );
+                                          return (
+                                            <td key={dIdx} className="p-0.5">
+                                              <button
+                                                onClick={() =>
+                                                  toggleHour(dIdx, h.index)
+                                                }
+                                                disabled={
+                                                  readOnlyMode || dayIsOff
+                                                }
+                                                title={`${dName} ${h.label} (${h.time})`}
+                                                className={`w-6 h-5 rounded border transition-all ${
+                                                  dayIsOff
+                                                    ? 'bg-red-200 border-red-300 cursor-not-allowed'
+                                                    : isBlocked
+                                                    ? 'bg-amber-500 border-amber-600 text-white font-bold'
+                                                    : 'bg-white/80 border-slate-200 hover:border-amber-400'
+                                                }`}
+                                              >
+                                                {dayIsOff
+                                                  ? ''
+                                                  : isBlocked
+                                                  ? '×'
+                                                  : ''}
+                                              </button>
+                                            </td>
+                                          );
+                                        })}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -8236,34 +8570,42 @@ export default function App() {
                     const isDayOff = (
                       generationRules.teacherDaysOff[t.id] || []
                     ).includes(editingCell.day);
+                    const isUnavailable = isTeacherOff(
+                      generationRules,
+                      t.id,
+                      editingCell.day,
+                      editingCell.hour
+                    );
                     const deptColor = getDeptColor(t.subject);
                     return (
                       <button
                         key={t.id}
                         onClick={() => handleAssignTeacher(t.id, false)}
-                        disabled={isDayOff}
+                        disabled={isUnavailable}
                         className={`w-full flex items-center justify-between p-2 rounded-lg border text-left transition-all ${
-                          isDayOff
+                          isUnavailable
                             ? 'border-slate-200 opacity-60 cursor-not-allowed'
                             : 'border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/40'
                         }`}
                         style={{
-                          backgroundColor: isDayOff ? DAY_OFF_COLOR : deptColor,
+                          backgroundColor: isUnavailable
+                            ? DAY_OFF_COLOR
+                            : deptColor,
                         }}
                       >
                         <span
                           className={`text-xs font-bold ${
-                            isDayOff ? 'text-red-800' : 'text-slate-700'
+                            isUnavailable ? 'text-red-800' : 'text-slate-700'
                           }`}
                         >
                           {t.name} ({t.subject})
                         </span>
-                        {isDayOff && (
+                        {isUnavailable && (
                           <span className="bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
-                            LIBERO
+                            {isDayOff ? 'LIBERO' : 'ORA BLOCCATA'}
                           </span>
                         )}
-                        {isBusy && !isDayOff && (
+                        {isBusy && !isUnavailable && (
                           <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1 py-0.5 rounded">
                             Occupato
                           </span>
@@ -8286,33 +8628,36 @@ export default function App() {
                         slot.teacherId === s.id &&
                         slot.type === 'sostegno'
                     );
-                    const isDayOff = (
-                      generationRules.teacherDaysOff[s.id] || []
-                    ).includes(editingCell.day);
+                    const isUnavailable = isTeacherOff(
+                      generationRules,
+                      s.id,
+                      editingCell.day,
+                      editingCell.hour
+                    );
                     return (
                       <button
                         key={s.id}
                         onClick={() => handleAssignTeacher(s.id, true)}
-                        disabled={isDayOff}
+                        disabled={isUnavailable}
                         className={`w-full flex items-center justify-between p-2 rounded-lg border text-left transition-all ${
-                          isDayOff
+                          isUnavailable
                             ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed'
                             : 'border-slate-200 hover:border-purple-500 hover:bg-purple-50/40'
                         }`}
                       >
                         <span
                           className={`text-xs font-bold ${
-                            isDayOff ? 'text-slate-400' : 'text-purple-700'
+                            isUnavailable ? 'text-slate-400' : 'text-purple-700'
                           }`}
                         >
                           {s.name} (Sostegno)
                         </span>
-                        {isDayOff && (
+                        {isUnavailable && (
                           <span className="bg-slate-200 text-slate-600 text-[9px] font-bold px-1.5 py-0.5 rounded">
                             NON DISP.
                           </span>
                         )}
-                        {isBusy && !isDayOff && (
+                        {isBusy && !isUnavailable && (
                           <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1 py-0.5 rounded">
                             Occupato
                           </span>
