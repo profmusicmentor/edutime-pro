@@ -805,6 +805,56 @@ const DEFAULT_STRUMENTO: any[] = [
 const DAYS = ['LUNEDÌ', 'MARTEDÌ', 'MERCOLEDÌ', 'GIOVEDÌ', 'VENERDÌ', 'SABATO'];
 const DAY_INITIALS = ['L', 'Ma', 'Me', 'G', 'V', 'S'];
 
+/**
+ * Griglia di un modello orario: quanti giorni, quante ore curricolari al
+ * giorno, e se dopo le ore curricolari c'è il rientro pomeridiano.
+ *
+ * Prima questi numeri erano scritti dentro il generatore, i controlli e le
+ * tabelle (5 ore per 6 giorni nel modello A, 6 ore per 5 giorni nel modello
+ * B). Adesso sono un dato che la scuola può cambiare, e i valori di partenza
+ * sono esattamente quelli di prima: chi non tocca niente non vede differenze.
+ */
+const DEFAULT_MODEL_GRIDS: Record<
+  string,
+  { days: number; hours: number; rientro: boolean }
+> = {
+  modelloA: { days: 6, hours: 5, rientro: true },
+  modelloB: { days: 5, hours: 6, rientro: false },
+};
+
+/** Limiti di sicurezza dei campi: oltre non si va, sotto non ha senso. */
+const GRID_MIN_DAYS = 1;
+const GRID_MAX_DAYS = DAYS.length;
+const GRID_MIN_HOURS = 1;
+const GRID_MAX_HOURS = 12;
+
+/** Righe che un modello occupa nella griglia: ore curricolari più il rientro. */
+const gridSlots = (grid: { hours: number; rientro: boolean }) =>
+  grid.hours + (grid.rientro ? 1 : 0);
+
+/** Fonde le griglie salvate con quelle di partenza, scartando valori fuori scala. */
+const normalizeModelGrids = (saved: any) => {
+  const out: Record<string, { days: number; hours: number; rientro: boolean }> =
+    { ...DEFAULT_MODEL_GRIDS };
+  if (!saved || typeof saved !== 'object') return out;
+  Object.entries(saved).forEach(([model, value]: [string, any]) => {
+    if (!value || typeof value !== 'object') return;
+    const base = out[model] || DEFAULT_MODEL_GRIDS.modelloB;
+    out[model] = {
+      days: Math.min(
+        GRID_MAX_DAYS,
+        Math.max(GRID_MIN_DAYS, Number(value.days) || base.days)
+      ),
+      hours: Math.min(
+        GRID_MAX_HOURS,
+        Math.max(GRID_MIN_HOURS, Number(value.hours) || base.hours)
+      ),
+      rientro: value.rientro === undefined ? base.rientro : !!value.rientro,
+    };
+  });
+  return out;
+};
+
 /** Da 'AAAA-MM-GG' all'indice giorno usato in `timetable` (0=Lunedì..5=Sabato, -1=Domenica). */
 const getDayIndexFromDate = (dateStr: string) => {
   const jsDay = new Date(`${dateStr}T00:00:00`).getDay();
@@ -1224,6 +1274,13 @@ export default function App() {
   const [sostegno, setSostegno] = useState<any[]>(DEFAULT_SOSTEGNO);
   const [strumento, setStrumento] = useState<any[]>(DEFAULT_STRUMENTO);
   const [rooms, setRooms] = useState<any[]>(DEFAULT_ROOMS);
+  const [modelGrids, setModelGrids] = useState<any>(DEFAULT_MODEL_GRIDS);
+  /**
+   * Copia sincrona delle griglie: il salvataggio parte subito dopo la
+   * modifica, quando lo stato di React non è ancora aggiornato, e senza
+   * questa copia scriverebbe nel cloud i valori vecchi.
+   */
+  const modelGridsRef = useRef<any>(DEFAULT_MODEL_GRIDS);
   const [sedi, setSedi] = useState<any[]>(DEFAULT_SEDI);
   const [absences, setAbsences] = useState<any[]>([]);
   const [substitutions, setSubstitutions] = useState<any[]>([]);
@@ -1359,6 +1416,36 @@ export default function App() {
     return typeof conf === 'string' ? conf : conf.model;
   };
 
+  /** Griglia del modello di una sezione: giorni, ore curricolari, rientro. */
+  const getSectionGrid = (sec: string) =>
+    modelGrids?.[getSectionModel(sec)] ||
+    DEFAULT_MODEL_GRIDS[getSectionModel(sec)] ||
+    DEFAULT_MODEL_GRIDS.modelloB;
+
+  /** Giorni e righe da mostrare nelle viste che tengono insieme più sezioni. */
+  const gridsInUse = () =>
+    Object.keys(sectionsConfig || {}).length
+      ? Object.keys(sectionsConfig).map((sec) => getSectionGrid(sec))
+      : [DEFAULT_MODEL_GRIDS.modelloB];
+  const maxGridDays = Math.max(...gridsInUse().map((g: any) => g.days));
+  const maxGridSlots = Math.max(...gridsInUse().map((g: any) => gridSlots(g)));
+
+  /**
+   * Giorni da mostrare nelle tabelle e nelle stampe: quelli davvero usati da
+   * almeno un modello. Con i valori di partenza sono i sei di sempre.
+   */
+  const DAYS_IN_USE = DAYS.slice(0, maxGridDays);
+
+  /**
+   * Righe della griglia oraria: le ore del mattino e, se la scuola ne ha
+   * impostate di più, quelle del pomeriggio a seguire. Con i valori di
+   * partenza sono le sei righe di sempre.
+   */
+  const gridHourRows = [...diurnalHours, ...afternoonHours].slice(
+    0,
+    Math.max(maxGridSlots, diurnalHours.length)
+  );
+
   const getNoteKey = (
     classId: string,
     day: number,
@@ -1381,6 +1468,7 @@ export default function App() {
     groupConstraints: [],
     mixedClasses: DEFAULT_MIXED_CLASSES,
     rooms: DEFAULT_ROOMS,
+    modelGrids: DEFAULT_MODEL_GRIDS,
     sedi: DEFAULT_SEDI,
     absences: [],
     substitutions: [],
@@ -1436,6 +1524,14 @@ export default function App() {
           if (data.groupConstraints) setGroupConstraints(data.groupConstraints);
           if (data.mixedClasses) setMixedClasses(data.mixedClasses);
           if (data.rooms) setRooms(data.rooms);
+          // I documenti salvati prima della griglia parametrica non hanno
+          // modelGrids: restano sui valori di partenza, che sono gli stessi
+          // numeri che l'app usava quando erano scritti nel codice.
+          if (data.modelGrids) {
+            const grids = normalizeModelGrids(data.modelGrids);
+            modelGridsRef.current = grids;
+            setModelGrids(grids);
+          }
           if (data.sedi) setSedi(data.sedi);
           if (data.absences) setAbsences(data.absences);
           if (data.substitutions) setSubstitutions(data.substitutions);
@@ -1556,6 +1652,7 @@ export default function App() {
         mixedClasses:
           newMixedClasses !== undefined ? newMixedClasses : mixedClasses,
         rooms: newRooms !== undefined ? newRooms : rooms,
+        modelGrids: modelGridsRef.current,
         sedi: newSedi !== undefined ? newSedi : sedi,
         absences: newAbsences !== undefined ? newAbsences : absences,
         substitutions:
@@ -1582,6 +1679,7 @@ export default function App() {
       groupConstraints,
       mixedClasses,
       rooms,
+      modelGrids,
       sedi,
       absences,
       substitutions,
@@ -1692,6 +1790,24 @@ export default function App() {
     return list;
   }, [sectionsConfig]);
 
+  /** Griglia di una classe, cercata dalla sua sezione. */
+  const getClassGrid = (classId: string) => {
+    const classObj = classes.find((c) => c.id === classId);
+    return classObj
+      ? getSectionGrid(classObj.section)
+      : DEFAULT_MODEL_GRIDS.modelloB;
+  };
+
+  /**
+   * È l'ora del rientro pomeridiano per questa classe? Prima era l'ora 5 del
+   * modello A, scritta a mano in cinque punti; ora è la prima ora dopo quelle
+   * curricolari, qualunque sia la griglia del modello.
+   */
+  const isRientroHour = (classId: string, hour: number) => {
+    const grid = getClassGrid(classId);
+    return !!grid.rientro && hour === grid.hours;
+  };
+
   const allStaff = useMemo(
     () => [
       ...teachers.map((t) => ({ ...t, staffType: 'materia' })),
@@ -1789,9 +1905,9 @@ export default function App() {
       const hoursOff = (generationRules.teacherHoursOff || {})[staff.id] || [];
       if (planned > 0 && hoursOff.length > 0) {
         const staffHours =
-          staff.staffType === 'strumento' ? afternoonHours : diurnalHours;
+          staff.staffType === 'strumento' ? afternoonHours : gridHourRows;
         let freeCells = 0;
-        DAYS.forEach((_, d) => {
+        DAYS.slice(0, maxGridDays).forEach((_, d) => {
           if (daysOff.includes(d)) return;
           if (staff.staffType === 'strumento' && d === 5) return;
           staffHours.forEach((h: any) => {
@@ -1824,7 +1940,6 @@ export default function App() {
       const { classId, day, hour, teacherId, type, room } = slot;
       const classObj = classes.find((c) => c.id === classId);
       if (!classObj) return;
-      const model = getSectionModel(classObj.section);
 
       // "Lab. Musica" sulle lezioni di strumento e' solo un'etichetta di
       // comodo quando in "Aule" non c'e' un'aula dedicata a quello strumento:
@@ -1869,23 +1984,24 @@ export default function App() {
           });
         }
       }
-      if (model === 'modelloB' && day === 5 && hour < 6) {
+      // I limiti della griglia (quanti giorni, quante ore, se c'è il rientro)
+      // arrivano dalle impostazioni del modello, non più da numeri fissi.
+      const grid = getSectionGrid(classObj.section);
+      if (day >= grid.days && hour < gridSlots(grid)) {
         conflicts.push({
           type: 'error',
-          message: `La classe ${classId} (Modello B) ha ore assegnate di Sabato.`,
+          message: `La classe ${classId} ha ore assegnate di ${DAYS[day]}, fuori dai ${grid.days} giorni del suo modello.`,
           slot,
         });
       }
-      if (model === 'modelloA' && hour === 5 && type === 'materia') {
+      if (grid.rientro && hour === grid.hours && type === 'materia') {
         conflicts.push({
           type: 'error',
-          message: `La classe ${classId} (Modello A) supera il limite delle 13:00.`,
+          message: `La classe ${classId} ha una materia nell'ora del rientro pomeridiano.`,
           slot,
         });
       }
-      const isDiurnalClassHour =
-        (model === 'modelloA' && hour < 5) ||
-        (model === 'modelloB' && hour < 6);
+      const isDiurnalClassHour = hour < grid.hours;
       if (type === 'materia' && isDiurnalClassHour)
         classHourCounts[classId] =
           (classHourCounts[classId] || 0) + hourWeight(hour);
@@ -2095,22 +2211,29 @@ export default function App() {
     allStaff.forEach((staff) => {
       const plannedHours = staffHoursPlanned[staff.id] || 0;
       const maxDaysOff = getMaxDaysOffForHours(plannedHours);
-      let teachesA = false;
-      if (staff.staffType !== 'strumento') {
-        const assigns = staff.assignments || [];
-        assigns.forEach((a: any) => {
-          const classObj = classes.find((c) => c.id === a.classId);
-          if (classObj && getSectionModel(classObj.section) === 'modelloA')
-            teachesA = true;
-        });
-      }
+      /**
+       * Giorni in cui il docente può davvero lavorare: il massimo fra le
+       * griglie delle sue classi. Chi non arriva ai giorni della scuola ha il
+       * giorno libero d'ufficio nel primo giorno che le sue classi non usano
+       * (con i modelli di partenza è il sabato di chi sta solo sul modello B,
+       * come prima); gli altri lo ricevono nel giorno meno affollato.
+       */
+      const teacherGridDays =
+        staff.staffType === 'strumento'
+          ? maxGridDays
+          : Math.max(
+              0,
+              ...(staff.assignments || []).map(
+                (a: any) => getClassGrid(a.classId).days
+              )
+            );
       const currentDaysOff = newRules.teacherDaysOff[staff.id] || [];
       if (currentDaysOff.length === 0 && plannedHours > 0) {
-        if (!teachesA && staff.staffType !== 'strumento')
-          newRules.teacherDaysOff[staff.id] = [5];
+        if (teacherGridDays > 0 && teacherGridDays < maxGridDays)
+          newRules.teacherDaysOff[staff.id] = [teacherGridDays];
         else {
           let minDay = 0;
-          for (let i = 1; i < 6; i++)
+          for (let i = 1; i < maxGridDays; i++)
             if (daysOffCount[i] < daysOffCount[minDay]) minDay = i;
           newRules.teacherDaysOff[staff.id] = [minDay];
           daysOffCount[minDay]++;
@@ -2139,12 +2262,11 @@ export default function App() {
     if (generateOptions.materie) {
       const unplacedLessons: any[] = [];
       classes.forEach((cls) => {
-        const classObj = classes.find((c) => c.id === cls.id);
-        const sectionModel = classObj
-          ? getSectionModel(classObj.section)
-          : 'modelloB';
-        const maxHoursPerDay = sectionModel === 'modelloA' ? 5 : 6;
-        const totalDays = sectionModel === 'modelloA' ? 6 : 5;
+        // Quante ore al giorno e su quanti giorni: sono i numeri della
+        // griglia del modello, impostabili dalla scuola.
+        const grid = getClassGrid(cls.id);
+        const maxHoursPerDay = grid.hours;
+        const totalDays = grid.days;
         const pool: any[] = [];
 
         teachers.forEach((t) => {
@@ -2654,10 +2776,7 @@ export default function App() {
           strumento.find((m) => m.id === teacherId)?.subject || 'Strumento';
         room = 'Lab. Musica';
       } else {
-        const classObj = classes.find((c) => c.id === newClassId);
-        const isModelloA =
-          classObj && getSectionModel(classObj.section) === 'modelloA';
-        type = isModelloA && hour === 5 ? 'pomeriggio_musica' : 'materia';
+        type = isRientroHour(newClassId, hour) ? 'pomeriggio_musica' : 'materia';
         subject =
           teachers.find((t) => t.id === teacherId)?.subject || 'Lezione';
         room = getRoomForSubject(subject, rooms);
@@ -2771,13 +2890,7 @@ export default function App() {
           );
           let type1 = typeToClear,
             type2 = typeToClear;
-          const classObj1 = classes.find((c) => c.id === newClassId);
-          if (
-            classObj1 &&
-            getSectionModel(classObj1.section) === 'modelloA' &&
-            hour === 5 &&
-            typeToClear === 'materia'
-          )
+          if (isRientroHour(newClassId, hour) && typeToClear === 'materia')
             type1 = 'pomeriggio_musica';
           newTimetable.push({
             classId: newClassId,
@@ -2790,13 +2903,7 @@ export default function App() {
             room: tempRoom,
           });
           if (oldSlot) {
-            const classObj2 = classes.find((c) => c.id === oldSlot.classId);
-            if (
-              classObj2 &&
-              getSectionModel(classObj2.section) === 'modelloA' &&
-              hour === 5 &&
-              typeToClear === 'materia'
-            )
+            if (isRientroHour(oldSlot.classId, hour) && typeToClear === 'materia')
               type2 = 'pomeriggio_musica';
             newTimetable.push({
               classId: oldSlot.classId,
@@ -3151,10 +3258,7 @@ export default function App() {
     let type = typeToClear,
       room = tempRoom;
     if (type === 'materia') {
-      const classObj = classes.find((c) => c.id === classId);
-      const isModelloA =
-        classObj && getSectionModel(classObj.section) === 'modelloA';
-      type = isModelloA && hour === 5 ? 'pomeriggio_musica' : 'materia';
+      type = isRientroHour(classId, hour) ? 'pomeriggio_musica' : 'materia';
       room = getRoomForSubject(tDoc?.subject || '', rooms);
     } else if (type === 'sostegno') {
       room = 'Aula';
@@ -3278,13 +3382,7 @@ export default function App() {
           );
           let type1 = typeToClear,
             type2 = typeToClear;
-          const classObj1 = classes.find((c) => c.id === classId);
-          if (
-            classObj1 &&
-            getSectionModel(classObj1.section) === 'modelloA' &&
-            hour === 5 &&
-            typeToClear === 'materia'
-          )
+          if (isRientroHour(classId, hour) && typeToClear === 'materia')
             type1 = 'pomeriggio_musica';
           newTimetable.push({
             classId,
@@ -3296,13 +3394,8 @@ export default function App() {
             room: tempRoom,
           });
           if (oldSlotInClass) {
-            const classObj2 = classes.find(
-              (c) => c.id === conflictingSlot.classId
-            );
             if (
-              classObj2 &&
-              getSectionModel(classObj2.section) === 'modelloA' &&
-              hour === 5 &&
+              isRientroHour(conflictingSlot.classId, hour) &&
               typeToClear === 'materia'
             )
               type2 = 'pomeriggio_musica';
@@ -3667,6 +3760,43 @@ export default function App() {
       teachers,
       sostegno,
       newConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses
+    );
+  };
+
+  /**
+   * Cambia la griglia di un modello: quanti giorni, quante ore al giorno, se
+   * c'è il rientro pomeridiano. Sono gli stessi numeri che prima erano
+   * scritti nel codice del generatore.
+   */
+  const handleUpdateModelGrid = (
+    model: string,
+    field: 'days' | 'hours' | 'rientro',
+    value: any
+  ) => {
+    if (readOnlyMode) return;
+    const current =
+      modelGrids?.[model] ||
+      DEFAULT_MODEL_GRIDS[model] ||
+      DEFAULT_MODEL_GRIDS.modelloB;
+    const next = normalizeModelGrids({
+      ...modelGrids,
+      [model]: { ...current, [field]: value },
+    });
+    modelGridsRef.current = next;
+    setModelGrids(next);
+    pushDataToCloud(
+      timetable,
+      teachers,
+      sostegno,
+      sectionsConfig,
       strumento,
       diurnalHours,
       afternoonHours,
@@ -4392,16 +4522,16 @@ export default function App() {
       const staffPomeridiano = filteredStaff.filter(
         (s) => s.staffType === 'strumento'
       );
-      contentHtml += `<h1>📋 ORARIO SCOLASTICO DIURNO</h1><h2>☀️ Orario Mattutino - Tutti i Docenti</h2><table><thead><tr><th style="width: 130pt;" rowspan="2">Docente</th><th style="width: 25pt;" rowspan="2">Ore</th><th style="width: 130pt;" rowspan="2">Classi Assegnate</th>${DAYS.map(
+      contentHtml += `<h1>📋 ORARIO SCOLASTICO DIURNO</h1><h2>☀️ Orario Mattutino - Tutti i Docenti</h2><table><thead><tr><th style="width: 130pt;" rowspan="2">Docente</th><th style="width: 25pt;" rowspan="2">Ore</th><th style="width: 130pt;" rowspan="2">Classi Assegnate</th>${DAYS_IN_USE.map(
         (day, idx) =>
           `<th colspan="${diurnalHours.length}" class="${
-            idx < DAYS.length - 1 ? 'day-sep' : ''
+            idx < DAYS_IN_USE.length - 1 ? 'day-sep' : ''
           }">${day}</th>`
-      ).join('')}</tr><tr>${DAYS.map((_, dIdx) =>
+      ).join('')}</tr><tr>${DAYS_IN_USE.map((_, dIdx) =>
         diurnalHours
           .map((dh, hIdx) => {
             const isLast =
-              hIdx === diurnalHours.length - 1 && dIdx < DAYS.length - 1;
+              hIdx === diurnalHours.length - 1 && dIdx < DAYS_IN_USE.length - 1;
             return `<th class="sub ${isLast ? 'day-sep' : ''}">${escapeXml(
               dh.label.split(' ')[0]
             )}</th>`;
@@ -4415,7 +4545,7 @@ export default function App() {
         prevSubject = staff.subject;
         if (isNewDept)
           contentHtml += `<tr class="dept-separator"><td colspan="${
-            3 + DAYS.length * diurnalHours.length
+            3 + DAYS_IN_USE.length * diurnalHours.length
           }"></td></tr>`;
         contentHtml += `<tr><td class="staff-cell" style="background-color: ${deptColor} !important;">${escapeXml(
           staff.name
@@ -4430,7 +4560,7 @@ export default function App() {
           const isDayOff = (
             generationRules.teacherDaysOff[staff.id] || []
           ).includes(dIdx);
-          const isLastDay = dIdx < DAYS.length - 1;
+          const isLastDay = dIdx < DAYS_IN_USE.length - 1;
           diurnalHours.forEach((dh, hIdx) => {
             const isLastHour = hIdx === diurnalHours.length - 1;
             const borderClass = isLastHour && isLastDay ? 'day-sep' : '';
@@ -4531,30 +4661,26 @@ export default function App() {
       contentHtml += `</tbody></table><script>window.onload = function() { setTimeout(function() { window.print(); }, 300); }</script></body></html>`;
     } else if (printType === 'single_class') {
       const classObj = classes.find((c) => c.id === id);
-      contentHtml = `<html><head><title>Orario Classe ${id}</title><style>@page { size: A4 portrait; margin: 15mm; } body { font-family: sans-serif; font-size: 12px; margin: 15mm; padding: 0; } table { width: 100%; border-collapse: collapse; page-break-inside: avoid; } th, td { border: 1px solid #ccc; padding: 8px; text-align: center; } th { background-color: #f0f0f0; } tr { page-break-inside: avoid; }</style></head><body><h2 style="text-align:center;">Orario Classe ${id}</h2><table><thead><tr><th>Ora</th>${DAYS.map(
-        (d) => {
-          if (
-            d === 'SABATO' &&
-            classObj &&
-            getSectionModel(classObj.section) === 'modelloB'
-          )
-            return '';
+      // Giorni e righe della classe: quelli del suo modello, non piu' il
+      // sabato tolto a mano al modello B.
+      const classGrid = classObj
+        ? getSectionGrid(classObj.section)
+        : DEFAULT_MODEL_GRIDS.modelloB;
+      contentHtml = `<html><head><title>Orario Classe ${id}</title><style>@page { size: A4 portrait; margin: 15mm; } body { font-family: sans-serif; font-size: 12px; margin: 15mm; padding: 0; } table { width: 100%; border-collapse: collapse; page-break-inside: avoid; } th, td { border: 1px solid #ccc; padding: 8px; text-align: center; } th { background-color: #f0f0f0; } tr { page-break-inside: avoid; }</style></head><body><h2 style="text-align:center;">Orario Classe ${id}</h2><table><thead><tr><th>Ora</th>${DAYS_IN_USE.map(
+        (d, dIdx) => {
+          if (dIdx >= classGrid.days) return '';
           return `<th>${d}</th>`;
         }
-      ).join('')}</tr></thead><tbody>${diurnalHours
+      ).join('')}</tr></thead><tbody>${gridHourRows
+        .slice(0, gridSlots(classGrid))
         .map(
           (dh) =>
             `<tr><td style="font-weight:bold; width: 60px;">${
               dh.label
             }<br/><span style="font-size: 8px; font-weight:normal;">${
               dh.time
-            }</span></td>${DAYS.map((day, dIdx) => {
-              if (
-                day === 'SABATO' &&
-                classObj &&
-                getSectionModel(classObj.section) === 'modelloB'
-              )
-                return '';
+            }</span></td>${DAYS_IN_USE.map((day, dIdx) => {
+              if (dIdx >= classGrid.days) return '';
               const l = timetable.find(
                 (slot) =>
                   slot.classId === id &&
@@ -4584,11 +4710,11 @@ export default function App() {
         staff?.name
       }</h2><h3 style="text-align:center; color: #666;">${
         staff?.subject
-      }</h3><table><thead><tr><th>Ora</th>${DAYS.map(
+      }</h3><table><thead><tr><th>Ora</th>${DAYS_IN_USE.map(
         (d) => `<th>${d}</th>`
       ).join('')}</tr></thead><tbody>${(staff?.staffType === 'strumento'
         ? afternoonHours
-        : diurnalHours
+        : gridHourRows
       )
         .map(
           (dh) =>
@@ -4596,7 +4722,7 @@ export default function App() {
               dh.label
             }<br/><span style="font-size: 8px; font-weight:normal;">${
               dh.time
-            }</span></td>${DAYS.map((day, dIdx) => {
+            }</span></td>${DAYS_IN_USE.map((day, dIdx) => {
               const isDayOff = (
                 generationRules.teacherDaysOff[staff?.id] || []
               ).includes(dIdx);
@@ -5196,12 +5322,12 @@ export default function App() {
                       <th className="p-3 w-16 bg-slate-200 font-bold text-center border-r-4 border-slate-300 text-indigo-800 sticky left-80 z-40 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
                         Ore
                       </th>
-                      {DAYS.map((day, idx) => {
+                      {DAYS_IN_USE.map((day, idx) => {
                         const activeHours =
                           masterHourFilter === 'diurno'
                             ? diurnalHours
                             : afternoonHours;
-                        const isLastDay = idx === DAYS.length - 1;
+                        const isLastDay = idx === DAYS_IN_USE.length - 1;
                         return (
                           <th
                             key={day}
@@ -5222,7 +5348,7 @@ export default function App() {
                       <th className="p-2 w-16 bg-slate-100 border-r-4 border-slate-300 text-center text-slate-500 font-medium sticky left-80 z-30 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
                         Tot.
                       </th>
-                      {DAYS.map((day, dIdx) => {
+                      {DAYS_IN_USE.map((day, dIdx) => {
                         const activeHours =
                           masterHourFilter === 'diurno'
                             ? diurnalHours
@@ -5230,7 +5356,7 @@ export default function App() {
                         return activeHours.map((hObj, hIdx) => {
                           const isLastHourOfDay =
                             hIdx === activeHours.length - 1 &&
-                            dIdx < DAYS.length - 1;
+                            dIdx < DAYS_IN_USE.length - 1;
                           return (
                             <th
                               key={`${day}_h${hObj.index}`}
@@ -5265,7 +5391,7 @@ export default function App() {
                                 <td
                                   colSpan={
                                     2 +
-                                    DAYS.length *
+                                    DAYS_IN_USE.length *
                                       (masterHourFilter === 'diurno'
                                         ? diurnalHours.length
                                         : afternoonHours.length)
@@ -5348,7 +5474,7 @@ export default function App() {
                               <td className="p-2 w-16 border-r-4 border-slate-300 text-center font-bold text-indigo-700 bg-indigo-50/10 sticky left-80 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
                                 {hoursPlanned}h
                               </td>
-                              {DAYS.map((day, dIdx) => {
+                              {DAYS_IN_USE.map((day, dIdx) => {
                                 const activeHours =
                                   masterHourFilter === 'diurno'
                                     ? diurnalHours
@@ -5360,7 +5486,7 @@ export default function App() {
                                   const currentHour = hObj.index;
                                   const isLastHourOfDay =
                                     hIdx === activeHours.length - 1 &&
-                                    dIdx < DAYS.length - 1;
+                                    dIdx < DAYS_IN_USE.length - 1;
                                   const borderClass = isLastHourOfDay
                                     ? 'border-r-4 border-slate-300'
                                     : 'border-r border-slate-200';
@@ -5724,16 +5850,14 @@ export default function App() {
                         <th className="p-4 w-36 font-semibold border-r border-slate-200">
                           Ora
                         </th>
-                        {DAYS.map((day, idx) => {
-                          const selectedClassObj = classes.find(
-                            (c) => c.id === selectedClass
-                          );
-                          const showSaturday =
-                            viewType !== 'class' ||
-                            (selectedClassObj &&
-                              getSectionModel(selectedClassObj.section) ===
-                                'modelloA');
-                          if (idx === 5 && !showSaturday) return null;
+                        {DAYS_IN_USE.map((day, idx) => {
+                          // Nella vista di una classe si mostrano solo i
+                          // giorni del suo modello, quali che siano.
+                          if (
+                            viewType === 'class' &&
+                            idx >= getClassGrid(selectedClass).days
+                          )
+                            return null;
                           return (
                             <th
                               key={day}
@@ -5746,15 +5870,17 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {diurnalHours.map((hObj, hIdx) => {
-                        const selectedClassObj = classes.find(
-                          (c) => c.id === selectedClass
-                        );
-                        const isModelloA =
+                      {gridHourRows.map((hObj, hIdx) => {
+                        // Riga del rientro pomeridiano: la prima dopo le ore
+                        // curricolari, se il modello della classe lo prevede.
+                        const isRientroRow =
                           viewType === 'class' &&
-                          selectedClassObj &&
-                          getSectionModel(selectedClassObj.section) ===
-                            'modelloA';
+                          isRientroHour(selectedClass, hIdx);
+                        if (
+                          viewType === 'class' &&
+                          hIdx >= gridSlots(getClassGrid(selectedClass))
+                        )
+                          return null;
                         return (
                           <tr
                             key={hIdx}
@@ -5768,16 +5894,12 @@ export default function App() {
                                 {hObj.time}
                               </span>
                             </td>
-                            {DAYS.map((day, dIdx) => {
-                              const selectedClassObj = classes.find(
-                                (c) => c.id === selectedClass
-                              );
-                              const hasSaturday =
-                                viewType !== 'class' ||
-                                (selectedClassObj &&
-                                  getSectionModel(selectedClassObj.section) ===
-                                    'modelloA');
-                              if (dIdx === 5 && !hasSaturday) return null;
+                            {DAYS_IN_USE.map((day, dIdx) => {
+                              if (
+                                viewType === 'class' &&
+                                dIdx >= getClassGrid(selectedClass).days
+                              )
+                                return null;
                               if (viewType === 'class') {
                                 const classLessons = timetable.filter(
                                   (slot) =>
@@ -5954,7 +6076,7 @@ export default function App() {
                                           </button>
                                         )}
                                       </div>
-                                    ) : isModelloA && hIdx === 5 ? (
+                                    ) : isRientroRow ? (
                                       <span className="text-[11px] text-emerald-600 italic bg-emerald-50 px-2 py-1 rounded border border-emerald-100 block">
                                         Fine diurno
                                       </span>
@@ -6209,7 +6331,7 @@ export default function App() {
                                 {hObj.time}
                               </span>
                             </td>
-                            {DAYS.map((day, dIdx) => {
+                            {DAYS_IN_USE.map((day, dIdx) => {
                               if (dIdx === 5) return null;
                               if (viewType === 'class') {
                                 const pmLessons = timetable.filter(
@@ -6381,12 +6503,12 @@ export default function App() {
                         <th className="p-3 w-64 bg-slate-100 font-semibold border-r sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
                           Docente
                         </th>
-                        {DAYS.map((day, dIdx) => (
+                        {DAYS_IN_USE.map((day, dIdx) => (
                           <th
                             key={day}
                             colSpan={diurnalHours.length}
                             className={`p-2 font-bold text-center text-slate-700 ${
-                              dIdx < DAYS.length - 1
+                              dIdx < DAYS_IN_USE.length - 1
                                 ? 'border-r-4 border-slate-300 bg-slate-100/60'
                                 : 'bg-slate-100/30'
                             }`}
@@ -6399,11 +6521,11 @@ export default function App() {
                         <th className="p-2 bg-slate-100 border-r sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.1)]">
                           Carico ore
                         </th>
-                        {DAYS.map((day, dIdx) =>
+                        {DAYS_IN_USE.map((day, dIdx) =>
                           diurnalHours.map((dh, hIdx) => {
                             const isLast =
                               hIdx === diurnalHours.length - 1 &&
-                              dIdx < DAYS.length - 1;
+                              dIdx < DAYS_IN_USE.length - 1;
                             return (
                               <th
                                 key={`${day}_h_${dh.index}`}
@@ -6446,7 +6568,7 @@ export default function App() {
                                   {totalHours} ore assegnate
                                 </div>
                               </td>
-                              {DAYS.map((day, dIdx) => {
+                              {DAYS_IN_USE.map((day, dIdx) => {
                                 const isDayOff = (
                                   generationRules.teacherDaysOff[teacher.id] ||
                                   []
@@ -6454,7 +6576,7 @@ export default function App() {
                                 return diurnalHours.map((dh, hIdx) => {
                                   const isLast =
                                     hIdx === diurnalHours.length - 1 &&
-                                    dIdx < DAYS.length - 1;
+                                    dIdx < DAYS_IN_USE.length - 1;
                                   const borderStyle = isLast
                                     ? 'border-r-4 border-slate-300'
                                     : 'border-r border-slate-100';
@@ -7215,7 +7337,7 @@ export default function App() {
                               </span>
                             </div>
                             <div className="flex gap-1 items-center">
-                              {DAYS.map((dName, idx) => {
+                              {DAYS_IN_USE.map((dName, idx) => {
                                 const isOff = daysOffArr.includes(idx);
                                 const isDisabled =
                                   readOnlyMode || (!isOff && isLimitReached);
@@ -7291,7 +7413,7 @@ export default function App() {
                                   <thead>
                                     <tr>
                                       <th className="p-0.5"></th>
-                                      {DAYS.map((dName, dIdx) => (
+                                      {DAYS_IN_USE.map((dName, dIdx) => (
                                         <th
                                           key={dIdx}
                                           className="p-0.5 font-bold text-slate-600"
@@ -7311,7 +7433,7 @@ export default function App() {
                                         >
                                           {h.label}
                                         </td>
-                                        {DAYS.map((dName, dIdx) => {
+                                        {DAYS_IN_USE.map((dName, dIdx) => {
                                           const dayIsOff =
                                             daysOffArr.includes(dIdx);
                                           const isBlocked =
@@ -7529,29 +7651,105 @@ export default function App() {
               <p className="text-sm text-slate-500 mb-6">
                 Aggiungi, rinomina o rimuovi le sezioni dell'istituto.
               </p>
+              <p className="text-sm text-slate-500 mb-4">
+                La griglia oraria dei due modelli è modificabile: giorni della
+                settimana, ore al giorno ed eventuale rientro pomeridiano. Il
+                generatore, i controlli, le tabelle e le stampe seguono questi
+                numeri.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                <div className="p-5 rounded-2xl bg-indigo-50 border border-indigo-100">
-                  <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1 rounded-full uppercase">
-                    Modello A
-                  </span>
-                  <h3 className="text-lg font-bold text-slate-800 mt-3 mb-2">
-                    6 Giorni (Lun-Sab)
-                  </h3>
-                  <p className="text-xs text-slate-600">
-                    5 ore al giorno, sabato attivo.
-                  </p>
-                </div>
-                <div className="p-5 rounded-2xl bg-amber-50 border border-amber-100">
-                  <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full uppercase">
-                    Modello B
-                  </span>
-                  <h3 className="text-lg font-bold text-slate-800 mt-3 mb-2">
-                    5 Giorni (Lun-Ven)
-                  </h3>
-                  <p className="text-xs text-slate-600">
-                    6 ore al giorno, sabato libero.
-                  </p>
-                </div>
+                {[
+                  {
+                    model: 'modelloA',
+                    nome: 'Modello A',
+                    box: 'bg-indigo-50 border-indigo-100',
+                    tag: 'bg-indigo-100 text-indigo-800',
+                  },
+                  {
+                    model: 'modelloB',
+                    nome: 'Modello B',
+                    box: 'bg-amber-50 border-amber-100',
+                    tag: 'bg-amber-100 text-amber-800',
+                  },
+                ].map(({ model, nome, box, tag }) => {
+                  const grid =
+                    modelGrids?.[model] || DEFAULT_MODEL_GRIDS[model];
+                  return (
+                    <div
+                      key={model}
+                      className={`p-5 rounded-2xl border ${box}`}
+                    >
+                      <span
+                        className={`${tag} text-xs font-bold px-3 py-1 rounded-full uppercase`}
+                      >
+                        {nome}
+                      </span>
+                      <h3 className="text-lg font-bold text-slate-800 mt-3 mb-3">
+                        {grid.days} giorni ({DAYS[0].slice(0, 3).toLowerCase()}-
+                        {DAYS[grid.days - 1].slice(0, 3).toLowerCase()}),{' '}
+                        {grid.hours} ore
+                      </h3>
+                      <div className="flex flex-wrap gap-4 items-end">
+                        <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                          Giorni a settimana
+                          <input
+                            type="number"
+                            min={GRID_MIN_DAYS}
+                            max={GRID_MAX_DAYS}
+                            value={grid.days}
+                            onChange={(e) =>
+                              handleUpdateModelGrid(
+                                model,
+                                'days',
+                                Number(e.target.value)
+                              )
+                            }
+                            disabled={readOnlyMode}
+                            className="w-20 border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                          Ore al giorno
+                          <input
+                            type="number"
+                            min={GRID_MIN_HOURS}
+                            max={GRID_MAX_HOURS}
+                            value={grid.hours}
+                            onChange={(e) =>
+                              handleUpdateModelGrid(
+                                model,
+                                'hours',
+                                Number(e.target.value)
+                              )
+                            }
+                            disabled={readOnlyMode}
+                            className="w-20 border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                          />
+                        </label>
+                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 pb-1">
+                          <input
+                            type="checkbox"
+                            checked={!!grid.rientro}
+                            onChange={(e) =>
+                              handleUpdateModelGrid(
+                                model,
+                                'rientro',
+                                e.target.checked
+                              )
+                            }
+                            disabled={readOnlyMode}
+                            className="w-4 h-4 accent-indigo-600 disabled:opacity-50"
+                          />
+                          Rientro pomeridiano
+                        </label>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-3">
+                        Le etichette e gli orari delle singole ore si cambiano
+                        in "Ore e Orari".
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
               <div className="border-t border-slate-100 pt-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -7631,10 +7829,14 @@ export default function App() {
                             className="text-sm bg-white border border-slate-300 rounded-lg py-1.5 px-2 font-medium w-full focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <option value="modelloA">
-                              Modello A (6 Giorni)
+                              Modello A ({(modelGrids?.modelloA ||
+                                DEFAULT_MODEL_GRIDS.modelloA).days}{' '}
+                              giorni)
                             </option>
                             <option value="modelloB">
-                              Modello B (5 Giorni)
+                              Modello B ({(modelGrids?.modelloB ||
+                                DEFAULT_MODEL_GRIDS.modelloB).days}{' '}
+                              giorni)
                             </option>
                           </select>
                           <select

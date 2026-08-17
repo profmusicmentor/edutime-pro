@@ -455,7 +455,7 @@ export const chapters: Chapter[] = [
     ],
     note: {
       title: 'Modello A e Modello B nella vista Classe',
-      body: 'Se la classe è di Modello A vedrai anche il sabato (5 ore). Se è di Modello B il sabato non compare: la classe ha 6 ore dal lunedì al venerdì.',
+      body: 'La vista Classe mostra i giorni e le ore della griglia del suo modello: con i valori di partenza il Modello A ha il sabato e 5 ore, il Modello B si ferma al venerdì con 6 ore. Se cambi la griglia in «Sezioni & Regole», la tabella si adegua.',
     },
   },
   {
@@ -573,9 +573,15 @@ export const chapters: Chapter[] = [
         body: (
           <>
             <p>
-              <B>Modello A</B>: 6 giorni (Lun-Sab), 5 ore al giorno, sabato
-              attivo. <B>Modello B</B>: 5 giorni (Lun-Ven), 6 ore al giorno,
-              sabato libero.
+              I due modelli partono dalla configurazione classica della
+              secondaria di primo grado — <B>Modello A</B>: 6 giorni (Lun-Sab),
+              5 ore al giorno più il rientro; <B>Modello B</B>: 5 giorni
+              (Lun-Ven), 6 ore al giorno — ma la <B>griglia è modificabile</B>:
+              in questa scheda imposti quanti giorni a settimana, quante ore al
+              giorno e se c'è il rientro pomeridiano. Generatore, controlli,
+              tabelle e stampe seguono i numeri che imposti qui, quindi una
+              scuola che lavora su 4 giorni da 3 ore può descrivere la propria
+              settimana senza forzature.
             </p>
             <p className="mt-2">
               Per ogni sezione puoi cambiare modello, attivare o disattivare gli
@@ -994,9 +1000,11 @@ export const chapters: Chapter[] = [
             items={[
               <>
                 <B>Modello A e Modello B</B> non sono il monte ore: dicono solo
-                come si distribuisce la settimana. A = 6 giorni con 5 ore, B = 5
-                giorni con 6 ore. Scegli quello che somiglia alla vostra
-                settimana, poi regola le ore con la durata e il monte ore.
+                come si distribuisce la settimana. Di partenza A = 6 giorni con
+                5 ore e B = 5 giorni con 6 ore, ma giorni e ore si cambiano in
+                «Sezioni & Regole». Scegli il modello che somiglia alla vostra
+                settimana, adegua la griglia, poi regola le ore con la durata e
+                il monte ore.
               </>,
               <>
                 L'app ragiona per <B>cattedre</B>: ogni docente ha le sue ore su
@@ -1052,12 +1060,18 @@ export const chapters: Chapter[] = [
           <Ul
             items={[
               <>
-                <B>Modello A</B>: 6 giorni (Lun-Sab), 5 ore al giorno. La 6ª ora
-                (13:00-14:00) è considerata pomeridiana.
+                <B>Modello A</B>, di partenza: 6 giorni (Lun-Sab), 5 ore al
+                giorno. L'ora successiva alle curricolari è il rientro
+                pomeridiano.
               </>,
               <>
-                <B>Modello B</B>: 5 giorni (Lun-Ven), 6 ore al giorno, sabato
-                libero.
+                <B>Modello B</B>, di partenza: 5 giorni (Lun-Ven), 6 ore al
+                giorno, sabato libero.
+              </>,
+              <>
+                Entrambi i modelli sono <B>modificabili</B> in «Sezioni &
+                Regole»: giorni a settimana, ore al giorno e rientro
+                pomeridiano. Chi non li tocca continua a lavorare come prima.
               </>,
             ]}
           />
