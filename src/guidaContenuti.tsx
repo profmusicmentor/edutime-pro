@@ -548,9 +548,14 @@ export const chapters: Chapter[] = [
         ),
       },
       {
-        title: '🌴 Giorni di indisponibilità',
+        title: '🌴 Indisponibilità',
         tag: 'per docente',
         body: "Premi le lettere L · Ma · Me · G · V · S per segnare i giorni liberi di ciascun docente. Il numero massimo dipende dalle ore assegnate; se un docente non ha giorni liberi, l'algoritmo gliene assegna uno.",
+      },
+      {
+        title: '⏰ Ore singole bloccate',
+        tag: 'cattedre condivise',
+        body: "Il tasto ⏰ accanto ai giorni apre una griglia giorno × ora: cliccando una cella dichiari che il docente in quell'ora non è a scuola. Serve per chi ha la cattedra in comune con un altro istituto — per esempio «il lunedì può esserci solo dopo le 11»: blocchi 1ª, 2ª e 3ª ora del lunedì e l'algoritmo userà solo le ore successive. Le ore bloccate non contano nel limite dei giorni liberi; se però le celle rimaste non bastano per le ore di cattedra, la scheda Conflitti lo segnala.",
       },
       {
         title: '🌍 Classi Miste (lingue straniere)',
