@@ -1026,6 +1026,26 @@ const getRoomForSubject = (subject: string, rooms: any[]) => {
   return match ? match.name : 'Aula';
 };
 
+/**
+ * L'aula va mostrata solo se dice qualcosa: "Aula" e "Classe" sono il
+ * default di chi non usa i laboratori, scriverli in ogni cella sarebbe
+ * rumore. Chi lavora in DADA ha invece nomi veri e li vuole vedere.
+ */
+const isNamedRoom = (roomName?: string) =>
+  !!roomName && roomName !== 'Aula' && roomName !== 'Classe';
+
+/**
+ * Etichetta corta per le celle strette della stampa A3: "Lab. Scienze"
+ * diventa "L.SCIEN". Il nome intero non ci sta in una colonna da 6.5pt.
+ */
+const roomShortLabel = (roomName?: string) => {
+  if (!isNamedRoom(roomName)) return '';
+  const name = String(roomName);
+  const lab = name.match(/^lab\.?\s*(?:di\s+)?(.+)$/i);
+  if (lab) return `L.${lab[1].slice(0, 5).toUpperCase()}`;
+  return name.slice(0, 7).toUpperCase();
+};
+
 const getRoomSede = (roomName: string, rooms: any[]) =>
   (rooms || []).find((r) => r.name === roomName)?.sedeId;
 
@@ -1620,6 +1640,38 @@ const consolidateShortDays = (tt: any[], ctx: any, budgetMs = 1500) => {
   return { moved, shortDaysLeft };
 };
 
+/** Frecce per spostare una riga docente su e giù nel suo elenco. */
+const StaffOrderButtons = ({
+  index,
+  total,
+  disabled,
+  onMove,
+}: {
+  index: number;
+  total: number;
+  disabled?: boolean;
+  onMove: (direction: number) => void;
+}) => (
+  <div className="flex flex-col gap-0.5 shrink-0">
+    <button
+      onClick={() => onMove(-1)}
+      disabled={disabled || index === 0}
+      title="Sposta su"
+      className="w-5 h-4 leading-none rounded bg-white/70 hover:bg-white text-slate-600 text-[9px] font-bold border border-slate-300 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
+    >
+      ▲
+    </button>
+    <button
+      onClick={() => onMove(1)}
+      disabled={disabled || index === total - 1}
+      title="Sposta giù"
+      className="w-5 h-4 leading-none rounded bg-white/70 hover:bg-white text-slate-600 text-[9px] font-bold border border-slate-300 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
+    >
+      ▼
+    </button>
+  </div>
+);
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('master-view');
   const [sectionsConfig, setSectionsConfig] = useState<any>(
@@ -1706,6 +1758,12 @@ export default function App() {
   const [generationReport, setGenerationReport] = useState<any>(null);
   const [highlightedSlot, setHighlightedSlot] = useState<any>(null);
   const [tempRoom, setTempRoom] = useState('Aula');
+  /**
+   * L'aula scelta a mano nel modale vince solo se l'utente ha davvero
+   * toccato il menu: altrimenti resta il laboratorio legato alla materia,
+   * che è quello che si aspetta chi non usa la DADA.
+   */
+  const [roomTouched, setRoomTouched] = useState(false);
   const [assignModal, setAssignModal] = useState<any>(null);
   const [assignClass, setAssignClass] = useState('');
   const [assignHours, setAssignHours] = useState(1);
@@ -1732,15 +1790,28 @@ export default function App() {
 
   useEffect(() => {
     if (editingCell) {
-      const slot = timetable.find(
+      // L'aula da mostrare è quella della lezione, non quella del sostegno
+      // che sta nella stessa cella (e che sta sempre in classe).
+      const cellSlots = timetable.filter(
         (s) =>
           s.classId === editingCell.classId &&
           s.day === editingCell.day &&
           s.hour === editingCell.hour
       );
+      const slot =
+        cellSlots.find(
+          (s) => s.type === 'materia' || s.type === 'pomeriggio_musica'
+        ) || cellSlots[0];
       setTempRoom(slot?.room || 'Aula');
+      // Se l'ora era già stata spostata a mano in un'aula diversa da quella
+      // della sua materia, quella scelta vale come se l'utente l'avesse
+      // appena fatta: cambiando docente non deve tornare al default.
+      setRoomTouched(
+        !!slot?.room &&
+          slot.room !== getRoomForSubject(slot.subject, rooms)
+      );
     }
-  }, [editingCell, timetable]);
+  }, [editingCell, timetable, rooms]);
 
   const mergedHoursMap = useMemo(() => {
     const map: any = {};
@@ -3294,7 +3365,7 @@ export default function App() {
         type = isRientroHour(newClassId, hour) ? 'pomeriggio_musica' : 'materia';
         subject =
           teachers.find((t) => t.id === teacherId)?.subject || 'Lezione';
-        room = getRoomForSubject(subject, rooms);
+        room = roomTouched ? tempRoom : getRoomForSubject(subject, rooms);
       }
       filtered.push({
         classId: newClassId,
@@ -3497,6 +3568,91 @@ export default function App() {
       groupConstraints,
       mixedClasses
     );
+  };
+
+  /**
+   * L'ordine delle liste docenti è l'ordine di inserimento, ed è quello che
+   * si vede ovunque: registro cattedre, quadro master, stampe. Chi aggiunge
+   * una collega a metà anno se la ritrova in coda, staccata dal suo
+   * dipartimento (e senza la riga di separazione, che guarda solo la
+   * materia della riga precedente). Queste due funzioni servono a
+   * rimetterla al suo posto.
+   */
+  const reorderStaffList = (list: any[], id: string, direction: number) => {
+    const idx = list.findIndex((s) => s.id === id);
+    const target = idx + direction;
+    if (idx < 0 || target < 0 || target >= list.length) return null;
+    const next = [...list];
+    next[idx] = list[target];
+    next[target] = list[idx];
+    return next;
+  };
+
+  const persistStaffLists = (
+    updatedTeachers: any[],
+    updatedSostegno: any[],
+    updatedStrumento: any[]
+  ) => {
+    pushDataToCloud(
+      timetable,
+      updatedTeachers,
+      updatedSostegno,
+      sectionsConfig,
+      updatedStrumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses
+    );
+  };
+
+  /** Sposta un docente di una posizione su (-1) o giù (+1) nel suo elenco. */
+  const handleMoveStaff = (
+    id: string,
+    direction: number,
+    staffType: string
+  ) => {
+    if (readOnlyMode) return;
+    if (staffType === 'materia') {
+      const next = reorderStaffList(teachers, id, direction);
+      if (!next) return;
+      setTeachers(next);
+      persistStaffLists(next, sostegno, strumento);
+    } else if (staffType === 'sostegno') {
+      const next = reorderStaffList(sostegno, id, direction);
+      if (!next) return;
+      setSostegno(next);
+      persistStaffLists(teachers, next, strumento);
+    } else if (staffType === 'strumento') {
+      const next = reorderStaffList(strumento, id, direction);
+      if (!next) return;
+      setStrumento(next);
+      persistStaffLists(teachers, sostegno, next);
+    }
+  };
+
+  /** Riordina l'elenco per materia e, a parità di materia, per nome. */
+  const handleSortStaffBySubject = (staffType: string) => {
+    if (readOnlyMode) return;
+    const bySubject = (a: any, b: any) =>
+      (a.subject || '').localeCompare(b.subject || '') ||
+      (a.name || '').localeCompare(b.name || '');
+    if (staffType === 'materia') {
+      const next = [...teachers].sort(bySubject);
+      setTeachers(next);
+      persistStaffLists(next, sostegno, strumento);
+    } else if (staffType === 'sostegno') {
+      const next = [...sostegno].sort(bySubject);
+      setSostegno(next);
+      persistStaffLists(teachers, next, strumento);
+    } else if (staffType === 'strumento') {
+      const next = [...strumento].sort(bySubject);
+      setStrumento(next);
+      persistStaffLists(teachers, sostegno, next);
+    }
   };
 
   const handleToggleConsecutive = (
@@ -3774,7 +3930,9 @@ export default function App() {
       room = tempRoom;
     if (type === 'materia') {
       type = isRientroHour(classId, hour) ? 'pomeriggio_musica' : 'materia';
-      room = getRoomForSubject(tDoc?.subject || '', rooms);
+      room = roomTouched
+        ? tempRoom
+        : getRoomForSubject(tDoc?.subject || '', rooms);
     } else if (type === 'sostegno') {
       room = 'Aula';
     } else {
@@ -5038,7 +5196,7 @@ export default function App() {
       setPrintAlertOpen(true);
       return;
     }
-    let css = `@page { size: A3 landscape; margin: 6mm; } * { box-sizing: border-box; } body { background-color: white; color: black; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 6mm; font-size: 7.5pt; } h1 { font-size: 14pt; font-weight: bold; margin: 0 0 4mm 0; color: #1e3a8a; text-align: center; } h2 { font-size: 9pt; margin: 0 0 2mm 0; color: #1e3a8a; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #1e3a8a; padding-bottom: 1mm; } table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 3mm; } tr { page-break-inside: auto; } td, th { border: 0.5pt solid #64748b; padding: 1.5pt 2pt; text-align: center; font-size: 6.5pt; line-height: 1.15; overflow: hidden; vertical-align: middle; } th { background-color: #1e3a8a !important; color: white !important; font-weight: bold; font-size: 6.5pt; border: 1pt solid #1e3a8a; } th.sub { background-color: #e5e7eb !important; color: #374151 !important; font-size: 6pt; } td.staff-cell { text-align: left; font-weight: bold; font-size: 7pt; padding: 2pt 3pt; } td.staff-cell .subj { font-size: 5.5pt; font-weight: normal; color: #374151; text-transform: uppercase; display: block; } td.hours-cell { font-weight: bold; color: #1e3a8a; background-color: #f0f4ff !important; } td.class-cell { text-align: left; color: #4f46e5; font-weight: bold; font-size: 6pt; } td.day-off { background-color: ${DAY_OFF_COLOR} !important; color: #991b1b !important; font-style: italic; font-weight: bold; font-size: 6pt; } td.lesson-active { background-color: #dbeafe !important; color: #1e3a8a !important; font-weight: bold; font-size: 7.5pt; } td.empty { background-color: #fafafa; } tr.dept-separator td { background-color: #1e3a8a !important; height: 3pt; padding: 0; } .page-break { page-break-before: always; } .day-sep { border-right: 2pt solid #1e3a8a !important; }`;
+    let css = `@page { size: A3 landscape; margin: 6mm; } * { box-sizing: border-box; } body { background-color: white; color: black; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 6mm; font-size: 7.5pt; } h1 { font-size: 14pt; font-weight: bold; margin: 0 0 4mm 0; color: #1e3a8a; text-align: center; } h2 { font-size: 9pt; margin: 0 0 2mm 0; color: #1e3a8a; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #1e3a8a; padding-bottom: 1mm; } table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 3mm; } tr { page-break-inside: auto; } td, th { border: 0.5pt solid #64748b; padding: 1.5pt 2pt; text-align: center; font-size: 6.5pt; line-height: 1.15; overflow: hidden; vertical-align: middle; } th { background-color: #1e3a8a !important; color: white !important; font-weight: bold; font-size: 6.5pt; border: 1pt solid #1e3a8a; } th.sub { background-color: #e5e7eb !important; color: #374151 !important; font-size: 6pt; } td.staff-cell { text-align: left; font-weight: bold; font-size: 7pt; padding: 2pt 3pt; } td.staff-cell .subj { font-size: 5.5pt; font-weight: normal; color: #374151; text-transform: uppercase; display: block; } td.hours-cell { font-weight: bold; color: #1e3a8a; background-color: #f0f4ff !important; } td.class-cell { text-align: left; color: #4f46e5; font-weight: bold; font-size: 6pt; } td.day-off { background-color: ${DAY_OFF_COLOR} !important; color: #991b1b !important; font-style: italic; font-weight: bold; font-size: 6pt; } td.lesson-active { background-color: #dbeafe !important; color: #1e3a8a !important; font-weight: bold; font-size: 7.5pt; line-height: 1.05; } td.lesson-active .room { display: block; font-size: 4.8pt; font-weight: normal; color: #4338ca; letter-spacing: -0.15pt; white-space: nowrap; } td.empty { background-color: #fafafa; } tr.dept-separator td { background-color: #1e3a8a !important; height: 3pt; padding: 0; } .page-break { page-break-before: always; } .day-sep { border-right: 2pt solid #1e3a8a !important; }`;
     let contentHtml = `<html><head><title>Orario - EduTime Pro</title><style>${css}</style></head><body>`;
     if (printType === 'master') {
       const staffDiurno = filteredStaff.filter(
@@ -5105,7 +5263,13 @@ export default function App() {
               if (occupied)
                 contentHtml += `<td class="lesson-active ${borderClass}">${escapeXml(
                   occupied.classId
-                )}</td>`;
+                )}${
+                  roomShortLabel(occupied.room)
+                    ? `<span class="room">${escapeXml(
+                        roomShortLabel(occupied.room)
+                      )}</span>`
+                    : ''
+                }</td>`;
               else contentHtml += `<td class="empty ${borderClass}">-</td>`;
             }
           });
@@ -5176,7 +5340,13 @@ export default function App() {
               if (occupied)
                 contentHtml += `<td class="lesson-active ${borderClass}">${escapeXml(
                   occupied.classId
-                )}</td>`;
+                )}${
+                  roomShortLabel(occupied.room)
+                    ? `<span class="room">${escapeXml(
+                        roomShortLabel(occupied.room)
+                      )}</span>`
+                    : ''
+                }</td>`;
               else contentHtml += `<td class="empty ${borderClass}">-</td>`;
             }
           });
@@ -5220,7 +5390,13 @@ export default function App() {
                       l.subject
                     )}</b><br/><span style="font-size:10px;">${escapeXml(
                       allStaff.find((s) => s.id === l.teacherId)?.name
-                    )}</span>`
+                    )}</span>${
+                      isNamedRoom(l.room)
+                        ? `<br/><span style="font-size:9px;color:#4338ca;">📍 ${escapeXml(
+                            l.room
+                          )}</span>`
+                        : ''
+                    }`
                   : '-'
               }</td>`;
             }).join('')}</tr>`
@@ -5262,7 +5438,17 @@ export default function App() {
               );
               return `<td style="${
                 l ? 'background-color: #dbeafe; font-weight: bold;' : ''
-              }">${l ? `<b>Classe ${escapeXml(l.classId)}</b>` : '-'}</td>`;
+              }">${
+                l
+                  ? `<b>Classe ${escapeXml(l.classId)}</b>${
+                      isNamedRoom(l.room)
+                        ? `<br/><span style="font-size:9px;font-weight:normal;color:#4338ca;">📍 ${escapeXml(
+                            l.room
+                          )}</span>`
+                        : ''
+                    }`
+                  : '-'
+              }</td>`;
             }).join('')}</tr>`
         )
         .join('')}</tbody></table></body></html>`;
@@ -6485,6 +6671,14 @@ export default function App() {
                                                   m.id === pmLesson.teacherId
                                               )?.name}
                                           </p>
+                                          {isNamedRoom(pmLesson.room) && (
+                                            <p
+                                              className="text-[10px] text-emerald-700 font-semibold truncate"
+                                              title={`Aula: ${pmLesson.room}`}
+                                            >
+                                              📍 {pmLesson.room}
+                                            </p>
+                                          )}
                                         </div>
                                       </div>
                                     </td>
@@ -6550,6 +6744,14 @@ export default function App() {
                                                 )?.name
                                               }
                                             </p>
+                                            {isNamedRoom(materia.room) && (
+                                              <p
+                                                className="text-[10px] text-indigo-700 font-semibold truncate"
+                                                title={`Aula: ${materia.room}`}
+                                              >
+                                                📍 {materia.room}
+                                              </p>
+                                            )}
                                           </div>
                                           {sost && (
                                             <div className="mt-1.5 text-[10px] bg-purple-100 text-purple-800 font-semibold px-1.5 py-0.5 rounded-sm inline-block self-start">
@@ -6677,6 +6879,14 @@ export default function App() {
                                         <span className="text-[10px] text-slate-500 uppercase tracking-wider">
                                           {slotOccupied.subject}
                                         </span>
+                                        {isNamedRoom(slotOccupied.room) && (
+                                          <span
+                                            className="text-[10px] text-indigo-700 font-semibold truncate max-w-full"
+                                            title={`Aula: ${slotOccupied.room}`}
+                                          >
+                                            📍 {slotOccupied.room}
+                                          </span>
+                                        )}
                                       </div>
                                     ) : (
                                       <span className="text-xs text-slate-200">
@@ -6819,6 +7029,14 @@ export default function App() {
                                         <span className="text-[10px] text-slate-500 uppercase tracking-wider">
                                           {slotOccupied.subject}
                                         </span>
+                                        {isNamedRoom(slotOccupied.room) && (
+                                          <span
+                                            className="text-[10px] text-indigo-700 font-semibold truncate max-w-full"
+                                            title={`Aula: ${slotOccupied.room}`}
+                                          >
+                                            📍 {slotOccupied.room}
+                                          </span>
+                                        )}
                                       </div>
                                     ) : (
                                       <span className="text-xs text-slate-300">
@@ -7209,6 +7427,18 @@ export default function App() {
                   </button>
                 </div>
                 <button
+                  onClick={() =>
+                    handleSortStaffBySubject(
+                      cattedreSubTab === 'diurne' ? 'materia' : cattedreSubTab
+                    )
+                  }
+                  disabled={readOnlyMode}
+                  title="Riordina l'elenco per materia e, a parità di materia, per nome"
+                  className="px-4 py-2 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  🔤 Ordina per materia
+                </button>
+                <button
                   onClick={() => setShowResetModal(true)}
                   disabled={readOnlyMode}
                   className="px-4 py-2 rounded-lg text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 hover:text-rose-700 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -7279,11 +7509,27 @@ export default function App() {
                                   className="p-2 w-64 border-r border-slate-300 sticky left-0 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]"
                                   style={{ backgroundColor: deptColor }}
                                 >
-                                  <div className="font-bold text-xs text-slate-800 uppercase">
-                                    {teacher.name}
-                                  </div>
-                                  <div className="text-[10px] text-slate-600 uppercase font-bold">
-                                    {teacher.subject}
+                                  <div className="flex items-center gap-2">
+                                    <StaffOrderButtons
+                                      index={idx}
+                                      total={teachers.length}
+                                      disabled={readOnlyMode}
+                                      onMove={(direction) =>
+                                        handleMoveStaff(
+                                          teacher.id,
+                                          direction,
+                                          'materia'
+                                        )
+                                      }
+                                    />
+                                    <div className="min-w-0">
+                                      <div className="font-bold text-xs text-slate-800 uppercase truncate">
+                                        {teacher.name}
+                                      </div>
+                                      <div className="text-[10px] text-slate-600 uppercase font-bold truncate">
+                                        {teacher.subject}
+                                      </div>
+                                    </div>
                                   </div>
                                 </td>
                                 <td className="p-2 w-16 border-r border-slate-200 text-center bg-white">
@@ -7404,7 +7650,7 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-sm">
-                      {sostegno.map((sos) => {
+                      {sostegno.map((sos, idx) => {
                         const assignments = sos.assignments || [];
                         const totalHoursAssigned = assignments.reduce(
                           (sum: number, a: any) => sum + a.hours,
@@ -7421,11 +7667,27 @@ export default function App() {
                                 backgroundColor: getDeptColor('SOSTEGNO'),
                               }}
                             >
-                              <div className="font-bold text-xs text-slate-800 uppercase">
-                                {sos.name}
-                              </div>
-                              <div className="text-[10px] text-slate-600 uppercase font-bold">
-                                {sos.subject}
+                              <div className="flex items-center gap-2">
+                                <StaffOrderButtons
+                                  index={idx}
+                                  total={sostegno.length}
+                                  disabled={readOnlyMode}
+                                  onMove={(direction) =>
+                                    handleMoveStaff(
+                                      sos.id,
+                                      direction,
+                                      'sostegno'
+                                    )
+                                  }
+                                />
+                                <div className="min-w-0">
+                                  <div className="font-bold text-xs text-slate-800 uppercase truncate">
+                                    {sos.name}
+                                  </div>
+                                  <div className="text-[10px] text-slate-600 uppercase font-bold truncate">
+                                    {sos.subject}
+                                  </div>
+                                </div>
                               </div>
                             </td>
                             <td className="p-2 w-16 border-r border-slate-200 text-center bg-white">
@@ -7556,11 +7818,27 @@ export default function App() {
                                   className="p-2 w-64 border-r border-slate-300 sticky left-0 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]"
                                   style={{ backgroundColor: deptColor }}
                                 >
-                                  <div className="font-bold text-xs text-slate-800 uppercase">
-                                    {str.name}
-                                  </div>
-                                  <div className="text-[10px] text-slate-600 uppercase font-bold">
-                                    {str.subject}
+                                  <div className="flex items-center gap-2">
+                                    <StaffOrderButtons
+                                      index={idx}
+                                      total={strumento.length}
+                                      disabled={readOnlyMode}
+                                      onMove={(direction) =>
+                                        handleMoveStaff(
+                                          str.id,
+                                          direction,
+                                          'strumento'
+                                        )
+                                      }
+                                    />
+                                    <div className="min-w-0">
+                                      <div className="font-bold text-xs text-slate-800 uppercase truncate">
+                                        {str.name}
+                                      </div>
+                                      <div className="text-[10px] text-slate-600 uppercase font-bold truncate">
+                                        {str.subject}
+                                      </div>
+                                    </div>
                                   </div>
                                 </td>
                                 <td className="p-2 w-16 border-r border-slate-200 text-center bg-white">
@@ -9492,7 +9770,10 @@ export default function App() {
                 </label>
                 <select
                   value={tempRoom}
-                  onChange={(e) => setTempRoom(e.target.value)}
+                  onChange={(e) => {
+                    setTempRoom(e.target.value);
+                    setRoomTouched(true);
+                  }}
                   className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
                 >
                   {rooms.map((r) => (

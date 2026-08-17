@@ -417,11 +417,11 @@ export const chapters: Chapter[] = [
             items={[
               <>
                 <B>Classe</B>: orario completo (materia, docente, sostegno
-                affiancato, note).
+                affiancato, aula, note).
               </>,
               <>
-                <B>Docente</B>: orario personale, con celle libere e giorni
-                liberi evidenziati.
+                <B>Docente</B>: orario personale, con celle libere, giorni
+                liberi evidenziati e aula di ogni lezione.
               </>,
               <>
                 <B>Sostegno</B>: in quale classe è in compresenza ogni ora.
@@ -446,6 +446,11 @@ export const chapters: Chapter[] = [
         title: 'Modifica cella nella vista Classe',
         tag: 'click sulla cella',
         body: 'Cliccando una cella (vuota o occupata) si apre il modale Modifica Cella, da cui assegni docente, sostegno, aula oppure rimuovi la lezione.',
+      },
+      {
+        title: 'Dove si svolge la lezione',
+        tag: 'utile con la DADA',
+        body: "Sotto il nome del docente compare 📍 con l'aula o il laboratorio, quando è diverso dall'aula della classe. Lo stesso dato si trova nelle stampe A4 della classe e del docente e nel quadro A3, dove per ragioni di spazio è abbreviato (Lab. Scienze diventa L.SCIEN).",
       },
       {
         title: 'Note sulle celle',
@@ -484,6 +489,11 @@ export const chapters: Chapter[] = [
         title: 'Colonna delle supplenze',
         tag: 'serve alle Sostituzioni',
         body: "Spunta la casella dei docenti disponibili a fare supplenze retribuite nelle proprie ore buca. Solo loro compaiono fra i sostituti proposti nella scheda Sostituzioni: se lasci tutte le caselle vuote, lì non verrà proposto nessun nome.",
+      },
+      {
+        title: 'Ordine dei docenti (▲ ▼)',
+        tag: 'anche nel quadro e nelle stampe',
+        body: "Le frecce accanto a ogni nome spostano il docente su e giù nell'elenco. L'ordine che imposti qui è quello che vedi anche nell'Orario Generale e nella stampa A3, quindi serve a rimettere accanto ai colleghi di materia chi è stato inserito a metà anno. Il pulsante 🔤 Ordina per materia riordina in un colpo solo la sotto-scheda aperta, per materia e poi per nome.",
       },
       {
         title: 'Pulsante ➕',
@@ -862,7 +872,10 @@ export const chapters: Chapter[] = [
               </>,
               <>
                 <B>🏫 Aula / Laboratorio</B>: Aula Normale, Palestra, Lab.
-                Musica, Lab. Tecnologia, Lab. Arte, Lab. Scienze.
+                Musica, Lab. Tecnologia, Lab. Arte, Lab. Scienze. Se non tocchi
+                questo menu vale il laboratorio collegato alla materia; se lo
+                scegli tu, la tua scelta resta anche quando cambi il docente
+                della cella.
               </>,
             ]}
           />
