@@ -82,6 +82,12 @@ const DEFAULT_RULES: any = {
    * quattro giorni. 0 = nessun limite.
    */
   globalMaxHoursPerDay: 5,
+  /**
+   * Minimo di ore in una giornata di lavoro: dopo la generazione le giornate
+   * più corte vengono riassorbite dove il docente è già a scuola.
+   * 0 = nessun vincolo.
+   */
+  globalMinHoursPerDay: 2,
   teacherMaxGapHours: {},
   teacherDaysOff: {},
   /**
@@ -925,9 +931,31 @@ const maxHoursPerDayFor = (rules: any) => {
   return v === undefined || v === null ? 5 : v;
 };
 
+/**
+ * Minimo di ore in una giornata di lavoro: sotto questa soglia il docente
+ * verrebbe a scuola per un'ora sola. 0 = nessun vincolo.
+ */
+const minHoursPerDayFor = (rules: any) => {
+  const v = rules?.globalMinHoursPerDay;
+  return v === undefined || v === null ? 2 : v;
+};
+
 /** Ore già assegnate a un docente in un giorno, sostegno compreso. */
 const hoursOfTeacherOnDay = (tt: any[], teacherId: string, day: number) =>
   tt.filter((s) => s.teacherId === teacherId && s.day === day).length;
+
+/**
+ * Tetto giornaliero effettivo di un docente: il limite scelto dalla scuola,
+ * abbassato alla sua quota giornaliera (ore di cattedra divise per i giorni in
+ * cui è a scuola) quando questa è più stretta. È la regola che distribuisce la
+ * cattedra invece di ammassarla sui primi giorni della settimana.
+ */
+const dailyCapFor = (rules: any, idealPerDay: any, teacherId: string) => {
+  const rule = maxHoursPerDayFor(rules);
+  if (rule <= 0) return 0;
+  const ideal = (idealPerDay || {})[teacherId];
+  return ideal ? Math.min(rule, ideal) : rule;
+};
 
 /** Chiave di una cella di indisponibilità oraria dentro teacherHoursOff. */
 const hourOffKey = (day: number, hour: number) => `${day}_${hour}`;
@@ -1024,7 +1052,7 @@ const canPlaceMateriaHard = (
 
   if (isTeacherOff(rules, lesson.teacherId, day, hour)) return false;
 
-  const maxPerDay = maxHoursPerDayFor(rules);
+  const maxPerDay = dailyCapFor(rules, ctx.idealPerDay, lesson.teacherId);
   if (
     maxPerDay > 0 &&
     hoursOfTeacherOnDay(tt, lesson.teacherId, day) >= maxPerDay
@@ -1287,6 +1315,286 @@ const repairUnplacedLessons = (
   return { stillMissing, recovered, swaps };
 };
 
+/**
+ * Cerca una lezione della stessa classe con cui scambiare la cella: la nostra
+ * sale nel giorno in cui il docente è già a scuola, quella scende nella cella
+ * lasciata libera. Vale solo se entrambe le collocazioni reggono i vincoli
+ * rigidi e se lo scambio non regala all'altro docente una giornata sotto il
+ * minimo.
+ */
+const findExchange = (
+  tt: any[],
+  slot: any,
+  lesson: any,
+  shortDay: number,
+  grid: any,
+  teacherId: string,
+  minPerDay: number,
+  ctx: any
+) => {
+  const candidates = tt.filter(
+    (s) =>
+      s.classId === slot.classId &&
+      s.type === 'materia' &&
+      !s.locked &&
+      s.day !== shortDay &&
+      s.day < grid.days &&
+      s.hour < grid.hours &&
+      s.teacherId !== teacherId &&
+      !isMixedLesson(s, ctx.mixedClasses) &&
+      hoursOfTeacherOnDay(tt, teacherId, s.day) > 0
+  );
+
+  const gapFor = (id: string) =>
+    ctx.rules.teacherMaxGapHours &&
+    ctx.rules.teacherMaxGapHours[id] !== undefined
+      ? ctx.rules.teacherMaxGapHours[id]
+      : ctx.rules.globalMaxGapHours || 1;
+
+  let best: any = null;
+
+  for (const victim of candidates) {
+    // L'altro docente scende nella giornata corta: se lì non ha già abbastanza
+    // ore, lo scambio sposterebbe il problema sulle sue spalle.
+    const victimHoursOnShortDay = hoursOfTeacherOnDay(
+      tt,
+      victim.teacherId,
+      shortDay
+    );
+    if (victimHoursOnShortDay > 0 && victimHoursOnShortDay + 1 < minPerDay)
+      continue;
+    if (victimHoursOnShortDay === 0) continue;
+
+    const index = tt.indexOf(victim);
+    tt.splice(index, 1);
+
+    const nostraOk = canPlaceMateriaHard(
+      tt,
+      lesson,
+      slot.classId,
+      victim.day,
+      victim.hour,
+      ctx
+    );
+    const suaOk =
+      nostraOk &&
+      canPlaceMateriaHard(
+        tt,
+        {
+          teacherId: victim.teacherId,
+          subject: victim.subject,
+          classId: victim.classId,
+        },
+        victim.classId,
+        shortDay,
+        slot.hour,
+        ctx
+      );
+
+    // Fra tutti gli scambi possibili si sceglie quello che lascia meno ore
+    // buca: consolidare non deve sfilacciare le altre giornate.
+    let costo = Infinity;
+    if (nostraOk && suaOk) {
+      costo =
+        materiaPlacementPenalty(
+          tt,
+          lesson,
+          slot.classId,
+          victim.day,
+          victim.hour,
+          gapFor(teacherId)
+        ) +
+        materiaPlacementPenalty(
+          tt,
+          {
+            teacherId: victim.teacherId,
+            subject: victim.subject,
+            classId: victim.classId,
+          },
+          victim.classId,
+          shortDay,
+          slot.hour,
+          gapFor(victim.teacherId)
+        );
+    }
+
+    tt.splice(index, 0, victim);
+    if (costo < Infinity && (!best || costo < best.costo))
+      best = { victim, costo };
+  }
+
+  return best;
+};
+
+/**
+ * Terza passata: le giornate spezzate.
+ *
+ * Distribuire la cattedra sui giorni disponibili lascia qualche coda: il
+ * docente si ritrova a venire a scuola per una sola ora. Qui quelle giornate
+ * vengono riassorbite, spostando le lezioni in un giorno in cui il docente è
+ * già presente. Lo spostamento vale solo se tutte le ore di quella giornata
+ * trovano casa: altrimenti si torna indietro e la giornata resta com'era.
+ *
+ * Il tetto che conta in questa passata è il massimo della scuola, non la quota
+ * giornaliera: la quota serve a distribuire, ma non deve impedire di chiudere
+ * una giornata da un'ora sola. Celle col lucchetto e classi abbinate restano
+ * ferme, come nella riparazione.
+ */
+const consolidateShortDays = (tt: any[], ctx: any, budgetMs = 1500) => {
+  const minPerDay = minHoursPerDayFor(ctx.rules);
+  if (minPerDay <= 1) return { moved: 0, shortDaysLeft: 0 };
+
+  const deadline = Date.now() + budgetMs;
+  // Senza idealPerDay il tetto torna a essere quello della scuola.
+  const relaxedCtx = { ...ctx, idealPerDay: null };
+  const maxGapFor = (teacherId: string) =>
+    ctx.rules.teacherMaxGapHours &&
+    ctx.rules.teacherMaxGapHours[teacherId] !== undefined
+      ? ctx.rules.teacherMaxGapHours[teacherId]
+      : ctx.rules.globalMaxGapHours || 1;
+
+  let moved = 0;
+  let shortDaysLeft = 0;
+
+  const teacherIds = Array.from(
+    new Set(tt.filter((s) => s.type === 'materia').map((s) => s.teacherId))
+  );
+
+  for (const teacherId of teacherIds) {
+    if (Date.now() > deadline) break;
+
+    const daysWorked = Array.from(
+      new Set(
+        tt.filter((s) => s.teacherId === teacherId).map((s) => s.day)
+      )
+    ).sort((a, b) => a - b);
+
+    for (const day of daysWorked) {
+      if (Date.now() > deadline) break;
+
+      const daySlots = tt.filter(
+        (s) => s.teacherId === teacherId && s.day === day
+      );
+      if (daySlots.length === 0 || daySlots.length >= minPerDay) continue;
+
+      const movable = daySlots.every(
+        (s) =>
+          s.type === 'materia' &&
+          !s.locked &&
+          !isMixedLesson(s, ctx.mixedClasses)
+      );
+      if (!movable) {
+        shortDaysLeft++;
+        continue;
+      }
+
+      // Le lezioni escono dalla griglia: così le celle che liberano tornano
+      // disponibili e i controlli non le vedono come occupate.
+      const removed = daySlots.map((slot) => ({
+        slot,
+        index: tt.indexOf(slot),
+      }));
+      removed
+        .sort((a, b) => b.index - a.index)
+        .forEach(({ index }) => tt.splice(index, 1));
+
+      const landed: any[] = [];
+      const evicted: any[] = [];
+      let allPlaced = true;
+
+      for (const { slot } of removed) {
+        const grid = ctx.getGrid(slot.classId);
+        const lesson = {
+          teacherId: slot.teacherId,
+          subject: slot.subject,
+          classId: slot.classId,
+          preferConsecutive: !!(ctx.teachers || []).find(
+            (t: any) => t.id === slot.teacherId
+          )?.preferConsecutive,
+        };
+
+        let best: any = null;
+        for (let d = 0; d < grid.days; d++) {
+          if (d === day) continue;
+          // Solo dove il docente è già a scuola: aprire un'altra giornata
+          // corta non risolverebbe niente.
+          if (hoursOfTeacherOnDay(tt, teacherId, d) === 0) continue;
+          for (let h = 0; h < grid.hours; h++) {
+            if (
+              !canPlaceMateriaHard(tt, lesson, slot.classId, d, h, relaxedCtx)
+            )
+              continue;
+            const penalty = materiaPlacementPenalty(
+              tt,
+              lesson,
+              slot.classId,
+              d,
+              h,
+              maxGapFor(teacherId)
+            );
+            if (!best || penalty < best.penalty)
+              best = { day: d, hour: h, penalty };
+          }
+        }
+
+        if (best) {
+          const newSlot = { ...slot, day: best.day, hour: best.hour };
+          tt.push(newSlot);
+          landed.push(newSlot);
+          continue;
+        }
+
+        // Le classi sono quasi sempre piene: senza celle libere l'unica
+        // strada è lo scambio. La lezione prende il posto di un'altra della
+        // stessa classe in un giorno buono, e quella scende qui.
+        const swap = findExchange(
+          tt,
+          slot,
+          lesson,
+          day,
+          grid,
+          teacherId,
+          minPerDay,
+          relaxedCtx
+        );
+        if (!swap) {
+          allPlaced = false;
+          break;
+        }
+        const victimIndex = tt.indexOf(swap.victim);
+        if (victimIndex !== -1) tt.splice(victimIndex, 1);
+        evicted.push(swap.victim);
+        const movedLesson = {
+          ...slot,
+          day: swap.victim.day,
+          hour: swap.victim.hour,
+        };
+        const movedVictim = { ...swap.victim, day, hour: slot.hour };
+        tt.push(movedLesson, movedVictim);
+        landed.push(movedLesson, movedVictim);
+      }
+
+      if (allPlaced) {
+        moved += landed.length;
+      } else {
+        // Annullo tutto: la griglia deve tornare identica a com'era, comprese
+        // le lezioni sfrattate per gli scambi.
+        landed.forEach((s) => {
+          const i = tt.indexOf(s);
+          if (i !== -1) tt.splice(i, 1);
+        });
+        evicted.forEach((s) => tt.push(s));
+        removed
+          .sort((a, b) => a.index - b.index)
+          .forEach(({ slot, index }) => tt.splice(index, 0, slot));
+        shortDaysLeft++;
+      }
+    }
+  }
+
+  return { moved, shortDaysLeft };
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('master-view');
   const [sectionsConfig, setSectionsConfig] = useState<any>(
@@ -1538,6 +1846,7 @@ export default function App() {
             setGenerationRules({
               globalMaxGapHours: rules.globalMaxGapHours ?? 1,
               globalMaxHoursPerDay: rules.globalMaxHoursPerDay ?? 5,
+              globalMinHoursPerDay: rules.globalMinHoursPerDay ?? 2,
               teacherMaxGapHours: rules.teacherMaxGapHours || {},
               teacherDaysOff: safeDaysOff,
               teacherHoursOff: safeHoursOff,
@@ -1972,6 +2281,27 @@ export default function App() {
           });
         }
       }
+      // Giornate rimaste sotto il minimo: il docente viene a scuola per
+      // un'ora sola e la passata di consolidamento non è riuscita a chiuderla.
+      const minPerDay = minHoursPerDayFor(generationRules);
+      if (minPerDay > 1) {
+        const perDay: Record<number, number> = {};
+        timetable.forEach((s) => {
+          if (s.teacherId === staff.id)
+            perDay[s.day] = (perDay[s.day] || 0) + 1;
+        });
+        const corte = Object.entries(perDay)
+          .filter(([, n]) => n < minPerDay)
+          .map(([d]) => DAYS[Number(d)]);
+        if (corte.length > 0) {
+          conflicts.push({
+            type: 'warning',
+            message: `Il docente ${staff.name} ha una giornata sotto il minimo di ${minPerDay} ore (${corte.join(', ')}).`,
+            suggestion: `Sposta a mano quelle ore in un giorno in cui è già a scuola, oppure abbassa il minimo in "Sezioni & Regole".`,
+            teacherId: staff.id,
+          });
+        }
+      }
       const maxAllowed = getMaxDaysOffForHours(planned);
       if (planned > 0 && daysOff.length > maxAllowed) {
         conflicts.push({
@@ -2302,6 +2632,8 @@ export default function App() {
         assigned: 0,
         recovered: 0,
         swaps: 0,
+        consolidated: 0,
+        shortDaysLeft: 0,
         missing: [] as any[],
       },
     };
@@ -2409,9 +2741,14 @@ export default function App() {
                 candidate.teacherId,
                 day
               );
+              const capForCandidate = dailyCapFor(
+                newRules,
+                idealPerDay,
+                candidate.teacherId
+              );
               if (
-                maxPerDayRule > 0 &&
-                hoursTodayForCandidate >= maxPerDayRule
+                capForCandidate > 0 &&
+                hoursTodayForCandidate >= capForCandidate
               )
                 continue;
               const dailyClassLessons = newTimetable.filter(
@@ -2470,13 +2807,10 @@ export default function App() {
               let penalty = 0;
 
               // Spinta a distribuire: più ore ha già oggi, meno conviene
-              // dargliene un'altra, e oltre la quota giornaliera ideale la
-              // cella costa parecchio. Resta una penalità, non un divieto:
-              // se non c'è altro posto la lezione si piazza lo stesso.
+              // dargliene un'altra. Il tetto giornaliero fa il grosso del
+              // lavoro, questa serve a scegliere fra due giorni entrambi
+              // ammessi.
               penalty += dailyLessons.length * 4;
-              const quota = idealPerDay[candidate.teacherId] || 99;
-              if (dailyLessons.length >= quota)
-                penalty += (dailyLessons.length - quota + 1) * 60;
 
               if (dailyLessons.length > 0) {
                 const minHour = Math.min(
@@ -2586,14 +2920,21 @@ export default function App() {
       // Seconda passata: prova a recuperare le ore rimaste fuori sfrattando
       // una lezione già piazzata e ricollocandola. Se non ci riesce, la
       // griglia resta identica a quella della passata greedy.
-      const repair = repairUnplacedLessons(newTimetable, unplacedLessons, {
+      const repairCtx = {
         rules: newRules,
         rooms,
         classes,
         sectionsConfig,
         mixedClasses,
         teachers,
-      });
+        idealPerDay,
+        getGrid: getClassGrid,
+      };
+      const repair = repairUnplacedLessons(
+        newTimetable,
+        unplacedLessons,
+        repairCtx
+      );
       report.materie.assigned += repair.recovered;
       report.materie.recovered = repair.recovered;
       report.materie.swaps = repair.swaps;
@@ -2604,6 +2945,12 @@ export default function App() {
           subject: lesson.subject,
         })
       );
+
+      // Terza passata: chiude le giornate da un'ora sola lasciate dalla
+      // distribuzione.
+      const consolidation = consolidateShortDays(newTimetable, repairCtx);
+      report.materie.consolidated = consolidation.moved;
+      report.materie.shortDaysLeft = consolidation.shortDaysLeft;
     }
 
     if (generateOptions.sostegno) {
@@ -7218,6 +7565,11 @@ export default function App() {
                   Rispetterà il <strong>massimo ore al giorno</strong> per
                   docente e distribuirà le ore sui giorni disponibili.
                 </li>
+                <li>
+                  Chiuderà le giornate sotto il{' '}
+                  <strong>minimo ore al giorno</strong> spostando quelle ore
+                  dove il docente è già a scuola.
+                </li>
                 <li>Compatterà le lezioni al mattino.</li>
                 <li>
                   <strong>Vietato avere due ore buche di fila</strong>{' '}
@@ -7338,6 +7690,29 @@ export default function App() {
                     <div className="text-xs font-medium text-slate-600">
                       Per docente, così la settimana non si schiaccia su pochi
                       giorni
+                    </div>
+                  </div>
+                  <h3 className="font-bold text-slate-800 mt-5 mb-3 flex items-center gap-2">
+                    🚪 Minimo Ore al Giorno
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={minHoursPerDayFor(generationRules)}
+                      onChange={(e) =>
+                        handleUpdateRules(
+                          'globalMinHoursPerDay',
+                          parseInt(e.target.value)
+                        )
+                      }
+                      disabled={readOnlyMode}
+                      className="text-sm bg-white border border-indigo-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700 cursor-pointer disabled:opacity-50"
+                    >
+                      <option value={0}>Nessun minimo</option>
+                      <option value={2}>2 ore</option>
+                      <option value={3}>3 ore</option>
+                    </select>
+                    <div className="text-xs font-medium text-slate-600">
+                      Niente viaggi a scuola per un'ora sola
                     </div>
                   </div>
                 </div>
@@ -9359,6 +9734,15 @@ export default function App() {
                     seconda passata
                     {generationReport.materie.swaps > 0 &&
                       ` (${generationReport.materie.swaps} spostando un'altra lezione)`}
+                    .
+                  </p>
+                )}
+                {generationReport.materie.consolidated > 0 && (
+                  <p className="text-xs text-emerald-700 mt-1">
+                    🧩 {generationReport.materie.consolidated} ore spostate per
+                    chiudere le giornate sotto il minimo
+                    {generationReport.materie.shortDaysLeft > 0 &&
+                      ` (${generationReport.materie.shortDaysLeft} giornate non è stato possibile chiuderle)`}
                     .
                   </p>
                 )}

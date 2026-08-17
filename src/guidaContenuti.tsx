@@ -550,7 +550,12 @@ export const chapters: Chapter[] = [
       {
         title: '📆 Massimo ore al giorno',
         tag: 'distribuzione',
-        body: "Quante ore può fare un docente in una giornata: 4, 5 (predefinito), 6 oppure nessun limite. Serve a evitare le giornate da sei ore di fila e la settimana schiacciata su pochi giorni. Insieme al tetto l'algoritmo spinge a spalmare la cattedra sui giorni disponibili. Attenzione al compromesso: più il tetto è basso, più l'orario si distribuisce ma più ore buca compaiono, e con cattedre pesanti qualche ora può restare fuori — se il tetto rende la cattedra impossibile, la scheda Conflitti lo dice.",
+        body: "Quante ore può fare un docente in una giornata: 4, 5 (predefinito), 6 oppure nessun limite. Oltre a questo tetto l'algoritmo ne applica uno suo, più stretto: le ore di cattedra divise per i giorni in cui il docente è a scuola. È quello che evita le giornate da sei ore e la settimana schiacciata su quattro giorni. Il compromesso c'è: distribuire di più significa qualche ora buca in più e, con le cattedre pesanti, qualche ora che resta fuori. Se il tetto rende la cattedra impossibile da piazzare, la scheda Conflitti lo dice.",
+      },
+      {
+        title: "🚪 Minimo ore al giorno",
+        tag: 'niente viaggi a vuoto',
+        body: "Nessun minimo, 2 ore (predefinito) o 3. A generazione finita l'algoritmo ripassa le giornate sotto la soglia e prova a chiuderle, spostando quelle ore in un giorno in cui il docente è già a scuola: se non c'è posto libero scambia la cella con un'altra lezione della stessa classe, e se lo scambio non regge lascia tutto com'era. Le giornate che restano sotto il minimo finiscono nei Conflitti, così le sposti a mano.",
       },
       {
         title: '🌴 Indisponibilità',
