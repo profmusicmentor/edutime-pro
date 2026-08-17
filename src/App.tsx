@@ -116,10 +116,13 @@ const DEFAULT_ROOMS: any[] = [
   { id: 'lab-musica', name: 'Lab. Musica', subjects: ['MUSICA'] },
   { id: 'lab-tecnologia', name: 'Lab. Tecnologia', subjects: ['TECNOLOGIA'] },
   { id: 'lab-arte', name: 'Lab. Arte', subjects: ['ARTE'] },
+  // Attenzione a collegare qui una materia curricolare pesante: l'aula diventa
+  // una risorsa unica per tutta la scuola e le sue ore non entrano più
+  // nell'orario. Matematica si fa in classe, il laboratorio serve a scienze.
   {
     id: 'lab-scienze',
     name: 'Lab. Scienze',
-    subjects: ['SCIENZE', 'MATEM. SCI.'],
+    subjects: ['SCIENZE'],
   },
 ];
 
@@ -986,6 +989,36 @@ const hasHoursOffOnDay = (rules: any, teacherId: string, day: number) =>
     (k: string) => k.split('_')[0] === String(day)
   );
 
+/**
+ * Quante aule di quel tipo ha la scuola: due palestre, tre laboratori di
+ * informatica. Finché il campo non c'è vale 1, com'era prima.
+ */
+const roomCapacity = (roomName: string, rooms: any[]) => {
+  const room = (rooms || []).find((r) => r.name === roomName);
+  const n = Number(room?.capacity);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+};
+
+/** L'aula è satura in quella cella? */
+const isRoomFull = (
+  tt: any[],
+  roomName: string,
+  day: number,
+  hour: number,
+  rooms: any[],
+  ignoreSlot?: any
+) => {
+  if (!roomName || roomName === 'Aula' || roomName === 'Classe') return false;
+  const used = tt.filter(
+    (s) =>
+      s !== ignoreSlot &&
+      s.room === roomName &&
+      s.day === day &&
+      s.hour === hour
+  ).length;
+  return used >= roomCapacity(roomName, rooms);
+};
+
 const getRoomForSubject = (subject: string, rooms: any[]) => {
   const match = (rooms || []).find((r) =>
     (r.subjects || []).includes(subject)
@@ -1080,15 +1113,7 @@ const canPlaceMateriaHard = (
   if (sameTeacherToday.length >= 3) return false;
 
   const room = getRoomForSubject(lesson.subject, rooms);
-  const roomBusy = tt.some(
-    (s) =>
-      s.room &&
-      s.room !== 'Aula' &&
-      s.room === room &&
-      s.day === day &&
-      s.hour === hour
-  );
-  if (roomBusy) return false;
+  if (isRoomFull(tt, room, day, hour, rooms)) return false;
 
   const sede = getSedeForSlot(
     { room, classId },
@@ -2477,11 +2502,15 @@ export default function App() {
     });
 
     Object.entries(roomSchedules).forEach(([key, cls]: any) => {
-      if (cls.length > 1) {
+      const [roomName] = key.split('_');
+      if (cls.length > roomCapacity(roomName, rooms)) {
         const [room, day, hour] = key.split('_');
         conflicts.push({
           type: 'error',
-          message: `Conflitto Aula: ${room} è occupata contemporaneamente da ${cls.join(
+          message: `Conflitto Aula: ${room} (${roomCapacity(
+            room,
+            rooms
+          )} disponibile/i) è occupata contemporaneamente da ${cls.join(
             ', '
           )}.`,
           suggestion: `Sposta una delle lezioni in un'altra ora o assegna un'altra aula.`,
@@ -2491,6 +2520,45 @@ export default function App() {
               s.day === parseInt(day) &&
               s.hour === parseInt(hour)
           ),
+        });
+      }
+    });
+
+    // Una materia collegata a un'aula speciale può chiedere più ore di quante
+    // l'aula ne offra in una settimana: le ore in eccesso non entrano
+    // nell'orario e sembrano sparite. Meglio dirlo prima di generare.
+    const oreRichiestePerMateria: Record<string, number> = {};
+    teachers.forEach((t) => {
+      (t.assignments || []).forEach((a: any) => {
+        oreRichiestePerMateria[t.subject] =
+          (oreRichiestePerMateria[t.subject] || 0) + a.hours;
+      });
+    });
+    const celleSettimanali = maxGridDays * gridHourRows.length;
+    const materiePerAula: Record<string, string[]> = {};
+    Object.keys(oreRichiestePerMateria).forEach((subject) => {
+      const room = getRoomForSubject(subject, rooms);
+      if (!room || room === 'Aula' || room === 'Classe') return;
+      if (!materiePerAula[room]) materiePerAula[room] = [];
+      materiePerAula[room].push(subject);
+    });
+    Object.entries(materiePerAula).forEach(([room, subjects]) => {
+      const richieste = subjects.reduce(
+        (sum, s) => sum + (oreRichiestePerMateria[s] || 0),
+        0
+      );
+      const disponibili = celleSettimanali * roomCapacity(room, rooms);
+      if (richieste > disponibili) {
+        conflicts.push({
+          type: 'error',
+          message: `${subjects.join(' e ')} ${
+            subjects.length > 1 ? 'chiedono' : 'chiede'
+          } ${formatHours(
+            richieste
+          )} ore ma "${room}" ne offre ${disponibili} a settimana: ${formatHours(
+            richieste - disponibili
+          )} ore non entreranno in orario.`,
+          suggestion: `In "Aule e Laboratori" aumenta quante ${room} ci sono, oppure scollega la materia dall'aula se si può fare in classe.`,
         });
       }
     });
@@ -2518,13 +2586,40 @@ export default function App() {
     classes.forEach((c) => {
       const hrs = classHourCounts[c.id] || 0;
       const expected = getSectionWeeklyHours(c.section);
-      if (hrs !== expected && hrs > 0)
-        conflicts.push({
-          type: 'warning',
-          message: `La classe ${c.id} ha assegnate ${formatHours(
-            hrs
-          )}/${formatHours(expected)} ore curricolari.`,
-        });
+      if (hrs === expected || hrs === 0) return;
+      // Il Registro Cattedre dice quante ore sono state assegnate ai docenti,
+      // questo conteggio dice quante ne sono davvero finite in orario: se i
+      // due numeri non coincidono è perché qualche ora non è stata piazzata.
+      const inCattedra = teachers.reduce(
+        (sum, t) =>
+          sum +
+          (t.assignments || [])
+            .filter((a: any) => a.classId === c.id)
+            .reduce((s: number, a: any) => s + a.hours, 0),
+        0
+      );
+      const fuori = inCattedra - hrs;
+      conflicts.push({
+        type: 'warning',
+        message:
+          fuori > 0
+            ? `La classe ${c.id} ha ${formatHours(
+                hrs
+              )} ore in orario sulle ${formatHours(
+                expected
+              )} previste: ${formatHours(fuori)} ${
+                fuori === 1
+                  ? 'ora è in cattedra ma non è stata piazzata'
+                  : 'ore sono in cattedra ma non sono state piazzate'
+              }.`
+            : `La classe ${c.id} ha ${formatHours(
+                hrs
+              )} ore in orario sulle ${formatHours(expected)} previste.`,
+        suggestion:
+          fuori > 0
+            ? `Guarda gli altri conflitti: di solito è un'aula satura o un docente senza celle libere. Puoi anche rigenerare o assegnare le ore a mano.`
+            : `Controlla le ore assegnate ai docenti per questa classe nel Registro Cattedre.`,
+      });
     });
     return { conflicts, classHourCounts };
   }, [
@@ -2759,15 +2854,8 @@ export default function App() {
               );
               if (dailyClassLessons.length >= 3) continue;
               const currentRoom = getRoomForSubject(candidate.subject, rooms);
-              const roomBusy = newTimetable.some(
-                (s) =>
-                  s.room &&
-                  s.room !== 'Aula' &&
-                  s.room === currentRoom &&
-                  s.day === day &&
-                  s.hour === hour
-              );
-              if (roomBusy) continue;
+              if (isRoomFull(newTimetable, currentRoom, day, hour, rooms))
+                continue;
               const currentSede = getSedeForSlot(
                 { room: currentRoom, classId: cls.id },
                 rooms,
@@ -3022,10 +3110,7 @@ export default function App() {
         const roomIsExclusive = configuredRoom !== 'Aula';
         const roomTaken = (day: number, hour: number) =>
           roomIsExclusive &&
-          newTimetable.some(
-            (s) =>
-              s.room === strumentoRoom && s.day === day && s.hour === hour
-          );
+          isRoomFull(newTimetable, strumentoRoom, day, hour, rooms);
         if (assigns.length > 0) {
           assigns.forEach((assign: any) => {
             const targetClassId = assign.classId;
@@ -4297,6 +4382,16 @@ export default function App() {
     if (readOnlyMode) return;
     const newRooms = rooms.map((r) =>
       r.id === id ? { ...r, subjects: parseSubjects(subjectsText) } : r
+    );
+    setRooms(newRooms);
+    pushRooms(newRooms);
+  };
+
+  const handleUpdateRoomCapacity = (roomId: string, value: string) => {
+    if (readOnlyMode) return;
+    const n = Math.max(1, Math.min(12, parseInt(value) || 1));
+    const newRooms = rooms.map((r) =>
+      r.id === roomId ? { ...r, capacity: n } : r
     );
     setRooms(newRooms);
     pushRooms(newRooms);
@@ -8571,6 +8666,21 @@ export default function App() {
                       disabled={readOnlyMode}
                       placeholder="es. MUSICA"
                       className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white uppercase focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                    />
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">
+                      Quante ce ne sono
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={roomCapacity(r.name, rooms)}
+                      onChange={(e) =>
+                        handleUpdateRoomCapacity(r.id, e.target.value)
+                      }
+                      disabled={readOnlyMode}
+                      title="Quante aule di questo tipo ha la scuola: due palestre, tre laboratori..."
+                      className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                     />
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">
                       Sede

@@ -1104,16 +1104,32 @@ export const chapters: Chapter[] = [
         title: 'Aule e laboratori',
         tag: 'assegnazione automatica',
         body: (
-          <Ul
-            items={[
-              'ED. FISICA → Palestra',
-              'MUSICA → Lab. Musica',
-              'TECNOLOGIA → Lab. Tecnologia',
-              'ARTE → Lab. Arte',
-              'SCIENZE / MATEM. SCI. → Lab. Scienze',
-              'Altro → Aula',
-            ]}
-          />
+          <>
+            <Ul
+              items={[
+                'ED. FISICA → Palestra',
+                'MUSICA → Lab. Musica',
+                'TECNOLOGIA → Lab. Tecnologia',
+                'ARTE → Lab. Arte',
+                'SCIENZE → Lab. Scienze',
+                'Altro → Aula',
+              ]}
+            />
+            <p className="mt-2">
+              Collegare una materia a un'aula significa <B>prenotarla</B>: in
+              quell'ora nessun'altra classe può usarla. Se le ore della materia
+              superano quelle che l'aula offre in una settimana, le ore in
+              eccesso non entrano in orario — la scheda Conflitti fa il conto e
+              lo dice. Per questo conviene collegare solo le materie che si
+              fanno davvero in laboratorio: la matematica si fa in classe.
+            </p>
+            <p className="mt-2">
+              Se la scuola ha più spazi dello stesso tipo (due palestre, tre
+              laboratori), scrivi quanti sono nel campo{' '}
+              <B>Quante ce ne sono</B>: l'algoritmo permetterà altrettante
+              classi in contemporanea.
+            </p>
+          </>
         ),
       },
       {
