@@ -96,6 +96,14 @@ const DEFAULT_RULES: any = {
    * trova in quel caso lo spegne.
    */
   autoDayOff: true,
+  /**
+   * Gruppi di materie che nella stessa classe non dovrebbero capitare nello
+   * stesso giorno: le due lingue straniere, di solito. È una penalità forte,
+   * non un divieto: meglio due lingue di fila che un'ora non piazzata.
+   */
+  subjectSeparation: [],
+  /** Allontanare le ore della stessa materia dai giorni adiacenti. */
+  spreadSameSubject: false,
   teacherMaxGapHours: {},
   teacherDaysOff: {},
   /**
@@ -1242,15 +1250,54 @@ const canPlaceMateriaHard = (
  * (buchi, buco lungo, prime ore, ore consecutive), senza il pizzico di
  * casualità, perché qui serve una scelta ripetibile.
  */
+/**
+ * Penalità didattiche chieste dalle scuole: due materie che non stanno bene
+ * nello stesso giorno (le lingue straniere), e le ore della stessa materia
+ * che è meglio non accostare in giorni consecutivi.
+ */
+const didacticPenalty = (
+  tt: any[],
+  subject: string,
+  classId: string,
+  day: number,
+  rules: any
+) => {
+  let penalty = 0;
+  const gruppi: string[][] = rules?.subjectSeparation || [];
+  const mieiGruppi = gruppi.filter((g) => g.includes(subject));
+  if (mieiGruppi.length > 0) {
+    const scontro = tt.some(
+      (s) =>
+        s.classId === classId &&
+        s.day === day &&
+        s.type !== 'sostegno' &&
+        s.subject !== subject &&
+        mieiGruppi.some((g) => g.includes(s.subject))
+    );
+    if (scontro) penalty += 400;
+  }
+  if (rules?.spreadSameSubject) {
+    const inGiornoVicino = tt.some(
+      (s) =>
+        s.classId === classId &&
+        s.subject === subject &&
+        Math.abs(s.day - day) === 1
+    );
+    if (inGiornoVicino) penalty += 60;
+  }
+  return penalty;
+};
+
 const materiaPlacementPenalty = (
   tt: any[],
   lesson: any,
   classId: string,
   day: number,
   hour: number,
-  maxGapAllowed: number
+  maxGapAllowed: number,
+  rules?: any
 ) => {
-  let penalty = 0;
+  let penalty = didacticPenalty(tt, lesson.subject, classId, day, rules);
   const dailyLessons = tt.filter(
     (s) => s.teacherId === lesson.teacherId && s.day === day
   );
@@ -1344,7 +1391,8 @@ const repairUnplacedLessons = (
         lesson.classId,
         cell.day,
         cell.hour,
-        maxGapFor(lesson.teacherId)
+        maxGapFor(lesson.teacherId),
+        ctx.rules
       );
       if (!best || penalty < best.penalty) best = { ...cell, penalty };
     }
@@ -1514,7 +1562,8 @@ const findExchange = (
           slot.classId,
           victim.day,
           victim.hour,
-          gapFor(teacherId)
+          gapFor(teacherId),
+          ctx.rules
         ) +
         materiaPlacementPenalty(
           tt,
@@ -1526,7 +1575,8 @@ const findExchange = (
           victim.classId,
           shortDay,
           slot.hour,
-          gapFor(victim.teacherId)
+          gapFor(victim.teacherId),
+          ctx.rules
         );
     }
 
@@ -1642,7 +1692,8 @@ const consolidateShortDays = (tt: any[], ctx: any, budgetMs = 1500) => {
               slot.classId,
               d,
               h,
-              maxGapFor(teacherId)
+              maxGapFor(teacherId),
+              ctx.rules
             );
             if (!best || penalty < best.penalty)
               best = { day: d, hour: h, penalty };
@@ -1836,6 +1887,8 @@ export default function App() {
   const [assignModal, setAssignModal] = useState<any>(null);
   /** Materia di quella sola classe, quando è diversa da quella del docente. */
   const [assignSubject, setAssignSubject] = useState('');
+  const [newSepA, setNewSepA] = useState('');
+  const [newSepB, setNewSepB] = useState('');
   const [assignClass, setAssignClass] = useState('');
   const [assignHours, setAssignHours] = useState(1);
   const [groupConstraints, setGroupConstraints] = useState<any[]>([]);
@@ -2015,6 +2068,12 @@ export default function App() {
               globalMaxHoursPerDay: rules.globalMaxHoursPerDay ?? 5,
               globalMinHoursPerDay: rules.globalMinHoursPerDay ?? 2,
               autoDayOff: rules.autoDayOff !== false,
+              subjectSeparation: Array.isArray(rules.subjectSeparation)
+                ? rules.subjectSeparation.filter(
+                    (g: any) => Array.isArray(g) && g.length >= 2
+                  )
+                : [],
+              spreadSameSubject: !!rules.spreadSameSubject,
               teacherMaxGapHours: rules.teacherMaxGapHours || {},
               teacherDaysOff: safeDaysOff,
               teacherHoursOff: safeHoursOff,
@@ -3075,7 +3134,13 @@ export default function App() {
                 (slot) =>
                   slot.teacherId === candidate.teacherId && slot.day === day
               );
-              let penalty = 0;
+              let penalty = didacticPenalty(
+                newTimetable,
+                candidate.subject,
+                cls.id,
+                day,
+                newRules
+              );
 
               // Spinta a distribuire: più ore ha già oggi, meno conviene
               // dargliene un'altra. Il tetto giornaliero fa il grosso del
@@ -3807,6 +3872,31 @@ export default function App() {
       cellNotes,
       groupConstraints,
       mixedClasses
+    );
+  };
+
+  /** Coppia di materie da non mettere nello stesso giorno nella stessa classe. */
+  const handleAddSubjectSeparation = () => {
+    if (readOnlyMode) return;
+    const a = newSepA.trim().toUpperCase();
+    const b = newSepB.trim().toUpperCase();
+    if (!a || !b || a === b) return;
+    const gruppi: string[][] = generationRules.subjectSeparation || [];
+    const esiste = gruppi.some(
+      (g) => g.includes(a) && g.includes(b) && g.length === 2
+    );
+    if (esiste) return;
+    handleUpdateRules('subjectSeparation', [...gruppi, [a, b]]);
+    setNewSepA('');
+    setNewSepB('');
+  };
+
+  const handleRemoveSubjectSeparation = (idx: number) => {
+    if (readOnlyMode) return;
+    const gruppi: string[][] = generationRules.subjectSeparation || [];
+    handleUpdateRules(
+      'subjectSeparation',
+      gruppi.filter((_, i) => i !== idx)
     );
   };
 
@@ -8793,6 +8883,106 @@ export default function App() {
                       );
                     })}
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-amber-200 border-l-4 border-l-amber-500">
+              <h2 className="text-xl font-bold text-amber-900 mb-2">
+                🚫 Materie da non affiancare
+              </h2>
+              <p className="text-sm text-slate-500 mb-6">
+                Coppie di materie che nella stessa classe è meglio non far
+                capitare nello stesso giorno: le due lingue straniere, di
+                solito. Il generatore le allontana con decisione, ma se
+                l'alternativa è lasciare un'ora fuori dall'orario le
+                affianca lo stesso e lo segnala nei Conflitti.
+              </p>
+              <div className="flex flex-wrap gap-2 mb-4 p-4 bg-amber-50 rounded-lg border border-amber-100">
+                <select
+                  value={newSepA}
+                  onChange={(e) => setNewSepA(e.target.value)}
+                  disabled={readOnlyMode}
+                  className="text-sm border border-slate-300 rounded-lg px-2 py-1.5 bg-white disabled:opacity-50"
+                >
+                  <option value="">— Materia —</option>
+                  {allDepartments.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-sm text-slate-500 self-center">
+                  non insieme a
+                </span>
+                <select
+                  value={newSepB}
+                  onChange={(e) => setNewSepB(e.target.value)}
+                  disabled={readOnlyMode}
+                  className="text-sm border border-slate-300 rounded-lg px-2 py-1.5 bg-white disabled:opacity-50"
+                >
+                  <option value="">— Materia —</option>
+                  {allDepartments.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleAddSubjectSeparation}
+                  disabled={readOnlyMode || !newSepA || !newSepB}
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Aggiungi
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {(generationRules.subjectSeparation || []).length === 0 && (
+                  <p className="text-xs text-slate-400 italic">
+                    Nessuna coppia impostata.
+                  </p>
+                )}
+                {(generationRules.subjectSeparation || []).map(
+                  (g: string[], idx: number) => (
+                    <span
+                      key={`${g.join('_')}_${idx}`}
+                      className="inline-flex items-center gap-2 bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-xs font-bold text-amber-800"
+                    >
+                      {g.join(' / ')}
+                      <button
+                        onClick={() => handleRemoveSubjectSeparation(idx)}
+                        disabled={readOnlyMode}
+                        className="text-rose-400 hover:text-rose-600 disabled:opacity-40"
+                        title="Togli"
+                      >
+                        🗑️
+                      </button>
+                    </span>
+                  )
+                )}
+              </div>
+              <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
+                📅 Ore della stessa materia
+              </h3>
+              <div className="flex items-center gap-3">
+                <select
+                  value={generationRules.spreadSameSubject ? 'si' : 'no'}
+                  onChange={(e) =>
+                    handleUpdateRules(
+                      'spreadSameSubject',
+                      e.target.value === 'si'
+                    )
+                  }
+                  disabled={readOnlyMode}
+                  className="text-sm bg-white border border-amber-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-amber-500 font-bold text-amber-800 cursor-pointer disabled:opacity-50"
+                >
+                  <option value="no">Come capita</option>
+                  <option value="si">Distanziale</option>
+                </select>
+                <div className="text-xs font-medium text-slate-600">
+                  Con «Distanziale» il generatore evita di mettere la stessa
+                  materia in due giorni di fila, senza toccare le due ore
+                  consecutive nello stesso giorno
                 </div>
               </div>
             </div>
