@@ -8,7 +8,7 @@
  * anche se arrivano dalla stessa persona.
  */
 
-export const config = { runtime: 'nodejs' };
+export const config = { runtime: 'edge' };
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const LIST_ID = process.env.BREVO_FEEDBACK_LIST_ID;
