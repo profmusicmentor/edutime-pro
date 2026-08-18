@@ -1,0 +1,3 @@
+# Due modalità Workspace: locale (solo browser) e cloud (Firestore condiviso via codice scuola)
+
+Per non forzare ogni scuola a fidarsi di un server esterno con i propri dati (docenti, orari, assenze), il Workspace supporta due modalità: `locale` (i dati restano solo nel browser, nessuna sincronizzazione) e `cloud` (sincronizzazione Firestore condivisa tra i colleghi tramite un codice scuola, con regole che vincolano l'accesso al documento al codice corretto). L'alternativa scartata era il cloud-only, che avrebbe semplificato il codice ma reso l'adozione più difficile per chi non vuole condividere dati con un server esterno.
