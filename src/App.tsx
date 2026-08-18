@@ -1027,6 +1027,22 @@ const isRoomFull = (
   return used >= roomCapacity(roomName, rooms);
 };
 
+/**
+ * La materia che quel docente insegna in quella classe. Di norma è la sua,
+ * ma alla primaria capita spesso che la stessa persona faccia italiano in
+ * una classe e storia e geografia in un'altra: in quel caso la materia sta
+ * sull'assegnazione, e vale solo lì. Duplicare il docente non è una
+ * soluzione: per l'app diventerebbero due persone, ciascuna col suo giorno
+ * libero e il suo tetto di ore.
+ */
+const subjectForClass = (staff: any, classId: string) => {
+  const assignment = (staff?.assignments || []).find(
+    (a: any) => a.classId === classId
+  );
+  const scritta = assignment?.subject;
+  return scritta ? String(scritta) : staff?.subject || 'Lezione';
+};
+
 const getRoomForSubject = (subject: string, rooms: any[]) => {
   const match = (rooms || []).find((r) =>
     (r.subjects || []).includes(subject)
@@ -1818,6 +1834,8 @@ export default function App() {
    */
   const [roomTouched, setRoomTouched] = useState(false);
   const [assignModal, setAssignModal] = useState<any>(null);
+  /** Materia di quella sola classe, quando è diversa da quella del docente. */
+  const [assignSubject, setAssignSubject] = useState('');
   const [assignClass, setAssignClass] = useState('');
   const [assignHours, setAssignHours] = useState(1);
   const [groupConstraints, setGroupConstraints] = useState<any[]>([]);
@@ -2926,10 +2944,11 @@ export default function App() {
           );
           if (assignment) {
             report.materie.requested += assignment.hours;
+            const materiaInClasse = subjectForClass(t, cls.id);
             for (let i = 0; i < assignment.hours; i++)
               pool.push({
                 teacherId: t.id,
-                subject: t.subject,
+                subject: materiaInClasse,
                 teacherName: t.name,
                 preferConsecutive: !!t.preferConsecutive,
               });
@@ -3456,8 +3475,10 @@ export default function App() {
         room = 'Lab. Musica';
       } else {
         type = isRientroHour(newClassId, hour) ? 'pomeriggio_musica' : 'materia';
-        subject =
-          teachers.find((t) => t.id === teacherId)?.subject || 'Lezione';
+        subject = subjectForClass(
+          teachers.find((t) => t.id === teacherId),
+          newClassId
+        );
         room = roomTouched ? tempRoom : getRoomForSubject(subject, rooms);
       }
       filtered.push({
@@ -4036,7 +4057,7 @@ export default function App() {
       day,
       hour,
       teacherId,
-      subject: tDoc ? tDoc.subject : 'Lezione',
+      subject: tDoc ? subjectForClass(tDoc, classId) : 'Lezione',
       type,
       room,
     });
@@ -4155,7 +4176,9 @@ export default function App() {
             day,
             hour,
             teacherId,
-            subject: teacherDoc?.subject || 'Materia',
+            subject: teacherDoc
+              ? subjectForClass(teacherDoc, classId)
+              : 'Materia',
             type: type1,
             room: tempRoom,
           });
@@ -4207,10 +4230,15 @@ export default function App() {
     staffId: string,
     classId: string,
     hours: number,
-    staffType: string
+    staffType: string,
+    subject?: string
   ) => {
     if (readOnlyMode) return;
     let updatedList = [];
+    // La materia arriva solo dal modale: la griglia del registro cambia le
+    // ore e basta, e non deve cancellare quella scritta prima.
+    const materia =
+      subject === undefined ? undefined : subject.trim().toUpperCase();
     const updateLogic = (list: any[]) =>
       list.map((t) => {
         if (t.id === staffId) {
@@ -4218,9 +4246,20 @@ export default function App() {
           const idx = assigns.findIndex((a) => a.classId === classId);
           if (hours <= 0) {
             if (idx !== -1) assigns.splice(idx, 1);
+          } else if (idx !== -1) {
+            assigns[idx] = {
+              ...assigns[idx],
+              hours,
+              ...(materia === undefined
+                ? {}
+                : { subject: materia || undefined }),
+            };
           } else {
-            if (idx !== -1) assigns[idx].hours = hours;
-            else assigns.push({ classId, hours });
+            assigns.push({
+              classId,
+              hours,
+              ...(materia ? { subject: materia } : {}),
+            });
           }
           return { ...t, assignments: assigns };
         }
@@ -4286,11 +4325,13 @@ export default function App() {
       assignModal.staffId,
       assignClass,
       assignHours,
-      assignModal.staffType
+      assignModal.staffType,
+      assignModal.staffType === 'materia' ? assignSubject : undefined
     );
     setAssignModal(null);
     setAssignClass('');
     setAssignHours(1);
+    setAssignSubject('');
   };
 
   const handleResetAllAssignments = () => {
@@ -7948,10 +7989,21 @@ export default function App() {
                                   const val = currentAssignment
                                     ? currentAssignment.hours
                                     : 0;
+                                  const materiaDiversa =
+                                    currentAssignment?.subject &&
+                                    currentAssignment.subject !==
+                                      teacher.subject
+                                      ? currentAssignment.subject
+                                      : '';
                                   return (
                                     <td
                                       key={cls.id}
                                       className="p-1 border-r border-slate-200 align-middle"
+                                      title={
+                                        materiaDiversa
+                                          ? `In ${cls.id} insegna ${materiaDiversa}`
+                                          : undefined
+                                      }
                                     >
                                       <input
                                         type="number"
@@ -7970,6 +8022,11 @@ export default function App() {
                                         disabled={readOnlyMode}
                                         className="w-full text-center text-xs font-bold rounded p-1.5 border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all bg-transparent focus:bg-white text-slate-700 placeholder-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
                                       />
+                                      {materiaDiversa && (
+                                        <span className="block text-[8px] font-bold text-amber-700 text-center truncate leading-tight">
+                                          {materiaDiversa}
+                                        </span>
+                                      )}
                                     </td>
                                   );
                                 })}
@@ -7982,6 +8039,7 @@ export default function App() {
                                       });
                                       setAssignClass(classes[0]?.id || '');
                                       setAssignHours(1);
+                                      setAssignSubject('');
                                     }}
                                     disabled={readOnlyMode}
                                     className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold text-xs px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
@@ -10522,7 +10580,17 @@ export default function App() {
                 </label>
                 <select
                   value={assignClass}
-                  onChange={(e) => setAssignClass(e.target.value)}
+                  onChange={(e) => {
+                    setAssignClass(e.target.value);
+                    const staff = allStaff.find(
+                      (x) => x.id === assignModal.staffId
+                    );
+                    const esistente = (staff?.assignments || []).find(
+                      (a: any) => a.classId === e.target.value
+                    );
+                    setAssignSubject(esistente?.subject || '');
+                    if (esistente?.hours) setAssignHours(esistente.hours);
+                  }}
                   className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
                 >
                   {classes.map((c) => (
@@ -10547,6 +10615,28 @@ export default function App() {
                   className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
+              {assignModal.staffType === 'materia' && (
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    Materia in questa classe
+                  </label>
+                  <input
+                    type="text"
+                    value={assignSubject}
+                    onChange={(e) => setAssignSubject(e.target.value)}
+                    placeholder={
+                      allStaff.find((s) => s.id === assignModal.staffId)
+                        ?.subject || 'Materia del docente'
+                    }
+                    className="w-full border border-slate-300 rounded-lg p-2 text-sm uppercase focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <p className="mt-1.5 text-[11px] text-slate-500">
+                    Lascia vuoto per la materia del docente. Compilalo quando
+                    in questa classe insegna altro: stessa persona, materia
+                    diversa.
+                  </p>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={() => setAssignModal(null)}
