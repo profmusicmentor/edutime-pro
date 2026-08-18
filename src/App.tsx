@@ -1694,6 +1694,8 @@ export default function App() {
   const [sedi, setSedi] = useState<any[]>(DEFAULT_SEDI);
   const [absences, setAbsences] = useState<any[]>([]);
   const [substitutions, setSubstitutions] = useState<any[]>([]);
+  /** Ora per cui è aperto l'elenco di chi può anticipare la lezione. */
+  const [anticipoPanel, setAnticipoPanel] = useState<any>(null);
   const [substitutionsDate, setSubstitutionsDate] = useState<string>(() =>
     new Date().toISOString().slice(0, 10)
   );
@@ -4657,6 +4659,26 @@ export default function App() {
   };
 
   /**
+   * Chi è già occupato in quell'ora: le lezioni dell'orario, ma anche le
+   * supplenze e gli anticipi già decisi per quella data. Senza la seconda
+   * metà lo stesso docente poteva essere proposto due volte nella stessa
+   * ora di due assenze diverse.
+   */
+  const busyTeacherIdsAt = (day: number, hour: number, date: string) => {
+    const busy = new Set(
+      timetable
+        .filter((s) => s.day === day && s.hour === hour)
+        .map((s) => s.teacherId)
+    );
+    substitutions
+      .filter(
+        (sub) => sub.date === date && sub.hour === hour && sub.teacherSubstitute
+      )
+      .forEach((sub) => busy.add(sub.teacherSubstitute));
+    return busy;
+  };
+
+  /**
    * Per un'assenza di tipo assenza/permesso: le ore della cattedra del
    * docente in quel giorno, con stato di copertura (sostegno già presente,
    * già assegnato un sostituto, o da coprire) e candidati sostituti
@@ -4695,10 +4717,10 @@ export default function App() {
       );
       let candidates: any[] = [];
       if (!coveredBySostegno && !existingSub) {
-        const busyTeacherIds = new Set(
-          timetable
-            .filter((s) => s.day === day && s.hour === lesson.hour)
-            .map((s) => s.teacherId)
+        const busyTeacherIds = busyTeacherIdsAt(
+          day,
+          lesson.hour,
+          absence.date
         );
         candidates = teachers
           .filter(
@@ -4733,6 +4755,82 @@ export default function App() {
         candidates,
       };
     });
+  };
+
+  /**
+   * Chi può coprire un'ora scoperta anticipando una propria lezione.
+   *
+   * È il caso classico segnalato dalle scuole: manca la collega di quinta e
+   * un'altra docente della stessa classe ha lezione a sesta e buca a quinta.
+   * Anticipa, e la classe esce un'ora prima. Non è uno spostamento
+   * dell'orario — quello resta quello di sempre — ma un modo di coprire
+   * quell'ora in quel giorno, alla pari della sorveglianza.
+   *
+   * Candidata è ogni lezione della stessa classe, più avanti nella
+   * giornata, di una docente libera nell'ora scoperta. Se l'ora che si
+   * svuota è l'ultima della classe l'uscita è pulita; altrimenti resta un
+   * buco a metà mattina, e chi sceglie deve saperlo.
+   */
+  const getAnticipoCandidates = (
+    absence: any,
+    hour: number,
+    classId: string
+  ) => {
+    const day = getDayIndexFromDate(absence.date);
+    if (day < 0) return [];
+    // Solo le ore curricolari del mattino: le lezioni di strumento sono
+    // pomeridiane e individuali, anticiparle non manda a casa la classe.
+    const classDayLessons = timetable.filter(
+      (s) =>
+        s.classId === classId &&
+        s.day === day &&
+        (s.type === 'materia' || s.type === 'pomeriggio_musica') &&
+        diurnalHours.some((dh) => dh.index === s.hour) &&
+        !strumento.some((m) => m.id === s.teacherId)
+    );
+    const lastHourOfDay = classDayLessons.reduce(
+      (max, s) => Math.max(max, s.hour),
+      -1
+    );
+    const busy = busyTeacherIdsAt(day, hour, absence.date);
+    return classDayLessons
+      .filter(
+        (l) =>
+          l.hour > hour &&
+          l.teacherId !== absence.teacherId &&
+          !busy.has(l.teacherId) &&
+          !isTeacherOff(generationRules, l.teacherId, day, hour)
+      )
+      .map((l) => {
+        // Se in quell'ora la classe è divisa in gruppi (lingue, classi
+        // miste) spostare una lezione non svuota l'ora: la classe resta.
+        const altreLezioniStessaOra = classDayLessons.some(
+          (s) => s.hour === l.hour && s !== l
+        );
+        const exitClean = l.hour === lastHourOfDay && !altreLezioniStessaOra;
+        const oreRimaste = classDayLessons
+          .filter((s) => s.hour !== l.hour)
+          .map((s) => s.hour);
+        const ultimaRimasta = oreRimaste.length
+          ? Math.max(...oreRimaste, hour)
+          : hour;
+        return {
+          teacherId: l.teacherId,
+          name:
+            allStaff.find((t) => t.id === l.teacherId)?.name || l.teacherId,
+          subject: l.subject,
+          fromHour: l.hour,
+          exitClean,
+          exitAfterHour: exitClean ? ultimaRimasta : undefined,
+        };
+      })
+      .sort((a, b) =>
+        a.exitClean === b.exitClean
+          ? a.fromHour - b.fromHour
+          : a.exitClean
+          ? -1
+          : 1
+      );
   };
 
   const paidSubstitutionHoursByTeacher = useMemo(() => {
@@ -4840,6 +4938,42 @@ export default function App() {
     const newSubstitutions = [...substitutions, newSub];
     setSubstitutions(newSubstitutions);
     pushAbsencesSubs(absences, newSubstitutions);
+  };
+
+  /**
+   * Registra un anticipo: la collega copre l'ora scoperta portando avanti la
+   * lezione che avrebbe fatto più tardi. L'orario settimanale non si tocca,
+   * la variazione vale solo per quella data e finisce nel foglio del giorno.
+   */
+  const handleConfirmAnticipo = (
+    absence: any,
+    hour: number,
+    classId: string,
+    subject: string,
+    candidate: any
+  ) => {
+    if (readOnlyMode) return;
+    const day = getDayIndexFromDate(absence.date);
+    const newSub = {
+      id: `sub_${Date.now()}`,
+      absenceId: absence.id,
+      date: absence.date,
+      day,
+      hour,
+      classId,
+      subjectOriginal: subject,
+      teacherOriginal: absence.teacherId,
+      teacherSubstitute: candidate.teacherId,
+      method: 'anticipo',
+      paid: false,
+      movedFromHour: candidate.fromHour,
+      subjectMoved: candidate.subject,
+      exitAfterHour: candidate.exitAfterHour,
+    };
+    const newSubstitutions = [...substitutions, newSub];
+    setSubstitutions(newSubstitutions);
+    pushAbsencesSubs(absences, newSubstitutions);
+    setAnticipoPanel(null);
   };
 
   const handleRemoveSubstitution = (id: string) => {
@@ -5540,8 +5674,10 @@ export default function App() {
     const subsByTeacher: Record<string, any[]> = {};
     const sorveglianzaSubs: any[] = [];
     const divisioneSubs: any[] = [];
+    const anticipoSubs: any[] = [];
     daySubs.forEach((s) => {
-      if (s.method === 'docente_disponibile' && s.teacherSubstitute) {
+      if (s.method === 'anticipo') anticipoSubs.push(s);
+      else if (s.method === 'docente_disponibile' && s.teacherSubstitute) {
         if (!subsByTeacher[s.teacherSubstitute])
           subsByTeacher[s.teacherSubstitute] = [];
         subsByTeacher[s.teacherSubstitute].push(s);
@@ -5580,6 +5716,29 @@ export default function App() {
       });
       html += `<td class="note-cell"></td></tr>`;
     }
+    anticipoSubs.forEach((sub) => {
+      rowIdx++;
+      const docente = allStaff.find((t) => t.id === sub.teacherSubstitute);
+      html += `<tr><td>${rowIdx}</td><td class="name-cell">${escapeXml(
+        docente?.name || sub.teacherSubstitute || ''
+      )}</td>`;
+      diurnalHours.forEach((dh) => {
+        if (dh.index === sub.hour)
+          html += `<td>${escapeXml(`${sub.classId} (ANT.)`)}</td>`;
+        else if (dh.index === sub.movedFromHour)
+          html += `<td>${escapeXml(`${sub.classId} spostata`)}</td>`;
+        else html += `<td></td>`;
+      });
+      html += `<td class="note-cell">${escapeXml(
+        `Anticipa ${sub.subjectMoved || 'la lezione'} dalla ${
+          sub.movedFromHour + 1
+        }ª${
+          sub.exitAfterHour !== undefined
+            ? `; la classe esce dopo la ${sub.exitAfterHour + 1}ª`
+            : `; la ${sub.movedFromHour + 1}ª resta scoperta`
+        }`
+      )}</td></tr>`;
+    });
     if (rowIdx === 0) {
       html += `<tr><td class="empty-row" colspan="${
         3 + diurnalHours.length
@@ -5589,7 +5748,10 @@ export default function App() {
 
     html += `<h3>Comunicazione alle classi su entrate/uscite in orario diverso</h3>`;
     html += `<table><thead><tr><th style="width:250pt;">Classe</th><th style="width:150pt;">Ore coinvolte</th><th>Note</th></tr></thead><tbody>`;
-    if (classAbsences.length === 0) {
+    const usciteDaAnticipo = anticipoSubs.filter(
+      (sub) => sub.exitAfterHour !== undefined
+    );
+    if (classAbsences.length === 0 && usciteDaAnticipo.length === 0) {
       html += `<tr><td class="empty-row" colspan="3">Nessuna comunicazione per questa data.</td></tr>`;
     }
     classAbsences.forEach((absence) => {
@@ -5609,9 +5771,31 @@ export default function App() {
         hoursLabel
       )}</td><td class="note-cell">${escapeXml(absence.note || '')}</td></tr>`;
     });
+    usciteDaAnticipo.forEach((sub) => {
+      const docente = allStaff.find((t) => t.id === sub.teacherSubstitute);
+      html += `<tr><td class="name-cell">Classe ${escapeXml(
+        sub.classId
+      )} — ESCE prima</td><td>${escapeXml(
+        `dopo la ${sub.exitAfterHour + 1}ª ora`
+      )}</td><td class="note-cell">${escapeXml(
+        `${docente?.name || ''} anticipa alla ${sub.hour + 1}ª la lezione della ${
+          sub.movedFromHour + 1
+        }ª${
+          timetable.some(
+            (slot) =>
+              slot.type === 'sostegno' &&
+              slot.classId === sub.classId &&
+              slot.day === sub.day &&
+              slot.hour === sub.movedFromHour
+          )
+            ? '. In quell\'ora era previsto il sostegno: avvisare la docente'
+            : ''
+        }`
+      )}</td></tr>`;
+    });
     html += `</tbody></table>`;
 
-    html += `<p class="legend">Legenda: (D) supplenza retribuita nell'ora buca del docente disponibile. — Foglio generato da EduTime Pro il ${new Date().toLocaleDateString(
+    html += `<p class="legend">Legenda: (D) supplenza retribuita nell'ora buca del docente disponibile. (ANT.) lezione anticipata da un'ora successiva dello stesso giorno. — Foglio generato da EduTime Pro il ${new Date().toLocaleDateString(
       'it-IT'
     )}.</p>`;
     html += `</body></html>`;
@@ -9470,11 +9654,24 @@ export default function App() {
                                 indicate).
                               </p>
                             )}
-                            {suggestions.map((s) => (
+                            {suggestions.map((s) => {
+                              const anticipoAperto =
+                                anticipoPanel &&
+                                anticipoPanel.absenceId === absence.id &&
+                                anticipoPanel.hour === s.hour;
+                              const anticipoCandidati = anticipoAperto
+                                ? getAnticipoCandidates(
+                                    absence,
+                                    s.hour,
+                                    s.classId
+                                  )
+                                : [];
+                              return (
                               <div
                                 key={s.hour}
-                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100"
+                                className="bg-slate-50 rounded-lg border border-slate-100"
                               >
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3">
                                 <div className="text-xs">
                                   <span className="font-bold">
                                     {mergedHoursMap[s.hour]?.label ||
@@ -9498,6 +9695,25 @@ export default function App() {
                                                 s.existingSub.teacherSubstitute
                                             )?.name ||
                                             s.existingSub.teacherSubstitute
+                                          }`
+                                        : s.existingSub.method === 'anticipo'
+                                        ? `⏪ ${
+                                            allStaff.find(
+                                              (t) =>
+                                                t.id ===
+                                                s.existingSub.teacherSubstitute
+                                            )?.name ||
+                                            s.existingSub.teacherSubstitute
+                                          } anticipa dalla ${
+                                            s.existingSub.movedFromHour + 1
+                                          }ª${
+                                            s.existingSub.exitAfterHour !==
+                                            undefined
+                                              ? ` — la classe esce dopo la ${
+                                                  s.existingSub.exitAfterHour +
+                                                  1
+                                                }ª`
+                                              : ''
                                           }`
                                         : s.existingSub.method ===
                                           'sorveglianza'
@@ -9587,10 +9803,92 @@ export default function App() {
                                     >
                                       Dividi alunni
                                     </button>
+                                    <button
+                                      onClick={() =>
+                                        setAnticipoPanel(
+                                          anticipoAperto
+                                            ? null
+                                            : {
+                                                absenceId: absence.id,
+                                                hour: s.hour,
+                                              }
+                                        )
+                                      }
+                                      disabled={readOnlyMode}
+                                      title="Una collega della stessa classe anticipa la lezione che avrebbe più tardi"
+                                      className="text-xs font-bold px-2 py-1 rounded-lg border bg-violet-50 border-violet-200 text-violet-700 hover:bg-violet-100 cursor-pointer disabled:opacity-50"
+                                    >
+                                      ⏪ Anticipa lezione
+                                    </button>
                                   </div>
                                 )}
                               </div>
-                            ))}
+                              {anticipoAperto && (
+                                <div className="border-t border-slate-200 px-3 py-2.5">
+                                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                                    Chi può anticipare la sua lezione in{' '}
+                                    {s.classId}
+                                  </p>
+                                  {anticipoCandidati.length === 0 && (
+                                    <p className="text-xs text-slate-400 italic">
+                                      Nessuna docente della classe ha lezione
+                                      più tardi ed è libera in quest'ora.
+                                    </p>
+                                  )}
+                                  <div className="flex flex-col gap-1.5">
+                                    {anticipoCandidati.map((c: any) => (
+                                      <button
+                                        key={`${c.teacherId}_${c.fromHour}`}
+                                        onClick={() =>
+                                          handleConfirmAnticipo(
+                                            absence,
+                                            s.hour,
+                                            s.classId,
+                                            s.subject,
+                                            c
+                                          )
+                                        }
+                                        disabled={readOnlyMode}
+                                        className={`text-left text-xs px-2.5 py-2 rounded-lg border cursor-pointer disabled:opacity-50 ${
+                                          c.exitClean
+                                            ? 'bg-white border-emerald-200 hover:bg-emerald-50'
+                                            : 'bg-white border-amber-200 hover:bg-amber-50'
+                                        }`}
+                                      >
+                                        <span className="font-bold">
+                                          {c.name}
+                                        </span>{' '}
+                                        anticipa {c.subject} dalla{' '}
+                                        {c.fromHour + 1}ª
+                                        <span
+                                          className={`block mt-0.5 font-semibold ${
+                                            c.exitClean
+                                              ? 'text-emerald-700'
+                                              : 'text-amber-700'
+                                          }`}
+                                        >
+                                          {c.exitClean
+                                            ? `La classe esce dopo la ${
+                                                (c.exitAfterHour ?? s.hour) + 1
+                                              }ª ora: avvisa le famiglie.`
+                                            : `Attenzione: la ${
+                                                c.fromHour + 1
+                                              }ª resta scoperta, la classe non esce.`}
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <button
+                                    onClick={() => setAnticipoPanel(null)}
+                                    className="mt-2 text-[11px] text-slate-500 hover:text-slate-700 font-semibold cursor-pointer"
+                                  >
+                                    Chiudi
+                                  </button>
+                                </div>
+                              )}
+                              </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>

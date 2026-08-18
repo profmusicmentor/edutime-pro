@@ -791,7 +791,7 @@ export const chapters: Chapter[] = [
         ),
       },
       {
-        title: 'Le tre risposte possibili',
+        title: 'Le quattro risposte possibili',
         tag: 'come si copre',
         body: (
           <Ul
@@ -809,11 +809,47 @@ export const chapters: Chapter[] = [
                 altre classi, non conta come ora retribuita.
               </>,
               <>
+                <B>⏪ Anticipa lezione</B>: una collega della stessa classe
+                porta avanti la lezione che avrebbe più tardi, e la classe
+                esce prima. Non è retribuita.
+              </>,
+              <>
                 Se in quell'ora la classe ha già il sostegno, l'app scrive{' '}
                 <B>✅ Coperta da sostegno</B> e non chiede nulla.
               </>,
             ]}
           />
+        ),
+      },
+      {
+        title: '⏪ Anticipare una lezione',
+        tag: "quando la classe puo' uscire prima",
+        body: (
+          <>
+            <p>
+              È il caso di tutti i giorni: manca la collega di quinta, e
+              un'altra docente della stessa classe ha lezione a sesta e buca a
+              quinta. Anticipa, e la classe esce un'ora prima. Il pulsante{' '}
+              <B>⏪ Anticipa lezione</B> apre l'elenco di chi può farlo: sono
+              le docenti che quel giorno hanno lezione in quella classe più
+              tardi e sono libere nell'ora scoperta.
+            </p>
+            <p className="mt-2">
+              Ogni proposta dice cosa succede alla classe. In{' '}
+              <B>verde</B> quando l'ora che si svuota è l'ultima della
+              giornata: la classe esce prima, e sta a te avvisare le famiglie.
+              In <B>giallo</B> quando la lezione anticipata viene da un'ora di
+              mezzo: la classe non esce e quell'ora resta scoperta, quindi ne
+              serve un'altra copertura.
+            </p>
+            <p className="mt-2">
+              L'anticipo vale <B>solo per quella data</B>: l'orario
+              settimanale non viene toccato, come per ogni altra sostituzione.
+              Finisce nel foglio del giorno, con la sigla <B>(ANT.)</B>{' '}
+              nell'ora coperta, l'indicazione dell'ora che si è svuotata e una
+              riga nella comunicazione alle classi.
+            </p>
+          </>
         ),
       },
       {
@@ -834,8 +870,9 @@ export const chapters: Chapter[] = [
         body: (
           <>
             Produce la <B>Predisposizione giornaliera supplenze docenti</B> del
-            giorno scelto: anno scolastico, titolari assenti, ore coinvolte e
-            sostituti assegnati. Come per le altre stampe si apre in una nuova
+            giorno scelto: anno scolastico, titolari assenti, ore coinvolte,
+            sostituti assegnati, lezioni anticipate e classi che entrano o
+            escono in orario diverso. Come per le altre stampe si apre in una nuova
             finestra: se non compare niente, il browser sta bloccando i pop-up.
           </>
         ),
