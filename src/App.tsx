@@ -90,6 +90,15 @@ const DEFAULT_RULES: any = {
    */
   globalMinHoursPerDay: 2,
   /**
+   * Quante ore lo stesso docente può fare nella stessa classe in un giorno.
+   * Alla secondaria tre è il tetto ragionevole ed è il valore storico. Alla
+   * primaria il docente prevalente ha ventidue ore su una classe sola e ne fa
+   * quattro o cinque al giorno: lì il tetto va alzato, altrimenti il
+   * generatore non riesce a piazzare la cattedra e i Conflitti si riempiono
+   * di errori che errori non sono. 0 = nessun limite.
+   */
+  globalMaxHoursPerClassPerDay: 3,
+  /**
    * Dare d'ufficio un giorno libero a chi non ce l'ha. È il comportamento
    * storico, ma dove la settimana è già corta (cinque giorni per tutti) il
    * giorno finisce in mezzo alla settimana e non lo vuole nessuno: chi si
@@ -847,11 +856,20 @@ const DAY_INITIALS = ['L', 'Ma', 'Me', 'G', 'V', 'S'];
  */
 const DEFAULT_MODEL_GRIDS: Record<
   string,
-  { days: number; hours: number; rientro: boolean }
+  { days: number; hours: number; pomeridiane: number; rientro: boolean }
 > = {
-  modelloA: { days: 6, hours: 5, rientro: true },
-  modelloB: { days: 5, hours: 6, rientro: false },
+  modelloA: { days: 6, hours: 5, pomeridiane: 0, rientro: true },
+  modelloB: { days: 5, hours: 6, pomeridiane: 0, rientro: false },
 };
+
+/**
+ * Quante ore pomeridiane curricolari può avere un modello. Sono le ore in cui
+ * si fa lezione normale dopo il mattino: l'educazione motoria delle quarte e
+ * quinte della primaria, il tempo prolungato della secondaria. Non vanno
+ * confuse con il rientro pomeridiano, che è l'ora riservata alle lezioni di
+ * strumento e in cui una materia curricolare è un errore.
+ */
+const GRID_MAX_AFTERNOON = 6;
 
 /** Limiti di sicurezza dei campi: oltre non si va, sotto non ha senso. */
 const GRID_MIN_DAYS = 1;
@@ -859,9 +877,19 @@ const GRID_MAX_DAYS = DAYS.length;
 const GRID_MIN_HOURS = 1;
 const GRID_MAX_HOURS = 12;
 
-/** Righe che un modello occupa nella griglia: ore curricolari più il rientro. */
-const gridSlots = (grid: { hours: number; rientro: boolean }) =>
-  grid.hours + (grid.rientro ? 1 : 0);
+/**
+ * Ore curricolari di un modello in un giorno: quelle del mattino più quelle
+ * del pomeriggio. È dove si può piazzare una materia.
+ */
+const curricularSlots = (grid: any) =>
+  grid.hours + (Number(grid.pomeridiane) || 0);
+
+/**
+ * Righe che un modello occupa nella griglia: le ore curricolari più il
+ * rientro pomeridiano, che è sempre l'ultima.
+ */
+const gridSlots = (grid: any) =>
+  curricularSlots(grid) + (grid.rientro ? 1 : 0);
 
 /** Fonde le griglie salvate con quelle di partenza, scartando valori fuori scala. */
 const normalizeModelGrids = (saved: any) => {
@@ -879,6 +907,10 @@ const normalizeModelGrids = (saved: any) => {
       hours: Math.min(
         GRID_MAX_HOURS,
         Math.max(GRID_MIN_HOURS, Number(value.hours) || base.hours)
+      ),
+      pomeridiane: Math.min(
+        GRID_MAX_AFTERNOON,
+        Math.max(0, Number(value.pomeridiane) || 0)
       ),
       rientro: value.rientro === undefined ? base.rientro : !!value.rientro,
     };
@@ -948,6 +980,15 @@ const getMaxDaysOffForHours = (hours: number) => {
 const maxHoursPerDayFor = (rules: any) => {
   const v = rules?.globalMaxHoursPerDay;
   return v === undefined || v === null ? 5 : v;
+};
+
+/**
+ * Quante ore lo stesso docente può fare nella stessa classe in un giorno.
+ * 0 (o assente) = nessun limite. Il default resta il 3 di sempre.
+ */
+const maxHoursPerClassPerDayFor = (rules: any) => {
+  const v = rules?.globalMaxHoursPerClassPerDay;
+  return v === undefined || v === null ? 3 : v;
 };
 
 /**
@@ -1205,7 +1246,9 @@ const canPlaceMateriaHard = (
     (s) =>
       s.classId === classId && s.day === day && s.teacherId === lesson.teacherId
   );
-  if (sameTeacherToday.length >= 3) return false;
+  const maxPerClassPerDay = maxHoursPerClassPerDayFor(rules);
+  if (maxPerClassPerDay > 0 && sameTeacherToday.length >= maxPerClassPerDay)
+    return false;
 
   const room = getRoomForSubject(lesson.subject, rooms);
   if (isRoomFull(tt, room, day, hour, rooms)) return false;
@@ -1499,7 +1542,7 @@ const findExchange = (
       !s.locked &&
       s.day !== shortDay &&
       s.day < grid.days &&
-      s.hour < grid.hours &&
+      s.hour < curricularSlots(grid) &&
       s.teacherId !== teacherId &&
       !isMixedLesson(s, ctx.mixedClasses) &&
       hoursOfTeacherOnDay(tt, teacherId, s.day) > 0
@@ -1681,7 +1724,7 @@ const consolidateShortDays = (tt: any[], ctx: any, budgetMs = 1500) => {
           // Solo dove il docente è già a scuola: aprire un'altra giornata
           // corta non risolverebbe niente.
           if (hoursOfTeacherOnDay(tt, teacherId, d) === 0) continue;
-          for (let h = 0; h < grid.hours; h++) {
+          for (let h = 0; h < curricularSlots(grid); h++) {
             if (
               !canPlaceMateriaHard(tt, lesson, slot.classId, d, h, relaxedCtx)
             )
@@ -1990,14 +2033,38 @@ export default function App() {
   const DAYS_IN_USE = DAYS.slice(0, maxGridDays);
 
   /**
+   * Ultima riga oraria con qualcosa dentro. Le viste singole devono arrivarci
+   * anche quando i modelli non la prevedono: chi ha ore al pomeriggio, docente
+   * di materia o di strumento, altrimenti sparisce dalla sua vista.
+   */
+  const lastUsedHourRow = timetable.length
+    ? Math.max(...timetable.map((slot) => slot.hour)) + 1
+    : 0;
+
+  /**
    * Righe della griglia oraria: le ore del mattino e, se la scuola ne ha
-   * impostate di più, quelle del pomeriggio a seguire. Con i valori di
-   * partenza sono le sei righe di sempre.
+   * impostate di più o ne ha di occupate, quelle del pomeriggio a seguire. Con
+   * i valori di partenza sono le sei righe di sempre.
    */
   const gridHourRows = [...diurnalHours, ...afternoonHours].slice(
     0,
-    Math.max(maxGridSlots, diurnalHours.length)
+    Math.max(maxGridSlots, diurnalHours.length, lastUsedHourRow)
   );
+
+  /**
+   * Righe da mostrare nella vista singola di un docente: quelle della griglia
+   * e, se ha ore al pomeriggio, fino all'ultima che occupa. Chi il pomeriggio
+   * non lo fa vede la tabella di sempre, senza righe vuote in fondo.
+   */
+  const staffRowCount = (staffId: string) => {
+    const base = Math.max(maxGridSlots, diurnalHours.length);
+    const last = timetable.reduce(
+      (max, slot) =>
+        slot.teacherId === staffId ? Math.max(max, slot.hour + 1) : max,
+      0
+    );
+    return Math.max(base, last);
+  };
 
   const getNoteKey = (
     classId: string,
@@ -2367,7 +2434,7 @@ export default function App() {
    */
   const isRientroHour = (classId: string, hour: number) => {
     const grid = getClassGrid(classId);
-    return !!grid.rientro && hour === grid.hours;
+    return !!grid.rientro && hour === curricularSlots(grid);
   };
 
   const allStaff = useMemo(
@@ -2391,6 +2458,21 @@ export default function App() {
   const filteredInstrumentStaff = useMemo(
     () => allStaff.filter((s) => s.staffType === 'strumento'),
     [allStaff]
+  );
+
+  /**
+   * Ore pomeridiane con almeno una lezione in orario. Il tabellone e l'export
+   * le aggiungono in coda alle ore del mattino, così un docente di materia con
+   * ore al pomeriggio (le due di educazione motoria delle quarte e quinte, il
+   * tempo prolungato) sta tutto su una riga sola invece di sparire. La scuola
+   * che non usa il pomeriggio non vede nessuna colonna in più.
+   */
+  const afternoonHoursInUse = useMemo(
+    () =>
+      afternoonHours.filter((h: any) =>
+        timetable.some((slot) => slot.hour === h.index)
+      ),
+    [afternoonHours, timetable]
   );
   const allDepartments = useMemo(
     () => Array.from(new Set(teachers.map((t) => t.subject))).sort(),
@@ -2442,6 +2524,7 @@ export default function App() {
     const teacherSchedules: any = {};
     const sostegnoSchedules: any = {};
     const teacherDailyClassCounts: any = {};
+    const maxPerClassPerDay = maxHoursPerClassPerDayFor(generationRules);
     const roomSchedules: any = {};
 
     allStaff.forEach((staff) => {
@@ -2598,14 +2681,17 @@ export default function App() {
           slot,
         });
       }
-      if (grid.rientro && hour === grid.hours && type === 'materia') {
+      if (grid.rientro && hour === curricularSlots(grid) && type === 'materia') {
         conflicts.push({
           type: 'error',
           message: `La classe ${classId} ha una materia nell'ora del rientro pomeridiano.`,
           slot,
         });
       }
-      const isDiurnalClassHour = hour < grid.hours;
+      // Le ore pomeridiane curricolari fanno monte ore come quelle del
+      // mattino: sono le due di educazione motoria che portano la quarta e la
+      // quinta della primaria da 27 a 29 ore. Fuori resta solo il rientro.
+      const isDiurnalClassHour = hour < curricularSlots(grid);
       if (type === 'materia' && isDiurnalClassHour)
         classHourCounts[classId] =
           (classHourCounts[classId] || 0) + hourWeight(hour);
@@ -2613,12 +2699,15 @@ export default function App() {
         const tcdKey = `${teacherId}_${classId}_${day}`;
         teacherDailyClassCounts[tcdKey] =
           (teacherDailyClassCounts[tcdKey] || 0) + 1;
-        if (teacherDailyClassCounts[tcdKey] > 3) {
+        if (
+          maxPerClassPerDay > 0 &&
+          teacherDailyClassCounts[tcdKey] > maxPerClassPerDay
+        ) {
           conflicts.push({
             type: 'error',
             message: `Il docente ${
               allStaff.find((t) => t.id === teacherId)?.name
-            } supera il limite di 3 ore giornaliere nella classe ${classId}.`,
+            } supera il limite di ${maxPerClassPerDay} ore giornaliere nella classe ${classId}.`,
             slot,
           });
         }
@@ -2975,6 +3064,7 @@ export default function App() {
     };
 
     const maxPerDayRule = maxHoursPerDayFor(newRules);
+    const maxPerClassPerDayRule = maxHoursPerClassPerDayFor(newRules);
 
     // Quota giornaliera ideale di ogni docente: le sue ore spalmate sui giorni
     // in cui è a scuola. Oltre quella quota la cella costa cara, così la
@@ -2993,7 +3083,9 @@ export default function App() {
         // Quante ore al giorno e su quanti giorni: sono i numeri della
         // griglia del modello, impostabili dalla scuola.
         const grid = getClassGrid(cls.id);
-        const maxHoursPerDay = grid.hours;
+        // Ore in cui il generatore può piazzare una materia: il mattino più le
+        // eventuali ore pomeridiane curricolari del modello.
+        const maxHoursPerDay = curricularSlots(grid);
         const totalDays = grid.days;
         const pool: any[] = [];
 
@@ -3094,7 +3186,11 @@ export default function App() {
                   slot.day === day &&
                   slot.teacherId === candidate.teacherId
               );
-              if (dailyClassLessons.length >= 3) continue;
+              if (
+                maxPerClassPerDayRule > 0 &&
+                dailyClassLessons.length >= maxPerClassPerDayRule
+              )
+                continue;
               const currentRoom = getRoomForSubject(candidate.subject, rooms);
               if (isRoomFull(newTimetable, currentRoom, day, hour, rooms))
                 continue;
@@ -3605,13 +3701,17 @@ export default function App() {
           slot.hour !== hour &&
           slot.type === 'materia'
       );
-      if (dailyClassLessons.length >= 3) {
+      const maxPerClassPerDay = maxHoursPerClassPerDayFor(generationRules);
+      if (
+        maxPerClassPerDay > 0 &&
+        dailyClassLessons.length >= maxPerClassPerDay
+      ) {
         setConflictModal({
           type: 'warning',
           title: 'Limite Ore Superato',
           message: `Il docente ${
             allStaff.find((t) => t.id === teacherId)?.name
-          } ha già 3 ore nella classe ${newClassId}.`,
+          } ha già ${maxPerClassPerDay} ore nella classe ${newClassId}.`,
           hideSwap: true,
           onConfirm: () => {
             executeCellUpdate(
@@ -4374,11 +4474,15 @@ export default function App() {
           slot.hour !== hour &&
           slot.type === 'materia'
       );
-      if (dailyClassLessons.length >= 3) {
+      const maxPerClassPerDay = maxHoursPerClassPerDayFor(generationRules);
+      if (
+        maxPerClassPerDay > 0 &&
+        dailyClassLessons.length >= maxPerClassPerDay
+      ) {
         setConflictModal({
           type: 'warning',
           title: 'Limite Ore Superato',
-          message: `Il docente ${teacherDoc?.name} ha già 3 ore in questa classe.`,
+          message: `Il docente ${teacherDoc?.name} ha già ${maxPerClassPerDay} ore in questa classe.`,
           hideSwap: true,
           onConfirm: () => {
             executeAssignTeacher(teacherId, actualStaffType);
@@ -4830,7 +4934,7 @@ export default function App() {
    */
   const handleUpdateModelGrid = (
     model: string,
-    field: 'days' | 'hours' | 'rientro',
+    field: 'days' | 'hours' | 'pomeridiane' | 'rientro',
     value: any
   ) => {
     if (readOnlyMode) return;
@@ -5691,26 +5795,33 @@ export default function App() {
   };
 
   const handleExportExcel = () => {
+    // Stesso criterio della stampa: un foglio solo con mattino e pomeriggio in
+    // uso, e il prospetto degli strumenti a parte solo se ci sono docenti di
+    // strumento.
     const sheets: XlsxSheet[] = [
       buildExcelSheet(
-        'Orario Diurno',
-        '📋 ORARIO SCOLASTICO DIURNO',
-        '☀️ Orario Mattutino - Tutti i Docenti',
+        'Orario',
+        '📋 ORARIO SCOLASTICO',
+        '☀️ Tutti i Docenti - Mattino e Pomeriggio',
         'Classi Assegnate',
-        DAYS,
-        diurnalHours,
-        filteredStaff.filter((s) => s.staffType !== 'strumento')
-      ),
-      buildExcelSheet(
-        'Orario Pomeridiano',
-        '🎵 ORARIO POMERIDIANO - INDIRIZZO MUSICALE',
-        'Strumenti Musicali',
-        'Strumento',
-        DAYS.slice(0, 5),
-        afternoonHours,
-        filteredInstrumentStaff
+        DAYS_IN_USE,
+        [...diurnalHours, ...afternoonHoursInUse],
+        filteredStaff
       ),
     ];
+    if (filteredInstrumentStaff.length > 0) {
+      sheets.push(
+        buildExcelSheet(
+          'Orario Pomeridiano',
+          '🎵 ORARIO POMERIDIANO - INDIRIZZO MUSICALE',
+          'Strumenti Musicali',
+          'Strumento',
+          DAYS_IN_USE,
+          afternoonHours,
+          filteredInstrumentStaff
+        )
+      );
+    }
 
     const data = buildXlsx(sheets, buildExcelStyles());
     const blob = new Blob([data as BlobPart], {
@@ -5738,22 +5849,25 @@ export default function App() {
     let css = `@page { size: A3 landscape; margin: 6mm; } * { box-sizing: border-box; } body { background-color: white; color: black; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 6mm; font-size: 7.5pt; } h1 { font-size: 14pt; font-weight: bold; margin: 0 0 4mm 0; color: #1e3a8a; text-align: center; } h2 { font-size: 9pt; margin: 0 0 2mm 0; color: #1e3a8a; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #1e3a8a; padding-bottom: 1mm; } table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 3mm; } tr { page-break-inside: auto; } td, th { border: 0.5pt solid #64748b; padding: 1.5pt 2pt; text-align: center; font-size: 6.5pt; line-height: 1.15; overflow: hidden; vertical-align: middle; } th { background-color: #1e3a8a !important; color: white !important; font-weight: bold; font-size: 6.5pt; border: 1pt solid #1e3a8a; } th.sub { background-color: #e5e7eb !important; color: #374151 !important; font-size: 6pt; } td.staff-cell { text-align: left; font-weight: bold; font-size: 7pt; padding: 2pt 3pt; } td.staff-cell .subj { font-size: 5.5pt; font-weight: normal; color: #374151; text-transform: uppercase; display: block; } td.hours-cell { font-weight: bold; color: #1e3a8a; background-color: #f0f4ff !important; } td.class-cell { text-align: left; color: #4f46e5; font-weight: bold; font-size: 6pt; } td.day-off { background-color: ${DAY_OFF_COLOR} !important; color: #991b1b !important; font-style: italic; font-weight: bold; font-size: 6pt; } td.lesson-active { background-color: #dbeafe !important; color: #1e3a8a !important; font-weight: bold; font-size: 7.5pt; line-height: 1.05; } td.lesson-active .room { display: block; font-size: 4.2pt; font-weight: normal; color: #4338ca; letter-spacing: -0.15pt; white-space: nowrap; } td.empty { background-color: #fafafa; } tr.dept-separator td { background-color: #1e3a8a !important; height: 3pt; padding: 0; } .page-break { page-break-before: always; } .day-sep { border-right: 2pt solid #1e3a8a !important; }`;
     let contentHtml = `<html><head><title>Orario - EduTime Pro</title><style>${css}</style></head><body>`;
     if (printType === 'master') {
-      const staffDiurno = filteredStaff.filter(
-        (s) => s.staffType !== 'strumento'
-      );
+      // Un tabellone solo, con le ore del mattino e quelle del pomeriggio
+      // davvero usate: chi insegna in tutte e due le fasce sta su una riga
+      // sola. Il prospetto dell'indirizzo musicale resta in coda, ma solo se
+      // la scuola ha docenti di strumento.
+      const printHours = [...diurnalHours, ...afternoonHoursInUse];
+      const staffTutti = filteredStaff;
       const staffPomeridiano = filteredStaff.filter(
         (s) => s.staffType === 'strumento'
       );
-      contentHtml += `<h1>📋 ORARIO SCOLASTICO DIURNO</h1><h2>☀️ Orario Mattutino - Tutti i Docenti</h2><table><thead><tr><th style="width: 130pt;" rowspan="2">Docente</th><th style="width: 25pt;" rowspan="2">Ore</th><th style="width: 130pt;" rowspan="2">Classi Assegnate</th>${DAYS_IN_USE.map(
+      contentHtml += `<h1>📋 ORARIO SCOLASTICO</h1><h2>☀️ Tutti i Docenti - Mattino e Pomeriggio</h2><table><thead><tr><th style="width: 130pt;" rowspan="2">Docente</th><th style="width: 25pt;" rowspan="2">Ore</th><th style="width: 130pt;" rowspan="2">Classi Assegnate</th>${DAYS_IN_USE.map(
         (day, idx) =>
-          `<th colspan="${diurnalHours.length}" class="${
+          `<th colspan="${printHours.length}" class="${
             idx < DAYS_IN_USE.length - 1 ? 'day-sep' : ''
           }">${day}</th>`
       ).join('')}</tr><tr>${DAYS_IN_USE.map((_, dIdx) =>
-        diurnalHours
+        printHours
           .map((dh, hIdx) => {
             const isLast =
-              hIdx === diurnalHours.length - 1 && dIdx < DAYS_IN_USE.length - 1;
+              hIdx === printHours.length - 1 && dIdx < DAYS_IN_USE.length - 1;
             return `<th class="sub ${isLast ? 'day-sep' : ''}">${escapeXml(
               dh.label.split(' ')[0]
             )}</th>`;
@@ -5761,13 +5875,13 @@ export default function App() {
           .join('')
       ).join('')}</tr></thead><tbody>`;
       let prevSubject = '';
-      staffDiurno.forEach((staff, idx) => {
+      staffTutti.forEach((staff, idx) => {
         const deptColor = getDeptColor(staff.subject);
         const isNewDept = staff.subject !== prevSubject && idx > 0;
         prevSubject = staff.subject;
         if (isNewDept)
           contentHtml += `<tr class="dept-separator"><td colspan="${
-            3 + DAYS_IN_USE.length * diurnalHours.length
+            3 + DAYS_IN_USE.length * printHours.length
           }"></td></tr>`;
         contentHtml += `<tr><td class="staff-cell" style="background-color: ${deptColor} !important;">${escapeXml(
           staff.name
@@ -5778,13 +5892,13 @@ export default function App() {
         }h</td><td class="class-cell">${escapeXml(
           staffClassSummary[staff.id]
         )}</td>`;
-        DAYS.forEach((_, dIdx) => {
+        DAYS_IN_USE.forEach((_, dIdx) => {
           const isDayOff = (
             generationRules.teacherDaysOff[staff.id] || []
           ).includes(dIdx);
           const isLastDay = dIdx < DAYS_IN_USE.length - 1;
-          diurnalHours.forEach((dh, hIdx) => {
-            const isLastHour = hIdx === diurnalHours.length - 1;
+          printHours.forEach((dh, hIdx) => {
+            const isLastHour = hIdx === printHours.length - 1;
             const borderClass = isLastHour && isLastDay ? 'day-sep' : '';
             if (isDayOff)
               contentHtml += `<td class="day-off ${borderClass}">LIBERO</td>`;
@@ -5815,21 +5929,24 @@ export default function App() {
         });
         contentHtml += `</tr>`;
       });
-      contentHtml += `</tbody></table><div class="page-break"></div><h1>🎵 ORARIO POMERIDIANO - INDIRIZZO MUSICALE</h1><h2>Strumenti Musicali</h2><table><thead><tr><th style="width: 130pt;" rowspan="2">Docente</th><th style="width: 25pt;" rowspan="2">Ore</th><th style="width: 130pt;" rowspan="2">Strumento</th>${DAYS.slice(
-        0,
-        5
-      )
+      contentHtml += `</tbody></table>`;
+      // Il prospetto dell'indirizzo musicale resta, ma solo dove serve: una
+      // scuola senza docenti di strumento non si porta dietro una pagina vuota.
+      if (staffPomeridiano.length > 0) {
+      contentHtml += `<div class="page-break"></div><h1>🎵 ORARIO POMERIDIANO - INDIRIZZO MUSICALE</h1><h2>Strumenti Musicali</h2><table><thead><tr><th style="width: 130pt;" rowspan="2">Docente</th><th style="width: 25pt;" rowspan="2">Ore</th><th style="width: 130pt;" rowspan="2">Strumento</th>${DAYS_IN_USE
         .map(
           (day, idx) =>
             `<th colspan="${afternoonHours.length}" class="${
-              idx < 4 ? 'day-sep' : ''
+              idx < DAYS_IN_USE.length - 1 ? 'day-sep' : ''
             }">${day}</th>`
         )
-        .join('')}</tr><tr>${DAYS.slice(0, 5)
+        .join('')}</tr><tr>${DAYS_IN_USE
         .map((_, dIdx) =>
           afternoonHours
             .map((ah, hIdx) => {
-              const isLast = hIdx === afternoonHours.length - 1 && dIdx < 4;
+              const isLast =
+                hIdx === afternoonHours.length - 1 &&
+                dIdx < DAYS_IN_USE.length - 1;
               return `<th class="sub ${isLast ? 'day-sep' : ''}">${escapeXml(
                 ah.label.split(' ')[0]
               )}</th>`;
@@ -5844,7 +5961,7 @@ export default function App() {
         prevSubjPM = staff.subject;
         if (isNewDept)
           contentHtml += `<tr class="dept-separator"><td colspan="${
-            3 + 5 * afternoonHours.length
+            3 + DAYS_IN_USE.length * afternoonHours.length
           }"></td></tr>`;
         contentHtml += `<tr><td class="staff-cell" style="background-color: ${deptColor} !important;">${escapeXml(
           staff.name
@@ -5855,11 +5972,11 @@ export default function App() {
         }h</td><td class="class-cell" style="color: #10b981;">${escapeXml(
           staffClassSummary[staff.id]
         )}</td>`;
-        DAYS.slice(0, 5).forEach((_, dIdx) => {
+        DAYS_IN_USE.forEach((_, dIdx) => {
           const isDayOff = (
             generationRules.teacherDaysOff[staff.id] || []
           ).includes(dIdx);
-          const isLastDay = dIdx < 4;
+          const isLastDay = dIdx < DAYS_IN_USE.length - 1;
           afternoonHours.forEach((ah, hIdx) => {
             const isLastHour = hIdx === afternoonHours.length - 1;
             const borderClass = isLastHour && isLastDay ? 'day-sep' : '';
@@ -5892,7 +6009,9 @@ export default function App() {
         });
         contentHtml += `</tr>`;
       });
-      contentHtml += `</tbody></table><script>window.onload = function() { setTimeout(function() { window.print(); }, 300); }</script></body></html>`;
+      contentHtml += `</tbody></table>`;
+      }
+      contentHtml += `<script>window.onload = function() { setTimeout(function() { window.print(); }, 300); }</script></body></html>`;
     } else if (printType === 'single_class') {
       const classObj = classes.find((c) => c.id === id);
       // Giorni e righe della classe: quelli del suo modello, non piu' il
@@ -5954,7 +6073,7 @@ export default function App() {
         (d) => `<th>${d}</th>`
       ).join('')}</tr></thead><tbody>${(staff?.staffType === 'strumento'
         ? afternoonHours
-        : gridHourRows
+        : gridHourRows.slice(0, staffRowCount(staff?.id))
       )
         .map(
           (dh) =>
@@ -7253,6 +7372,15 @@ export default function App() {
                           hIdx >= gridSlots(getClassGrid(selectedClass))
                         )
                           return null;
+                        if (viewType !== 'class') {
+                          const staffId =
+                            viewType === 'teacher'
+                              ? selectedTeacherId
+                              : viewType === 'sostegno'
+                                ? selectedSostegnoId
+                                : selectedStrumentoId;
+                          if (hIdx >= staffRowCount(staffId)) return null;
+                        }
                         return (
                           <tr
                             key={hIdx}
@@ -8744,6 +8872,34 @@ export default function App() {
                     </div>
                   </div>
                   <h3 className="font-bold text-slate-800 mt-5 mb-3 flex items-center gap-2">
+                    🧮 Massimo Ore al Giorno nella Stessa Classe
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={maxHoursPerClassPerDayFor(generationRules)}
+                      onChange={(e) =>
+                        handleUpdateRules(
+                          'globalMaxHoursPerClassPerDay',
+                          parseInt(e.target.value)
+                        )
+                      }
+                      disabled={readOnlyMode}
+                      className="text-sm bg-white border border-indigo-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700 cursor-pointer disabled:opacity-50"
+                    >
+                      <option value={2}>2 ore</option>
+                      <option value={3}>3 ore</option>
+                      <option value={4}>4 ore</option>
+                      <option value={5}>5 ore</option>
+                      <option value={6}>6 ore</option>
+                      <option value={0}>Nessun limite</option>
+                    </select>
+                    <div className="text-xs font-medium text-slate-600">
+                      Alla primaria il docente prevalente ne fa quattro o
+                      cinque: con il tetto a 3 risultano errori che errori non
+                      sono
+                    </div>
+                  </div>
+                  <h3 className="font-bold text-slate-800 mt-5 mb-3 flex items-center gap-2">
                     🚪 Minimo Ore al Giorno
                   </h3>
                   <div className="flex items-center gap-3">
@@ -9313,9 +9469,13 @@ export default function App() {
               </p>
               <p className="text-sm text-slate-500 mb-4">
                 La griglia oraria dei due modelli è modificabile: giorni della
-                settimana, ore al giorno ed eventuale rientro pomeridiano. Il
-                generatore, i controlli, le tabelle e le stampe seguono questi
-                numeri.
+                settimana, ore al giorno, ore pomeridiane curricolari ed
+                eventuale rientro pomeridiano. Le ore pomeridiane sono lezione
+                normale che prosegue dopo il mattino (l'educazione motoria
+                delle quarte e quinte della primaria, il tempo prolungato);
+                il rientro è invece l'ora riservata alle lezioni di strumento.
+                Il generatore, i controlli, le tabelle e le stampe seguono
+                questi numeri.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                 {[
@@ -9348,6 +9508,9 @@ export default function App() {
                         {grid.days} giorni ({DAYS[0].slice(0, 3).toLowerCase()}-
                         {DAYS[grid.days - 1].slice(0, 3).toLowerCase()}),{' '}
                         {grid.hours} ore
+                        {Number(grid.pomeridiane) > 0
+                          ? ` + ${grid.pomeridiane} pomeridiane`
+                          : ''}
                       </h3>
                       <div className="flex flex-wrap gap-4 items-end">
                         <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
@@ -9379,6 +9542,24 @@ export default function App() {
                               handleUpdateModelGrid(
                                 model,
                                 'hours',
+                                Number(e.target.value)
+                              )
+                            }
+                            disabled={readOnlyMode}
+                            className="w-20 border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                          Ore pomeridiane
+                          <input
+                            type="number"
+                            min={0}
+                            max={GRID_MAX_AFTERNOON}
+                            value={Number(grid.pomeridiane) || 0}
+                            onChange={(e) =>
+                              handleUpdateModelGrid(
+                                model,
+                                'pomeridiane',
                                 Number(e.target.value)
                               )
                             }

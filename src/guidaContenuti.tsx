@@ -272,12 +272,12 @@ export const chapters: Chapter[] = [
       {
         title: 'Stampa A3 📄',
         tag: 'output',
-        body: "Apre una nuova finestra con l'orario completo (diurno + pomeridiano) pronto per la stampa in A3 orizzontale. Se il browser blocca i pop-up compare un avviso: autorizzali e riprova.",
+        body: "Apre una nuova finestra con l'orario pronto per la stampa in A3 orizzontale. È un tabellone solo, con le ore del mattino e quelle del pomeriggio in cui c'è almeno una lezione: chi insegna in tutte e due le fasce sta su una riga sola. Se la scuola ha docenti di strumento, in coda resta il prospetto dell'indirizzo musicale. Se il browser blocca i pop-up compare un avviso: autorizzali e riprova.",
       },
       {
         title: 'Esporta Excel 📊',
         tag: 'output',
-        body: 'Scarica un file orario_scolastico.xls con due fogli: "Orario Diurno" (materie e sostegno) e "Orario Pomeridiano" (strumento). Le celle sono colorate per dipartimento e i giorni liberi evidenziati.',
+        body: 'Scarica un file orario_scolastico.xlsx con il foglio "Orario", che tiene insieme tutti i docenti e tutte le ore in uso, e, solo se la scuola ha docenti di strumento, un secondo foglio "Orario Pomeridiano" con l\'indirizzo musicale. Le celle sono colorate per dipartimento e i giorni liberi evidenziati.',
       },
     ],
     note: {
@@ -606,6 +606,11 @@ export const chapters: Chapter[] = [
         body: "Quante ore può fare un docente in una giornata: 4, 5 (predefinito), 6 oppure nessun limite. Oltre a questo tetto l'algoritmo ne applica uno suo, più stretto: le ore di cattedra divise per i giorni in cui il docente è a scuola. È quello che evita le giornate da sei ore e la settimana schiacciata su quattro giorni. Il compromesso c'è: distribuire di più significa qualche ora buca in più e, con le cattedre pesanti, qualche ora che resta fuori. Se il tetto rende la cattedra impossibile da piazzare, la scheda Conflitti lo dice.",
       },
       {
+        title: '🧮 Massimo ore al giorno nella stessa classe',
+        tag: 'primaria',
+        body: "Quante ore lo stesso docente può fare nella stessa classe in un giorno: da 2 a 6, oppure nessun limite. Il predefinito è 3, il valore storico, e alla secondaria va bene così. Alla primaria no: il docente prevalente ha ventidue ore su una classe sola e ne fa quattro o cinque al giorno, quindi con il tetto a 3 il generatore non riesce a piazzare la cattedra e la scheda Conflitti si riempie di errori che errori non sono. In quel caso porta il tetto a 5 o a 6.",
+      },
+      {
         title: "🚪 Minimo ore al giorno",
         tag: 'niente viaggi a vuoto',
         body: "Nessun minimo, 2 ore (predefinito) o 3. A generazione finita l'algoritmo ripassa le giornate sotto la soglia e prova a chiuderle, spostando quelle ore in un giorno in cui il docente è già a scuola: se non c'è posto libero scambia la cella con un'altra lezione della stessa classe, e se lo scambio non regge lascia tutto com'era. Le giornate che restano sotto il minimo finiscono nei Conflitti, così le sposti a mano.",
@@ -687,7 +692,12 @@ export const chapters: Chapter[] = [
               5 ore al giorno più il rientro; <B>Modello B</B>: 5 giorni
               (Lun-Ven), 6 ore al giorno — ma la <B>griglia è modificabile</B>:
               in questa scheda imposti quanti giorni a settimana, quante ore al
-              giorno e se c'è il rientro pomeridiano. Generatore, controlli,
+              giorno, quante ore pomeridiane curricolari e se c'è il rientro
+              pomeridiano. Le ore pomeridiane sono lezione normale che
+              prosegue dopo il mattino, come le due di educazione motoria che
+              portano le quarte e le quinte della primaria da 27 a 29 ore;
+              il rientro è un'altra cosa, è l'ora riservata alle lezioni di
+              strumento. Generatore, controlli,
               tabelle e stampe seguono i numeri che imposti qui, quindi una
               scuola che lavora su 4 giorni da 3 ore può descrivere la propria
               settimana senza forzature.
@@ -778,7 +788,7 @@ export const chapters: Chapter[] = [
               'Docente assegnato in un suo giorno di indisponibilità.',
               'Classe Modello B con ore di sabato.',
               'Classe Modello A che supera le 13:00 (5ª ora).',
-              'Più di 3 ore giornaliere dello stesso docente nella stessa classe.',
+              'Più ore giornaliere dello stesso docente nella stessa classe di quante ne consenta il tetto impostato in Sezioni & Regole (3 di partenza).',
               'Aula speciale occupata da più classi.',
               'Totale ore curricolari della classe diverso dal monte ore della sezione.',
               'Ore assegnate superiori a quelle previste dalla cattedra.',
@@ -1059,7 +1069,7 @@ export const chapters: Chapter[] = [
                 <B>❌ Annulla</B>: non fa nulla.
               </>,
               <>
-                Per il superamento del limite di 3 ore nella stessa classe
+                Per il superamento del limite di ore nella stessa classe
                 compare invece <B>⚠️ Procedi Comunque</B>.
               </>,
             ]}
@@ -1272,8 +1282,9 @@ export const chapters: Chapter[] = [
               </>,
               <>
                 Entrambi i modelli sono <B>modificabili</B> in «Sezioni &
-                Regole»: giorni a settimana, ore al giorno e rientro
-                pomeridiano. Chi non li tocca continua a lavorare come prima.
+                Regole»: giorni a settimana, ore al giorno, ore pomeridiane
+                curricolari e rientro pomeridiano. Chi non li tocca continua a
+                lavorare come prima.
               </>,
             ]}
           />
@@ -1348,7 +1359,7 @@ export const chapters: Chapter[] = [
         body: (
           <Ul
             items={[
-              'Max 3 ore al giorno dello stesso docente nella stessa classe.',
+              'Max ore al giorno dello stesso docente nella stessa classe: 3 di partenza, si cambia in Sezioni & Regole.',
               'Max 10 ore in due giorni consecutivi per docente.',
               'Vietate due ore buche di fila.',
               'Giorni liberi: ≥18h → 1, ≥12h → 2, altri → 3.',
