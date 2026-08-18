@@ -89,6 +89,13 @@ const DEFAULT_RULES: any = {
    * 0 = nessun vincolo.
    */
   globalMinHoursPerDay: 2,
+  /**
+   * Dare d'ufficio un giorno libero a chi non ce l'ha. È il comportamento
+   * storico, ma dove la settimana è già corta (cinque giorni per tutti) il
+   * giorno finisce in mezzo alla settimana e non lo vuole nessuno: chi si
+   * trova in quel caso lo spegne.
+   */
+  autoDayOff: true,
   teacherMaxGapHours: {},
   teacherDaysOff: {},
   /**
@@ -1039,8 +1046,10 @@ const isNamedRoom = (roomName?: string) =>
  * Etichetta corta per le celle strette della stampa A3: "Lab. Scienze"
  * diventa "L.SCIEN". Il nome intero non ci sta in una colonna da 6.5pt.
  */
-const roomShortLabel = (roomName?: string) => {
+const roomShortLabel = (roomName?: string, rooms?: any[]) => {
   if (!isNamedRoom(roomName)) return '';
+  const scritta = (rooms || []).find((r) => r.name === roomName)?.short;
+  if (scritta) return String(scritta).toUpperCase();
   const name = String(roomName);
   const lab = name.match(/^lab\.?\s*(?:di\s+)?(.+)$/i);
   if (lab) return `L.${lab[1].slice(0, 5).toUpperCase()}`;
@@ -1052,13 +1061,41 @@ const roomShortLabel = (roomName?: string) => {
  * quanto il codice di una classe: "Lab. Scienze" diventa "LSC". Il nome
  * intero resta nel titolo del pulsante.
  */
-const roomTinyLabel = (roomName?: string) => {
+const roomTinyLabel = (roomName?: string, rooms?: any[]) => {
   if (!isNamedRoom(roomName)) return '';
+  const scritta = (rooms || []).find((r) => r.name === roomName)?.short;
+  // Nel quadro la colonna è larga quanto "1A": la sigla dell'utente va
+  // stretta ancora un po', togliendo i punti che non aggiungono niente.
+  if (scritta)
+    return String(scritta).replace(/[.\s]/g, '').slice(0, 4).toUpperCase();
   const name = String(roomName);
   const lab = name.match(/^lab\.?\s*(?:di\s+)?(.+)$/i);
   if (lab) return `L${lab[1].slice(0, 2).toUpperCase()}`;
   return name.slice(0, 3).toUpperCase();
 };
+
+/**
+ * Le classi che stanno in quell'aula in quell'ora, esclusa quella che si sta
+ * modificando. Serve a dire subito "occupata da 2B" invece di scoprirlo dopo
+ * nella scheda Conflitti.
+ */
+const roomOccupantsAt = (
+  tt: any[],
+  roomName: string,
+  day: number,
+  hour: number,
+  exceptClassId?: string
+) =>
+  tt
+    .filter(
+      (s) =>
+        s.room === roomName &&
+        s.day === day &&
+        s.hour === hour &&
+        s.classId !== exceptClassId &&
+        s.type !== 'sostegno'
+    )
+    .map((s) => s.classId);
 
 const getRoomSede = (roomName: string, rooms: any[]) =>
   (rooms || []).find((r) => r.name === roomName)?.sedeId;
@@ -1959,6 +1996,7 @@ export default function App() {
               globalMaxGapHours: rules.globalMaxGapHours ?? 1,
               globalMaxHoursPerDay: rules.globalMaxHoursPerDay ?? 5,
               globalMinHoursPerDay: rules.globalMinHoursPerDay ?? 2,
+              autoDayOff: rules.autoDayOff !== false,
               teacherMaxGapHours: rules.teacherMaxGapHours || {},
               teacherDaysOff: safeDaysOff,
               teacherHoursOff: safeHoursOff,
@@ -2822,7 +2860,11 @@ export default function App() {
               )
             );
       const currentDaysOff = newRules.teacherDaysOff[staff.id] || [];
-      if (currentDaysOff.length === 0 && plannedHours > 0) {
+      if (
+        newRules.autoDayOff !== false &&
+        currentDaysOff.length === 0 &&
+        plannedHours > 0
+      ) {
         if (teacherGridDays > 0 && teacherGridDays < maxGridDays)
           newRules.teacherDaysOff[staff.id] = [teacherGridDays];
         else {
@@ -4606,6 +4648,22 @@ export default function App() {
     pushRooms(newRooms);
   };
 
+  /**
+   * Sigla scritta a mano per le stampe strette. Nel quadro A3 la colonna di
+   * un'ora è poco più di un centimetro: "Centrale Laboratorio Disegno" non ci
+   * sta in nessun modo, e l'abbreviazione automatica indovina di rado quella
+   * che la scuola usa davvero.
+   */
+  const handleUpdateRoomShort = (roomId: string, value: string) => {
+    if (readOnlyMode) return;
+    const sigla = value.trim().slice(0, 6).toUpperCase();
+    const newRooms = rooms.map((r) =>
+      r.id === roomId ? { ...r, short: sigla || undefined } : r
+    );
+    setRooms(newRooms);
+    pushRooms(newRooms);
+  };
+
   const handleUpdateRoomSede = (roomId: string, sedeId: string) => {
     if (readOnlyMode) return;
     const newRooms = rooms.map((r) =>
@@ -4863,12 +4921,23 @@ export default function App() {
         const ultimaRimasta = oreRimaste.length
           ? Math.max(...oreRimaste, hour)
           : hour;
+        // La lezione si porta dietro il suo laboratorio: se all'ora nuova
+        // quello spazio è già di un'altra classe, la collega non può
+        // svolgerla lì e chi decide deve saperlo prima.
+        const occupantiAula = isNamedRoom(l.room)
+          ? roomOccupantsAt(timetable, l.room, day, hour, classId)
+          : [];
         return {
           teacherId: l.teacherId,
           name:
             allStaff.find((t) => t.id === l.teacherId)?.name || l.teacherId,
           subject: l.subject,
           fromHour: l.hour,
+          room: l.room,
+          roomBusy:
+            occupantiAula.length >= roomCapacity(l.room, rooms)
+              ? occupantiAula
+              : [],
           exitClean,
           exitAfterHour: exitClean ? ultimaRimasta : undefined,
         };
@@ -5017,6 +5086,7 @@ export default function App() {
       paid: false,
       movedFromHour: candidate.fromHour,
       subjectMoved: candidate.subject,
+      roomMoved: candidate.room,
       exitAfterHour: candidate.exitAfterHour,
     };
     const newSubstitutions = [...substitutions, newSub];
@@ -5379,7 +5449,7 @@ export default function App() {
       setPrintAlertOpen(true);
       return;
     }
-    let css = `@page { size: A3 landscape; margin: 6mm; } * { box-sizing: border-box; } body { background-color: white; color: black; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 6mm; font-size: 7.5pt; } h1 { font-size: 14pt; font-weight: bold; margin: 0 0 4mm 0; color: #1e3a8a; text-align: center; } h2 { font-size: 9pt; margin: 0 0 2mm 0; color: #1e3a8a; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #1e3a8a; padding-bottom: 1mm; } table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 3mm; } tr { page-break-inside: auto; } td, th { border: 0.5pt solid #64748b; padding: 1.5pt 2pt; text-align: center; font-size: 6.5pt; line-height: 1.15; overflow: hidden; vertical-align: middle; } th { background-color: #1e3a8a !important; color: white !important; font-weight: bold; font-size: 6.5pt; border: 1pt solid #1e3a8a; } th.sub { background-color: #e5e7eb !important; color: #374151 !important; font-size: 6pt; } td.staff-cell { text-align: left; font-weight: bold; font-size: 7pt; padding: 2pt 3pt; } td.staff-cell .subj { font-size: 5.5pt; font-weight: normal; color: #374151; text-transform: uppercase; display: block; } td.hours-cell { font-weight: bold; color: #1e3a8a; background-color: #f0f4ff !important; } td.class-cell { text-align: left; color: #4f46e5; font-weight: bold; font-size: 6pt; } td.day-off { background-color: ${DAY_OFF_COLOR} !important; color: #991b1b !important; font-style: italic; font-weight: bold; font-size: 6pt; } td.lesson-active { background-color: #dbeafe !important; color: #1e3a8a !important; font-weight: bold; font-size: 7.5pt; line-height: 1.05; } td.lesson-active .room { display: block; font-size: 4.8pt; font-weight: normal; color: #4338ca; letter-spacing: -0.15pt; white-space: nowrap; } td.empty { background-color: #fafafa; } tr.dept-separator td { background-color: #1e3a8a !important; height: 3pt; padding: 0; } .page-break { page-break-before: always; } .day-sep { border-right: 2pt solid #1e3a8a !important; }`;
+    let css = `@page { size: A3 landscape; margin: 6mm; } * { box-sizing: border-box; } body { background-color: white; color: black; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 6mm; font-size: 7.5pt; } h1 { font-size: 14pt; font-weight: bold; margin: 0 0 4mm 0; color: #1e3a8a; text-align: center; } h2 { font-size: 9pt; margin: 0 0 2mm 0; color: #1e3a8a; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #1e3a8a; padding-bottom: 1mm; } table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 3mm; } tr { page-break-inside: auto; } td, th { border: 0.5pt solid #64748b; padding: 1.5pt 2pt; text-align: center; font-size: 6.5pt; line-height: 1.15; overflow: hidden; vertical-align: middle; } th { background-color: #1e3a8a !important; color: white !important; font-weight: bold; font-size: 6.5pt; border: 1pt solid #1e3a8a; } th.sub { background-color: #e5e7eb !important; color: #374151 !important; font-size: 6pt; } td.staff-cell { text-align: left; font-weight: bold; font-size: 7pt; padding: 2pt 3pt; } td.staff-cell .subj { font-size: 5.5pt; font-weight: normal; color: #374151; text-transform: uppercase; display: block; } td.hours-cell { font-weight: bold; color: #1e3a8a; background-color: #f0f4ff !important; } td.class-cell { text-align: left; color: #4f46e5; font-weight: bold; font-size: 6pt; } td.day-off { background-color: ${DAY_OFF_COLOR} !important; color: #991b1b !important; font-style: italic; font-weight: bold; font-size: 6pt; } td.lesson-active { background-color: #dbeafe !important; color: #1e3a8a !important; font-weight: bold; font-size: 7.5pt; line-height: 1.05; } td.lesson-active .room { display: block; font-size: 4.2pt; font-weight: normal; color: #4338ca; letter-spacing: -0.15pt; white-space: nowrap; } td.empty { background-color: #fafafa; } tr.dept-separator td { background-color: #1e3a8a !important; height: 3pt; padding: 0; } .page-break { page-break-before: always; } .day-sep { border-right: 2pt solid #1e3a8a !important; }`;
     let contentHtml = `<html><head><title>Orario - EduTime Pro</title><style>${css}</style></head><body>`;
     if (printType === 'master') {
       const staffDiurno = filteredStaff.filter(
@@ -5447,9 +5517,9 @@ export default function App() {
                 contentHtml += `<td class="lesson-active ${borderClass}">${escapeXml(
                   occupied.classId
                 )}${
-                  roomShortLabel(occupied.room)
+                  roomShortLabel(occupied.room, rooms)
                     ? `<span class="room">${escapeXml(
-                        roomShortLabel(occupied.room)
+                        roomShortLabel(occupied.room, rooms)
                       )}</span>`
                     : ''
                 }</td>`;
@@ -5524,9 +5594,9 @@ export default function App() {
                 contentHtml += `<td class="lesson-active ${borderClass}">${escapeXml(
                   occupied.classId
                 )}${
-                  roomShortLabel(occupied.room)
+                  roomShortLabel(occupied.room, rooms)
                     ? `<span class="room">${escapeXml(
-                        roomShortLabel(occupied.room)
+                        roomShortLabel(occupied.room, rooms)
                       )}</span>`
                     : ''
                 }</td>`;
@@ -5675,7 +5745,7 @@ export default function App() {
       (s) => s.date === substitutionsDate
     );
 
-    const css = `@page { size: A4 landscape; margin: 8mm; } * { box-sizing: border-box; } body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; color: #111827; font-size: 8pt; } h1 { text-align: center; font-size: 13pt; margin: 0 0 1mm 0; color: #1e3a8a; } h2 { text-align: center; font-size: 10pt; margin: 0 0 4mm 0; text-decoration: underline; } h3 { font-size: 8.5pt; text-transform: uppercase; background: #1e3a8a; color: white; margin: 4mm 0 0 0; padding: 1.5mm 2mm; } table { width: 100%; border-collapse: collapse; margin-bottom: 2mm; } th, td { border: 0.5pt solid #64748b; padding: 1.5pt 2pt; text-align: center; vertical-align: middle; font-size: 7.5pt; } th { background: #e5e7eb; font-weight: bold; } td.name-cell { text-align: left; font-weight: bold; padding-left: 2mm; } td.motivo-cell, td.note-cell { text-align: left; font-size: 7pt; } td.empty-row { font-style: italic; color: #6b7280; text-align: left; padding-left: 2mm; } .legend { font-size: 7pt; margin-top: 2mm; color: #374151; }`;
+    const css = `@page { size: A4 landscape; margin: 8mm; } * { box-sizing: border-box; } body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; color: #111827; font-size: 8pt; } h1 { text-align: center; font-size: 13pt; margin: 0 0 1mm 0; color: #1e3a8a; } h2 { text-align: center; font-size: 10pt; margin: 0 0 4mm 0; text-decoration: underline; } h3 { font-size: 8.5pt; text-transform: uppercase; background: #1e3a8a; color: white; margin: 4mm 0 0 0; padding: 1.5mm 2mm; } table { width: 100%; border-collapse: collapse; margin-bottom: 2mm; } th, td { border: 0.5pt solid #64748b; padding: 1.5pt 2pt; text-align: center; vertical-align: middle; font-size: 7.5pt; } th { background: #e5e7eb; font-weight: bold; } td.name-cell { text-align: left; font-weight: bold; padding-left: 2mm; } td.motivo-cell, td.note-cell { text-align: left; font-size: 7pt; } td.empty-row { font-style: italic; color: #6b7280; text-align: left; padding-left: 2mm; } span.room { display: block; font-size: 5.5pt; font-weight: normal; color: #4338ca; letter-spacing: -0.1pt; } .legend { font-size: 7pt; margin-top: 2mm; color: #374151; }`;
 
     let html = `<html><head><title>Foglio Supplenze ${escapeXml(
       dateLabel
@@ -5705,7 +5775,26 @@ export default function App() {
       )}</td>`;
       diurnalHours.forEach((dh) => {
         const l = lessons.find((x: any) => x.hour === dh.index);
-        html += `<td>${l ? escapeXml(l.classId) : ''}</td>`;
+        const aula = l
+          ? timetable.find(
+              (slot) =>
+                slot.classId === l.classId &&
+                slot.day === l.day &&
+                slot.hour === l.hour &&
+                slot.teacherId === absence.teacherId
+            )?.room
+          : undefined;
+        html += `<td>${
+          l
+            ? `${escapeXml(l.classId)}${
+                roomShortLabel(aula, rooms)
+                  ? `<span class="room">${escapeXml(
+                      roomShortLabel(aula, rooms)
+                    )}</span>`
+                  : ''
+              }`
+            : ''
+        }</td>`;
       });
       html += `<td class="motivo-cell">${
         absence.type === 'assenza' ? 'Assenza' : 'Permesso'
@@ -5743,7 +5832,26 @@ export default function App() {
       )}</td>`;
       diurnalHours.forEach((dh) => {
         const s = subs.find((x: any) => x.hour === dh.index);
-        html += `<td>${s ? escapeXml(`${s.classId} (D)`) : ''}</td>`;
+        const aula = s
+          ? timetable.find(
+              (slot) =>
+                slot.classId === s.classId &&
+                slot.day === s.day &&
+                slot.hour === s.hour &&
+                slot.type !== 'sostegno'
+            )?.room
+          : undefined;
+        html += `<td>${
+          s
+            ? `${escapeXml(`${s.classId} (D)`)}${
+                roomShortLabel(aula, rooms)
+                  ? `<span class="room">${escapeXml(
+                      roomShortLabel(aula, rooms)
+                    )}</span>`
+                  : ''
+              }`
+            : ''
+        }</td>`;
       });
       html += `<td class="note-cell"></td></tr>`;
     });
@@ -5773,7 +5881,13 @@ export default function App() {
       )}</td>`;
       diurnalHours.forEach((dh) => {
         if (dh.index === sub.hour)
-          html += `<td>${escapeXml(`${sub.classId} (ANT.)`)}</td>`;
+          html += `<td>${escapeXml(`${sub.classId} (ANT.)`)}${
+            roomShortLabel(sub.roomMoved, rooms)
+              ? `<span class="room">${escapeXml(
+                  roomShortLabel(sub.roomMoved, rooms)
+                )}</span>`
+              : ''
+          }</td>`;
         else if (dh.index === sub.movedFromHour)
           html += `<td>${escapeXml(`${sub.classId} spostata`)}</td>`;
         else html += `<td></td>`;
@@ -5781,7 +5895,7 @@ export default function App() {
       html += `<td class="note-cell">${escapeXml(
         `Anticipa ${sub.subjectMoved || 'la lezione'} dalla ${
           sub.movedFromHour + 1
-        }ª${
+        }ª${isNamedRoom(sub.roomMoved) ? ` in ${sub.roomMoved}` : ''}${
           sub.exitAfterHour !== undefined
             ? `; la classe esce dopo la ${sub.exitAfterHour + 1}ª`
             : `; la ${sub.movedFromHour + 1}ª resta scoperta`
@@ -6537,7 +6651,8 @@ export default function App() {
                                           >
                                             {isNamedRoom(occupiedSlot.room)
                                               ? roomTinyLabel(
-                                                  occupiedSlot.room
+                                                  occupiedSlot.room,
+                                                  rooms
                                                 )
                                               : '🏫'}
                                           </button>
@@ -8348,6 +8463,28 @@ export default function App() {
                       Niente viaggi a scuola per un'ora sola
                     </div>
                   </div>
+                  <h3 className="font-bold text-slate-800 mt-5 mb-3 flex items-center gap-2">
+                    🌴 Giorno Libero d'Ufficio
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={
+                        generationRules.autoDayOff === false ? 'no' : 'si'
+                      }
+                      onChange={(e) =>
+                        handleUpdateRules('autoDayOff', e.target.value === 'si')
+                      }
+                      disabled={readOnlyMode}
+                      className="text-sm bg-white border border-indigo-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700 cursor-pointer disabled:opacity-50"
+                    >
+                      <option value="si">Assegnalo tu</option>
+                      <option value="no">Nessuno</option>
+                    </select>
+                    <div className="text-xs font-medium text-slate-600">
+                      Con «Nessuno» restano solo i giorni liberi che hai messo
+                      a mano in 🌴 Indisponibilità
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -9206,6 +9343,24 @@ export default function App() {
                       className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white uppercase focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                     />
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">
+                      Sigla per le stampe
+                    </label>
+                    <input
+                      type="text"
+                      defaultValue={r.short || ''}
+                      onBlur={(e) => handleUpdateRoomShort(r.id, e.target.value)}
+                      disabled={readOnlyMode}
+                      maxLength={6}
+                      placeholder={roomShortLabel(r.name) || 'es. C.L.D.'}
+                      title="Come compare nel quadro A3, dove il nome intero non entra. Massimo 6 caratteri: nelle colonne più strette ne entrano bene 3 o 4."
+                      className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white uppercase focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                    />
+                    <p className="text-[9px] text-slate-400 leading-tight">
+                      Nel quadro generale e in A3 lo spazio è quello di un
+                      codice classe: 3 o 4 lettere si leggono, sei sono il
+                      massimo.
+                    </p>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">
                       Quante ce ne sono
                     </label>
                     <input
@@ -9936,6 +10091,16 @@ export default function App() {
                                         </span>{' '}
                                         anticipa {c.subject} dalla{' '}
                                         {c.fromHour + 1}ª
+                                        {isNamedRoom(c.room)
+                                          ? ` — 📍 ${c.room}`
+                                          : ''}
+                                        {c.roomBusy.length > 0 && (
+                                          <span className="block mt-0.5 font-semibold text-rose-700">
+                                            ⚠️ {c.room} in quest'ora è già di{' '}
+                                            {c.roomBusy.join(', ')}: servirà
+                                            un'altra aula.
+                                          </span>
+                                        )}
                                         <span
                                           className={`block mt-0.5 font-semibold ${
                                             c.exitClean
@@ -10150,12 +10315,67 @@ export default function App() {
                   }}
                   className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
                 >
-                  {rooms.map((r) => (
-                    <option key={r.id} value={r.name}>
-                      {r.id === 'aula' ? 'Aula Normale' : r.name}
-                    </option>
-                  ))}
+                  {rooms.map((r) => {
+                    const occupanti = isNamedRoom(r.name)
+                      ? roomOccupantsAt(
+                          timetable,
+                          r.name,
+                          editingCell.day,
+                          editingCell.hour,
+                          editingCell.classId
+                        )
+                      : [];
+                    const piena =
+                      occupanti.length >= roomCapacity(r.name, rooms);
+                    return (
+                      <option key={r.id} value={r.name}>
+                        {r.id === 'aula' ? 'Aula Normale' : r.name}
+                        {occupanti.length > 0
+                          ? ` — ${piena ? 'occupata' : 'in uso'} da ${occupanti
+                              .slice(0, 3)
+                              .join(', ')}`
+                          : ''}
+                      </option>
+                    );
+                  })}
                 </select>
+                {(() => {
+                  const occupanti = isNamedRoom(tempRoom)
+                    ? roomOccupantsAt(
+                        timetable,
+                        tempRoom,
+                        editingCell.day,
+                        editingCell.hour,
+                        editingCell.classId
+                      )
+                    : [];
+                  if (occupanti.length === 0) return null;
+                  const capienza = roomCapacity(tempRoom, rooms);
+                  const piena = occupanti.length >= capienza;
+                  return (
+                    <p
+                      className={`mt-2 text-[11px] font-semibold rounded-lg px-2.5 py-2 border ${
+                        piena
+                          ? 'bg-rose-50 border-rose-200 text-rose-700'
+                          : 'bg-amber-50 border-amber-200 text-amber-800'
+                      }`}
+                    >
+                      {piena
+                        ? `⚠️ ${tempRoom} è già occupata in quest'ora da ${occupanti.join(
+                            ', '
+                          )}${
+                            capienza > 1
+                              ? ` (${occupanti.length} su ${capienza} disponibili)`
+                              : ''
+                          }. Salvando avrai due classi nello stesso spazio.`
+                        : `${tempRoom} in quest'ora è usata da ${occupanti.join(
+                            ', '
+                          )}: restano ${
+                            capienza - occupanti.length
+                          } spazi su ${capienza}.`}
+                    </p>
+                  );
+                })()}
                 {(() => {
                   const lezioneInCella = timetable.some(
                     (slot) =>
