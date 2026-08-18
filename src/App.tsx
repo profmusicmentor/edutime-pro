@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Assistente from './Assistente';
 import WorkspaceGate from './WorkspaceGate';
 import SostieniProgetto from './SostieniProgetto';
+import Feedback from './Feedback';
 import {
   buildXlsx,
   type XlsxCell,
@@ -11487,6 +11488,8 @@ export default function App() {
         </a>{' '}
         •{' '}
         <SostieniProgetto />
+        {' • '}
+        <Feedback />
       </footer>
 
       <Assistente />
