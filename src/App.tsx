@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Assistente from './Assistente';
 import WorkspaceGate from './WorkspaceGate';
+import SostieniProgetto from './SostieniProgetto';
 import {
   buildXlsx,
   type XlsxCell,
@@ -1044,6 +1045,19 @@ const roomShortLabel = (roomName?: string) => {
   const lab = name.match(/^lab\.?\s*(?:di\s+)?(.+)$/i);
   if (lab) return `L.${lab[1].slice(0, 5).toUpperCase()}`;
   return name.slice(0, 7).toUpperCase();
+};
+
+/**
+ * Sigla di tre lettere per le colonne del quadro generale, che sono larghe
+ * quanto il codice di una classe: "Lab. Scienze" diventa "LSC". Il nome
+ * intero resta nel titolo del pulsante.
+ */
+const roomTinyLabel = (roomName?: string) => {
+  if (!isNamedRoom(roomName)) return '';
+  const name = String(roomName);
+  const lab = name.match(/^lab\.?\s*(?:di\s+)?(.+)$/i);
+  if (lab) return `L${lab[1].slice(0, 2).toUpperCase()}`;
+  return name.slice(0, 3).toUpperCase();
 };
 
 const getRoomSede = (roomName: string, rooms: any[]) =>
@@ -2710,6 +2724,41 @@ export default function App() {
     diurnalHours,
     afternoonHours,
   ]);
+
+  /**
+   * Salva la sola aula della cella aperta, senza toccare il docente.
+   * Prima l'unico modo di applicare la scelta del menu era riassegnare la
+   * lezione a un docente, e su una cella già assegnata quel clic finiva nel
+   * modale dei conflitti: la scelta dell'aula, di fatto, non si poteva
+   * confermare.
+   */
+  const handleSaveRoom = () => {
+    if (readOnlyMode || !editingCell) return;
+    const newTimetable = timetable.map((slot) =>
+      slot.classId === editingCell.classId &&
+      slot.day === editingCell.day &&
+      slot.hour === editingCell.hour &&
+      (slot.type === 'materia' || slot.type === 'pomeriggio_musica')
+        ? { ...slot, room: tempRoom }
+        : slot
+    );
+    setTimetable(newTimetable);
+    pushDataToCloud(
+      newTimetable,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses
+    );
+    setEditingCell(null);
+  };
 
   const handleRemoveSlot = (slotToRemove: any) => {
     if (!slotToRemove || readOnlyMode) return;
@@ -6208,7 +6257,7 @@ export default function App() {
             </div>
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-md flex-1 min-h-[400px] h-[65vh] resize-y relative flex flex-col">
               <div className="overflow-x-auto overflow-y-auto flex-1 h-full">
-                <table className="w-full text-left border-collapse table-fixed min-w-[1400px]">
+                <table className="w-full text-left border-collapse table-fixed min-w-[1650px]">
                   <thead className="sticky top-0 z-30">
                     <tr className="bg-slate-100 border-b-2 border-slate-300 shadow-sm">
                       <th className="p-3 w-80 min-w-[20rem] bg-slate-200 font-bold text-slate-800 border-r border-slate-300 sticky left-0 z-40 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
@@ -6466,6 +6515,33 @@ export default function App() {
                                           </option>
                                         ))}
                                       </select>
+                                      {occupiedSlot &&
+                                        staff.staffType === 'materia' && (
+                                          <button
+                                            onClick={() =>
+                                              setEditingCell({
+                                                classId: occupiedSlot.classId,
+                                                day: dIdx,
+                                                hour: currentHour,
+                                              })
+                                            }
+                                            disabled={readOnlyMode}
+                                            title={`Aula: ${
+                                              occupiedSlot.room || 'Aula'
+                                            } — clicca per cambiarla`}
+                                            className={`mt-0.5 w-full text-[9px] leading-tight font-bold rounded px-0.5 py-0.5 border transition-all cursor-pointer truncate disabled:opacity-40 disabled:cursor-not-allowed ${
+                                              isNamedRoom(occupiedSlot.room)
+                                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                                                : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'
+                                            }`}
+                                          >
+                                            {isNamedRoom(occupiedSlot.room)
+                                              ? roomTinyLabel(
+                                                  occupiedSlot.room
+                                                )
+                                              : '🏫'}
+                                          </button>
+                                        )}
                                     </td>
                                   );
                                 });
@@ -10080,6 +10156,37 @@ export default function App() {
                     </option>
                   ))}
                 </select>
+                {(() => {
+                  const lezioneInCella = timetable.some(
+                    (slot) =>
+                      slot.classId === editingCell.classId &&
+                      slot.day === editingCell.day &&
+                      slot.hour === editingCell.hour &&
+                      (slot.type === 'materia' ||
+                        slot.type === 'pomeriggio_musica')
+                  );
+                  return (
+                    <>
+                      <button
+                        onClick={handleSaveRoom}
+                        disabled={readOnlyMode || !lezioneInCella}
+                        title={
+                          lezioneInCella
+                            ? "Salva l'aula senza cambiare il docente"
+                            : 'Prima assegna un docente a questa cella'
+                        }
+                        className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        💾 Salva aula
+                      </button>
+                      <p className="mt-1.5 text-[11px] text-slate-500">
+                        {lezioneInCella
+                          ? "Cambia solo l'aula di questa lezione: il docente resta quello."
+                          : "L'aula si salva dopo aver assegnato un docente."}
+                      </p>
+                    </>
+                  );
+                })()}
               </div>
               <div className="pt-3 border-t border-slate-100 flex gap-2">
                 <button
@@ -10515,14 +10622,7 @@ export default function App() {
           Codice sorgente (AGPL-3.0)
         </a>{' '}
         •{' '}
-        <a
-          href="https://paypal.me/delfino0087"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-slate-700"
-        >
-          💛 Offrimi un caffè
-        </a>
+        <SostieniProgetto />
       </footer>
 
       <Assistente />

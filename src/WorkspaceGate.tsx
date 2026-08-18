@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import SostieniProgetto from './SostieniProgetto';
 import {
   buildCode,
   codeFromInviteText,
@@ -373,14 +374,7 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
           Codice sorgente (AGPL-3.0)
         </a>{' '}
         •{' '}
-        <a
-          href="https://paypal.me/delfino0087"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-slate-700"
-        >
-          💛 Offrimi un caffè
-        </a>
+        <SostieniProgetto />
       </footer>
     </div>
   );

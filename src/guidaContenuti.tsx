@@ -346,6 +346,26 @@ export const chapters: Chapter[] = [
         ),
       },
       {
+        title: "Il pulsante dell'aula",
+        tag: 'sotto ogni cella occupata',
+        body: (
+          <>
+            <p>
+              Sotto la tendina della classe, ogni ora assegnata a un docente di
+              materia ha un pulsantino con la sigla dell'aula: <B>LSC</B> per
+              il Lab. Scienze, <B>PAL</B> per la Palestra, e così via. Il nome
+              intero compare passandoci sopra col mouse.
+            </p>
+            <p className="mt-2">
+              Se l'ora si svolge nell'aula della classe il pulsante mostra solo
+              🏫. In entrambi i casi cliccandolo si apre la finestra{' '}
+              <B>Modifica Cella</B> di quella lezione, da cui scegliere l'aula
+              e salvarla.
+            </p>
+          </>
+        ),
+      },
+      {
         title: 'Celle bloccate (🔒/🔓)',
         tag: 'protezione',
         body: "Nella vista per classe ogni lezione ha un pulsante 🔒/🔓. Le celle bloccate vengono preservate dall'auto-generazione: blocca le ore che non vuoi far rimescolare.",
@@ -908,11 +928,17 @@ export const chapters: Chapter[] = [
                 <B>Assegna Sostegno</B>: docenti di sostegno disponibili.
               </>,
               <>
-                <B>🏫 Aula / Laboratorio</B>: Aula Normale, Palestra, Lab.
-                Musica, Lab. Tecnologia, Lab. Arte, Lab. Scienze. Se non tocchi
-                questo menu vale il laboratorio collegato alla materia; se lo
-                scegli tu, la tua scelta resta anche quando cambi il docente
-                della cella.
+                <B>🏫 Aula / Laboratorio</B>: l'elenco delle aule che hai
+                configurato in «Sezioni &amp; Regole». Se non tocchi questo
+                menu vale il laboratorio collegato alla materia; se lo scegli
+                tu, la tua scelta resta anche quando cambi il docente della
+                cella.
+              </>,
+              <>
+                <B>💾 Salva aula</B>: applica l'aula scelta alla lezione senza
+                toccare il docente. È il pulsante da usare per cambiare solo
+                il laboratorio: cliccare di nuovo sul docente già assegnato
+                non serve e anzi apre la finestra dei conflitti.
               </>,
             ]}
           />
@@ -1179,6 +1205,16 @@ export const chapters: Chapter[] = [
               <B>Quante ce ne sono</B>: l'algoritmo permetterà altrettante
               classi in contemporanea.
             </p>
+            <p className="mt-2">
+              <B>Se hai creato un laboratorio e non lo vedi da nessuna
+              parte</B>, è quasi sempre perché non è collegato a nessuna
+              materia: l'auto-generazione assegna le aule proprio da quel
+              collegamento, quindi le lezioni restano nell'aula della classe.
+              Puoi collegarlo a una materia, oppure metterlo a mano ora per
+              ora dalla finestra Modifica Cella con <B>💾 Salva aula</B>. Con
+              la DADA, dove è il docente ad avere il suo spazio e non la
+              materia, la seconda strada è spesso l'unica.
+            </p>
           </>
         ),
       },
@@ -1256,7 +1292,10 @@ export const chapters: Chapter[] = [
             >
               💛 puoi farlo qui
             </a>
-            , senza nessun obbligo.
+            , senza nessun obbligo. In fondo alla pagina la voce{' '}
+            <B>«Sostieni il progetto»</B> raccoglie anche gli altri modi per
+            dare una mano: i gadget della linea Nerd Approach, la newsletter e
+            il link da girare a un collega.
           </>
         ),
       },
