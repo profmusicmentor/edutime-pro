@@ -932,6 +932,12 @@ export const chapters: Chapter[] = [
               serve un'altra copertura.
             </p>
             <p className="mt-2">
+              Ogni proposta dice anche in quale <B>aula</B> si svolge la
+              lezione che verrebbe anticipata, e avvisa in rosso se in
+              quell'ora quel laboratorio è già di un'altra classe: in quel caso
+              la collega può anticipare lo stesso, ma le serve un'altra aula.
+            </p>
+            <p className="mt-2">
               L'anticipo vale <B>solo per quella data</B>: l'orario
               settimanale non viene toccato, come per ogni altra sostituzione.
               Finisce nel foglio del giorno, con la sigla <B>(ANT.)</B>{' '}
@@ -961,8 +967,11 @@ export const chapters: Chapter[] = [
             Produce la <B>Predisposizione giornaliera supplenze docenti</B> del
             giorno scelto: anno scolastico, titolari assenti, ore coinvolte,
             sostituti assegnati, lezioni anticipate e classi che entrano o
-            escono in orario diverso. Come per le altre stampe si apre in una nuova
-            finestra: se non compare niente, il browser sta bloccando i pop-up.
+            escono in orario diverso. Sotto ogni classe compare la{' '}
+            <B>sigla dell'aula</B>, così chi cerca il collega sa dove andare:
+            è la stessa sigla impostata in Gestione Aule. Come per le altre
+            stampe si apre in una nuova finestra: se non compare niente, il
+            browser sta bloccando i pop-up.
           </>
         ),
       },
@@ -1023,7 +1032,15 @@ export const chapters: Chapter[] = [
       {
         title: 'Aggiungi Assegnazione',
         tag: 'registro cattedre',
-        body: 'Dal pulsante ➕: scegli Classe e Ore Settimanali (1-30), poi 💾 Salva.',
+        body: (
+          <>
+            Dal pulsante ➕: scegli <B>Classe</B> e <B>Ore Settimanali</B>{' '}
+            (1-30), poi 💾 Salva. Per i docenti di materia c'è anche{' '}
+            <B>Materia in questa classe</B>, da compilare solo quando in quella
+            classe insegnano altro; scegliendo una classe già assegnata il
+            modale ne riprende ore e materia, così serve anche per correggerle.
+          </>
+        ),
       },
       {
         title: 'Conflitto Rilevato!',
