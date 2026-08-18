@@ -3957,6 +3957,161 @@ export default function App() {
     );
   };
 
+  /**
+   * Aggiunge o toglie un'ora del mattino.
+   *
+   * Le ore hanno un indice unico: le diurne occupano 0..n-1 e le
+   * pomeridiane proseguono da lì. Allungare il mattino significa quindi
+   * spostare in avanti tutti gli indici pomeridiani, e con loro le lezioni
+   * già piazzate, le indisponibilità, le note, le assenze e le
+   * sostituzioni: se si sposta una cosa sola il resto si disallinea in
+   * silenzio. La scuola primaria a tempo pieno ha bisogno di otto ore, e
+   * senza questo doveva usare le ore del corso di strumento.
+   */
+  const shiftHourIndexes = (from: number, delta: number) => {
+    const shift = (h: number) => (h >= from ? h + delta : h);
+    const newTimetable = timetable.map((s) =>
+      s.hour >= from ? { ...s, hour: s.hour + delta } : s
+    );
+    const newAfternoon = afternoonHours.map((h) =>
+      h.index >= from ? { ...h, index: h.index + delta } : h
+    );
+    const newRules = { ...generationRules };
+    const hoursOff: any = {};
+    Object.entries(generationRules.teacherHoursOff || {}).forEach(
+      ([teacherId, keys]: any) => {
+        hoursOff[teacherId] = (keys || []).map((k: string) => {
+          const [d, h] = String(k).split('_').map(Number);
+          return hourOffKey(d, shift(h));
+        });
+      }
+    );
+    newRules.teacherHoursOff = hoursOff;
+    const newNotes: any = {};
+    Object.entries(cellNotes || {}).forEach(([key, value]: any) => {
+      const parts = String(key).split('_');
+      if (parts.length < 4) {
+        newNotes[key] = value;
+        return;
+      }
+      const [classId, d, h, ...rest] = parts;
+      newNotes[`${classId}_${d}_${shift(Number(h))}_${rest.join('_')}`] = value;
+    });
+    const newAbsences = absences.map((a) => ({
+      ...a,
+      fromHour: a.fromHour === undefined ? undefined : shift(a.fromHour),
+      toHour: a.toHour === undefined ? undefined : shift(a.toHour),
+    }));
+    const newSubstitutions = substitutions.map((sub) => ({
+      ...sub,
+      hour: shift(sub.hour),
+      movedFromHour:
+        sub.movedFromHour === undefined ? undefined : shift(sub.movedFromHour),
+      exitAfterHour:
+        sub.exitAfterHour === undefined ? undefined : shift(sub.exitAfterHour),
+    }));
+    return {
+      newTimetable,
+      newAfternoon,
+      newRules,
+      newNotes,
+      newAbsences,
+      newSubstitutions,
+    };
+  };
+
+  const handleAddDiurnalHour = () => {
+    if (readOnlyMode) return;
+    const nuova = diurnalHours.length;
+    if (nuova >= GRID_MAX_HOURS) return;
+    const {
+      newTimetable,
+      newAfternoon,
+      newRules,
+      newNotes,
+      newAbsences,
+      newSubstitutions,
+    } = shiftHourIndexes(nuova, 1);
+    const newDiurnal = [
+      ...diurnalHours,
+      { index: nuova, label: `${nuova + 1}ª`, time: '' },
+    ];
+    setTimetable(newTimetable);
+    setDiurnalHours(newDiurnal);
+    setAfternoonHours(newAfternoon);
+    setGenerationRules(newRules);
+    setCellNotes(newNotes);
+    setAbsences(newAbsences);
+    setSubstitutions(newSubstitutions);
+    pushDataToCloud(
+      newTimetable,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      newDiurnal,
+      newAfternoon,
+      newRules,
+      generateOptions,
+      newNotes,
+      groupConstraints,
+      mixedClasses,
+      rooms,
+      sedi,
+      newAbsences,
+      newSubstitutions
+    );
+  };
+
+  const handleRemoveDiurnalHour = () => {
+    if (readOnlyMode) return;
+    if (diurnalHours.length <= 1) return;
+    const ultima = diurnalHours[diurnalHours.length - 1].index;
+    const occupata = timetable.some((s) => s.hour === ultima);
+    if (occupata) {
+      window.alert(
+        `Nell'ultima ora del mattino (${
+          diurnalHours[diurnalHours.length - 1].label
+        }) ci sono ancora lezioni: svuotala prima di toglierla.`
+      );
+      return;
+    }
+    const {
+      newTimetable,
+      newAfternoon,
+      newRules,
+      newNotes,
+      newAbsences,
+      newSubstitutions,
+    } = shiftHourIndexes(ultima + 1, -1);
+    const newDiurnal = diurnalHours.slice(0, -1);
+    setTimetable(newTimetable);
+    setDiurnalHours(newDiurnal);
+    setAfternoonHours(newAfternoon);
+    setGenerationRules(newRules);
+    setCellNotes(newNotes);
+    setAbsences(newAbsences);
+    setSubstitutions(newSubstitutions);
+    pushDataToCloud(
+      newTimetable,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      newDiurnal,
+      newAfternoon,
+      newRules,
+      generateOptions,
+      newNotes,
+      groupConstraints,
+      mixedClasses,
+      rooms,
+      sedi,
+      newAbsences,
+      newSubstitutions
+    );
+  };
+
   const handleHourLabelChange = (
     index: number,
     field: string,
@@ -9659,9 +9814,37 @@ export default function App() {
               </p>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="space-y-4">
-                  <h3 className="text-base font-bold text-indigo-700 flex items-center gap-1.5">
-                    <span>☀️ Ore Diurne</span>
-                  </h3>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <h3 className="text-base font-bold text-indigo-700 flex items-center gap-1.5">
+                      <span>☀️ Ore Diurne</span>
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleAddDiurnalHour}
+                        disabled={
+                          readOnlyMode || diurnalHours.length >= GRID_MAX_HOURS
+                        }
+                        title="Serve alla primaria a tempo pieno: aggiunge un'ora al mattino e sposta in avanti quelle pomeridiane"
+                        className="text-xs font-bold px-2.5 py-1 rounded-lg border bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        ➕ Aggiungi ora
+                      </button>
+                      <button
+                        onClick={handleRemoveDiurnalHour}
+                        disabled={readOnlyMode || diurnalHours.length <= 1}
+                        title="Toglie l'ultima ora del mattino, se non ci sono lezioni"
+                        className="text-xs font-bold px-2.5 py-1 rounded-lg border bg-white border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        ➖ Togli ultima
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Sono le ore delle lezioni curricolari. Alla primaria a
+                    tempo pieno servono anche la 7ª e l'8ª: aggiungile qui,
+                    poi alza le «Ore al giorno» del modello in Gestione
+                    Sezioni.
+                  </p>
                   <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
                     {diurnalHours.map((dh) => (
                       <div

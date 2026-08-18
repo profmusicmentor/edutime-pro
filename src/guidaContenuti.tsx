@@ -511,6 +511,29 @@ export const chapters: Chapter[] = [
         body: "Spunta la casella dei docenti disponibili a fare supplenze retribuite nelle proprie ore buca. Solo loro compaiono fra i sostituti proposti nella scheda Sostituzioni: se lasci tutte le caselle vuote, lì non verrà proposto nessun nome.",
       },
       {
+        title: 'Materia diversa in una classe',
+        tag: 'una persona, più materie',
+        body: (
+          <>
+            <p>
+              Capita spesso alla primaria: la stessa maestra fa italiano in una
+              classe e storia e geografia in un'altra. Non inserirla due volte:
+              per l'app diventerebbero due persone, ognuna con il suo giorno
+              libero e il suo tetto di ore, e i conflitti che ne nascono non si
+              possono risolvere.
+            </p>
+            <p className="mt-2">
+              Usa invece il pulsante <B>➕</B> in fondo alla riga: nel modale,
+              sotto le ore, c'è <B>Materia in questa classe</B>. Lasciato vuoto
+              vale la materia del docente; compilato, vale solo per quella
+              classe e compare in piccolo sotto le ore nel registro. Viste,
+              stampe ed export mostrano la materia giusta, mentre il colore di
+              dipartimento resta quello della materia principale.
+            </p>
+          </>
+        ),
+      },
+      {
         title: 'Ordine dei docenti (▲ ▼)',
         tag: 'anche nel quadro e nelle stampe',
         body: "Le frecce accanto a ogni nome spostano il docente su e giù nell'elenco. L'ordine che imposti qui è quello che vedi anche nell'Orario Generale e nella stampa A3, quindi serve a rimettere accanto ai colleghi di materia chi è stato inserito a metà anno. Il pulsante 🔤 Ordina per materia riordina in un colpo solo la sotto-scheda aperta, per materia e poi per nome.",
@@ -596,6 +619,52 @@ export const chapters: Chapter[] = [
         title: '⏰ Ore singole bloccate',
         tag: 'cattedre condivise',
         body: "Il tasto ⏰ accanto ai giorni apre una griglia giorno × ora: cliccando una cella dichiari che il docente in quell'ora non è a scuola. Serve per chi ha la cattedra in comune con un altro istituto — per esempio «il lunedì può esserci solo dopo le 11»: blocchi 1ª, 2ª e 3ª ora del lunedì e l'algoritmo userà solo le ore successive. Le ore bloccate non contano nel limite dei giorni liberi; se però le celle rimaste non bastano per le ore di cattedra, la scheda Conflitti lo segnala.",
+      },
+      {
+        title: "🌴 Giorno libero d'ufficio",
+        tag: 'settimana corta',
+        body: (
+          <>
+            <p>
+              Quando generi l'orario, ogni docente che non ha un giorno libero
+              ne riceve uno: è comodo alla secondaria, dove quasi tutti ne
+              hanno diritto, ma diventa un problema dove la settimana è già
+              corta per tutti. Se le classi lavorano su cinque giorni, il
+              sabato non esiste come giorno libero e l'app lo mette in mezzo
+              alla settimana; toglierlo a mano non basta, perché la
+              generazione dopo lo rimette.
+            </p>
+            <p className="mt-2">
+              Il menu <B>Giorno Libero d'Ufficio</B> decide:{' '}
+              <B>Assegnalo tu</B> è il comportamento di sempre,{' '}
+              <B>Nessuno</B> lascia solo i giorni liberi che hai messo a mano
+              in 🌴 Indisponibilità.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: '🚫 Materie da non affiancare',
+        tag: 'vincoli didattici',
+        body: (
+          <>
+            <p>
+              Coppie di materie che nella stessa classe è meglio non far
+              capitare nello stesso giorno: le due lingue straniere, di
+              solito. Le scegli da due menu e la coppia compare nell'elenco
+              sotto.
+            </p>
+            <p className="mt-2">
+              È una penalità forte, non un divieto: il generatore le allontana
+              con decisione, ma se l'unica alternativa è lasciare un'ora fuori
+              dall'orario le affianca lo stesso. Accanto c'è{' '}
+              <B>Ore della stessa materia</B>: con <B>Distanziale</B> l'app
+              evita di mettere la stessa materia in due giorni di fila, senza
+              toccare la preferenza delle due ore consecutive nello stesso
+              giorno.
+            </p>
+          </>
+        ),
       },
       {
         title: '🌍 Classi Miste (lingue straniere)',
@@ -932,7 +1001,9 @@ export const chapters: Chapter[] = [
                 configurato in «Sezioni &amp; Regole». Se non tocchi questo
                 menu vale il laboratorio collegato alla materia; se lo scegli
                 tu, la tua scelta resta anche quando cambi il docente della
-                cella.
+                cella. Accanto a ogni voce compare chi la sta già usando in
+                quell'ora, e sotto un avviso quando lo spazio è pieno: l'app
+                non blocca, ma lo dice prima che tu salvi.
               </>,
               <>
                 <B>💾 Salva aula</B>: applica l'aula scelta alla lezione senza
@@ -1054,6 +1125,34 @@ export const chapters: Chapter[] = [
               La durata vale per la colonna, cioè per quell'ora in tutti i
               giorni. Nei giorni in cui la mezz'ora non c'è, lasci le celle
               vuote: non serve nessuna impostazione per giorno.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: 'Le ore oltre la sesta',
+        tag: 'tempo pieno',
+        body: (
+          <>
+            <p>
+              Le ore del mattino di partenza sono sei. Alla primaria a tempo
+              pieno servono la 7ª e l'8ª: in{' '}
+              <B>Sezioni &amp; Regole → Orari e Campanella</B>, sopra l'elenco
+              delle ore diurne, il pulsante <B>➕ Aggiungi ora</B> ne mette una
+              in fondo al mattino, e <B>➖ Togli ultima</B> la rimuove se non
+              ci sono lezioni.
+            </p>
+            <p className="mt-2">
+              Le ore del corso di strumento si spostano di conseguenza, insieme
+              alle lezioni già inserite, alle note e alle assenze: l'orario che
+              hai non si scompone. Dopo aver aggiunto le ore, alza anche le{' '}
+              <B>Ore al giorno</B> del modello in Gestione Sezioni, altrimenti
+              la classe continua a fermarsi dov'era.
+            </p>
+            <p className="mt-2">
+              La mensa si gestisce come una materia qualsiasi: chiamala MENSA e
+              assegnala al docente che ha la sorveglianza, così entra
+              nell'orario e nel conteggio delle sue ore.
             </p>
           </>
         ),
@@ -1204,6 +1303,14 @@ export const chapters: Chapter[] = [
               laboratori), scrivi quanti sono nel campo{' '}
               <B>Quante ce ne sono</B>: l'algoritmo permetterà altrettante
               classi in contemporanea.
+            </p>
+            <p className="mt-2">
+              Il campo <B>Sigla per le stampe</B> decide come l'aula compare
+              nel quadro generale e in A3, dove la colonna di un'ora è larga
+              quanto il codice di una classe: «Centrale Laboratorio Disegno»
+              non ci sta in nessun modo, «C.L.D.» sì. Sono al massimo sei
+              caratteri, e tre o quattro si leggono meglio; lasciandolo vuoto
+              l'app abbrevia da sola.
             </p>
             <p className="mt-2">
               <B>Se hai creato un laboratorio e non lo vedi da nessuna
