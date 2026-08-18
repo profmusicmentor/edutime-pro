@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cerca, DOMANDE_SUGGERITE, NUMERO_CAPITOLI } from './guidaIndice';
+import Feedback from './Feedback';
 
 /**
  * Assistente della guida: pannello di aiuto che risponde a domande in
@@ -183,9 +184,12 @@ export default function Assistente({ inGuida = false }: Props) {
           ))}
       </div>
 
-      <p className="text-[10px] text-slate-400 px-3 py-2 border-t border-slate-200 shrink-0">
-        Risposte prese dalla guida dell'app. Nessun dato inviato in rete.
-      </p>
+      <div className="text-[10px] text-slate-400 px-3 py-2 border-t border-slate-200 shrink-0">
+        <p>Risposte prese dalla guida dell'app. Nessun dato inviato in rete.</p>
+        <p className="text-slate-500 mt-0.5">
+          Non hai trovato quello che cerchi? <Feedback />
+        </p>
+      </div>
     </div>
   );
 }

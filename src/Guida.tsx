@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import Assistente from './Assistente';
+import Feedback from './Feedback';
 import { chapters, steps } from './guidaContenuti';
 
 /**
@@ -231,7 +232,8 @@ export default function Guida() {
           className="underline hover:text-slate-700"
         >
           Codice sorgente (AGPL-3.0)
-        </a>
+        </a>{' '}
+        • <Feedback />
       </footer>
 
       <Assistente inGuida />
