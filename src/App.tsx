@@ -3,6 +3,7 @@ import Assistente from './Assistente';
 import WorkspaceGate from './WorkspaceGate';
 import SostieniProgetto from './SostieniProgetto';
 import Feedback from './Feedback';
+import Novita, { novitaDaVedere, segnaNovitaViste } from './Novita';
 import {
   buildXlsx,
   type XlsxCell,
@@ -883,7 +884,39 @@ const GRID_MAX_HOURS = 12;
  * del pomeriggio. È dove si può piazzare una materia.
  */
 const curricularSlots = (grid: any) =>
-  grid.hours + (Number(grid.pomeridiane) || 0);
+  maxDayHours(grid) + (Number(grid.pomeridiane) || 0);
+
+/**
+ * Ore del mattino di un modello in un giorno preciso. Di norma sono le stesse
+ * tutti i giorni (`grid.hours`); le scuole con la giornata lunga solo in certi
+ * giorni (il rientro del martedì e del giovedì, per dire) mettono il numero di
+ * quei giorni in `hoursByDay`. Casella vuota o assente: vale `grid.hours`,
+ * quindi chi non tocca niente ha esattamente l'orario di prima.
+ */
+const hoursOfDay = (grid: any, day: number) => {
+  const perDay = Array.isArray(grid?.hoursByDay) ? grid.hoursByDay : [];
+  const value = Number(perDay[day]);
+  return Number.isFinite(value) && value > 0 ? value : grid.hours;
+};
+
+/** Il giorno piu' lungo del modello: quante righe serve disegnare. */
+const maxDayHours = (grid: any) => {
+  const perDay = Array.isArray(grid?.hoursByDay) ? grid.hoursByDay : [];
+  let max = Number(grid?.hours) || 0;
+  const days = Number(grid?.days) || DAYS.length;
+  for (let d = 0; d < days; d++) {
+    const value = Number(perDay[d]);
+    if (Number.isFinite(value) && value > max) max = value;
+  }
+  return max;
+};
+
+/**
+ * Ore in cui si puo' fare lezione in un giorno preciso: quelle del mattino di
+ * quel giorno piu' le pomeridiane curricolari del modello.
+ */
+const curricularSlotsOn = (grid: any, day: number) =>
+  hoursOfDay(grid, day) + (Number(grid.pomeridiane) || 0);
 
 /**
  * Righe che un modello occupa nella griglia: le ore curricolari più il
@@ -894,8 +927,7 @@ const gridSlots = (grid: any) =>
 
 /** Fonde le griglie salvate con quelle di partenza, scartando valori fuori scala. */
 const normalizeModelGrids = (saved: any) => {
-  const out: Record<string, { days: number; hours: number; rientro: boolean }> =
-    { ...DEFAULT_MODEL_GRIDS };
+  const out: Record<string, any> = { ...DEFAULT_MODEL_GRIDS };
   if (!saved || typeof saved !== 'object') return out;
   Object.entries(saved).forEach(([model, value]: [string, any]) => {
     if (!value || typeof value !== 'object') return;
@@ -914,6 +946,16 @@ const normalizeModelGrids = (saved: any) => {
         Math.max(0, Number(value.pomeridiane) || 0)
       ),
       rientro: value.rientro === undefined ? base.rientro : !!value.rientro,
+      // Ore giorno per giorno: una casella per giorno della settimana, vuota
+      // dove vale il numero unico. I valori fuori scala si buttano invece di
+      // rompere la griglia.
+      hoursByDay: Array.isArray(value.hoursByDay)
+        ? Array.from({ length: DAYS.length }, (_, d) => {
+            const n = Number(value.hoursByDay[d]);
+            if (!Number.isFinite(n) || n <= 0) return null;
+            return Math.min(GRID_MAX_HOURS, Math.max(GRID_MIN_HOURS, n));
+          })
+        : null,
     };
   });
   return out;
@@ -1221,6 +1263,11 @@ const canPlaceMateriaHard = (
   const { rules, rooms, classes: classesList, sectionsConfig: sectionsCfg } = ctx;
 
   if (isTeacherOff(rules, lesson.teacherId, day, hour)) return false;
+
+  // Giornata corta: se il modello di quella classe quel giorno ha meno ore,
+  // la cella non esiste proprio.
+  const classGrid = ctx.getGrid ? ctx.getGrid(classId) : null;
+  if (classGrid && hour >= curricularSlotsOn(classGrid, day)) return false;
 
   const maxPerDay = dailyCapFor(rules, ctx.idealPerDay, lesson.teacherId);
   if (
@@ -1913,12 +1960,20 @@ export default function App() {
   const [newRoomSubjects, setNewRoomSubjects] = useState('');
   const [newSedeName, setNewSedeName] = useState('');
   const [editingCell, setEditingCell] = useState<any>(null);
+  /**
+   * Nel modale della cella: il prossimo docente scelto si aggiunge in
+   * compresenza invece di sostituire la materia. Serve al CLIL e in generale
+   * a chi ha due docenti curricolari insieme nella stessa ora.
+   */
+  const [compresenzaMode, setCompresenzaMode] = useState(false);
   const [editingNoteCell, setEditingNoteCell] = useState<any>(null);
   const [noteText, setNoteText] = useState('');
   const [showResetModal, setShowResetModal] = useState(false);
   const [printAlertOpen, setPrintAlertOpen] = useState(false);
   const [sectionActionModal, setSectionActionModal] = useState<any>(null);
   const [conflictModal, setConflictModal] = useState<any>(null);
+  /** Pannello delle novità: si apre da solo dopo un aggiornamento dell'app. */
+  const [novitaAperte, setNovitaAperte] = useState(() => novitaDaVedere());
   const [generationReport, setGenerationReport] = useState<any>(null);
   const [highlightedSlot, setHighlightedSlot] = useState<any>(null);
   const [tempRoom, setTempRoom] = useState('Aula');
@@ -1955,6 +2010,11 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('eduTime_readOnlyMode', String(readOnlyMode));
   }, [readOnlyMode]);
+
+  // Ogni cella si apre in modalità normale: la compresenza si chiede ogni volta.
+  useEffect(() => {
+    setCompresenzaMode(false);
+  }, [editingCell?.classId, editingCell?.day, editingCell?.hour]);
 
   useEffect(() => {
     if (editingCell) {
@@ -2682,6 +2742,23 @@ export default function App() {
           slot,
         });
       }
+      // Ore oltre la giornata di quel giorno: capita a chi accorcia un giorno
+      // dopo aver generato l'orario, e va detto invece di lasciarlo in tabella.
+      if (
+        type === 'materia' &&
+        day < grid.days &&
+        hour >= curricularSlotsOn(grid, day) &&
+        hour < curricularSlots(grid)
+      ) {
+        conflicts.push({
+          type: 'error',
+          message: `La classe ${classId} ha una lezione oltre le ${hoursOfDay(
+            grid,
+            day
+          )} ore di ${DAYS[day].toLowerCase()} previste dal suo modello.`,
+          slot,
+        });
+      }
       if (grid.rientro && hour === curricularSlots(grid) && type === 'materia') {
         conflicts.push({
           type: 'error',
@@ -2713,7 +2790,12 @@ export default function App() {
           });
         }
       }
-      if (teacherId && (type === 'materia' || type === 'pomeriggio_musica')) {
+      if (
+        teacherId &&
+        (type === 'materia' ||
+          type === 'pomeriggio_musica' ||
+          type === 'compresenza')
+      ) {
         const key = `${day}_${hour}`;
         if (!teacherSchedules[teacherId]) teacherSchedules[teacherId] = {};
         if (!teacherSchedules[teacherId][key])
@@ -3085,8 +3167,9 @@ export default function App() {
         // griglia del modello, impostabili dalla scuola.
         const grid = getClassGrid(cls.id);
         // Ore in cui il generatore può piazzare una materia: il mattino più le
-        // eventuali ore pomeridiane curricolari del modello.
-        const maxHoursPerDay = curricularSlots(grid);
+        // eventuali ore pomeridiane curricolari del modello. Il mattino può
+        // cambiare da un giorno all'altro, quindi il tetto si chiede giorno
+        // per giorno dentro il ciclo.
         const totalDays = grid.days;
         const pool: any[] = [];
 
@@ -3109,6 +3192,7 @@ export default function App() {
         pool.sort(() => Math.random() - 0.5);
 
         for (let day = 0; day < totalDays; day++) {
+          const maxHoursPerDay = curricularSlotsOn(grid, day);
           for (let hour = 0; hour < maxHoursPerDay; hour++) {
             if (pool.length === 0) break;
 
@@ -3345,7 +3429,9 @@ export default function App() {
             ...lesson,
             classId: cls.id,
             totalDays,
-            maxHoursPerDay,
+            // Le celle da provare arrivano fino al giorno piu' lungo: quelle
+            // che non esistono nei giorni corti le scarta canPlaceMateriaHard.
+            maxHoursPerDay: curricularSlots(grid),
           })
         );
       });
@@ -4425,6 +4511,106 @@ export default function App() {
     );
   };
 
+  /**
+   * Aggiunge (o toglie) un secondo docente curricolare nella cella, accanto
+   * alla materia che c'e' gia': e' la compresenza del CLIL, del potenziamento,
+   * dei laboratori a classe intera.
+   *
+   * Sta fuori dal generatore automatico: l'orario lo si costruisce come prima
+   * e la compresenza si mette a mano dove serve. Non fa monte ore per la
+   * classe (l'ora e' una sola), lo fa per il docente, che in quell'ora e'
+   * davvero occupato.
+   */
+  const salvaTimetable = (nuovo: any[]) => {
+    setTimetable(nuovo);
+    pushDataToCloud(
+      nuovo,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses
+    );
+  };
+
+  const handleAssignCompresenza = (teacherId: string) => {
+    if (readOnlyMode || !editingCell) return;
+    const { classId, day, hour } = editingCell;
+    const tDoc = allStaff.find((t) => t.id === teacherId);
+    const aggiungi = () => {
+      const filtered = timetable.filter(
+        (slot) =>
+          !(
+            slot.classId === classId &&
+            slot.day === day &&
+            slot.hour === hour &&
+            slot.type === 'compresenza'
+          )
+      );
+      filtered.push({
+        classId,
+        day,
+        hour,
+        teacherId,
+        subject: tDoc ? subjectForClass(tDoc, classId) : 'Compresenza',
+        // "Aula" e' lo spazio generico: la compresenza sta dove sta la
+        // lezione, quindi non deve prenotare un laboratorio per conto suo.
+        type: 'compresenza',
+        room: 'Aula',
+      });
+      salvaTimetable(filtered);
+      setEditingCell(null);
+      setCompresenzaMode(false);
+    };
+    // Il docente non puo' essere in due posti nella stessa ora: se e' gia'
+    // altrove lo si dice, e chi decide sceglie.
+    const altrove = timetable.find(
+      (slot) =>
+        slot.teacherId === teacherId &&
+        slot.day === day &&
+        slot.hour === hour &&
+        slot.classId !== classId
+    );
+    if (altrove) {
+      setConflictModal({
+        type: 'conflict',
+        title: 'Docente già occupato',
+        message: `${tDoc?.name} in quest'ora è nella classe ${altrove.classId}. Mettendolo anche qui sarà in due classi insieme.`,
+        hideSwap: true,
+        onConfirm: () => {
+          aggiungi();
+          setConflictModal(null);
+        },
+      });
+      return;
+    }
+    aggiungi();
+  };
+
+  /** Toglie la compresenza dalla cella aperta. */
+  const handleRemoveCompresenza = () => {
+    if (readOnlyMode || !editingCell) return;
+    const { classId, day, hour } = editingCell;
+    salvaTimetable(
+      timetable.filter(
+        (slot) =>
+          !(
+            slot.classId === classId &&
+            slot.day === day &&
+            slot.hour === hour &&
+            slot.type === 'compresenza'
+          )
+      )
+    );
+    setEditingCell(null);
+  };
+
   const handleAssignTeacher = (teacherId: string, isSostegno = false) => {
     if (readOnlyMode || !editingCell) return;
     const { classId, day, hour } = editingCell;
@@ -4935,7 +5121,7 @@ export default function App() {
    */
   const handleUpdateModelGrid = (
     model: string,
-    field: 'days' | 'hours' | 'pomeridiane' | 'rientro',
+    field: 'days' | 'hours' | 'pomeridiane' | 'rientro' | 'hoursByDay',
     value: any
   ) => {
     if (readOnlyMode) return;
@@ -4962,6 +5148,31 @@ export default function App() {
       cellNotes,
       groupConstraints,
       mixedClasses
+    );
+  };
+
+  /**
+   * Ore di un singolo giorno del modello. Campo vuoto: quel giorno torna al
+   * numero di ore unico, cioe' al comportamento di sempre.
+   */
+  const handleUpdateModelDayHours = (
+    model: string,
+    day: number,
+    value: string
+  ) => {
+    const current =
+      modelGrids?.[model] ||
+      DEFAULT_MODEL_GRIDS[model] ||
+      DEFAULT_MODEL_GRIDS.modelloB;
+    const perDay = Array.from({ length: DAYS.length }, (_, d) =>
+      Array.isArray(current.hoursByDay) ? current.hoursByDay[d] ?? null : null
+    );
+    const n = Number(value);
+    perDay[day] = value === '' || !Number.isFinite(n) || n <= 0 ? null : n;
+    handleUpdateModelGrid(
+      model,
+      'hoursByDay',
+      perDay.some((v) => v !== null) ? perDay : null
     );
   };
 
@@ -6042,6 +6253,13 @@ export default function App() {
                   slot.hour === dh.index &&
                   slot.type === 'materia'
               );
+              // Ore che quella classe quel giorno non fa: casella spenta.
+              if (
+                !l &&
+                dh.index >= curricularSlotsOn(classGrid, dIdx) &&
+                !(classGrid.rientro && dh.index === curricularSlots(classGrid))
+              )
+                return `<td style="background-color:#f1f5f9;"></td>`;
               const deptColor = l ? getDeptColor(l.subject) : '#fff';
               return `<td style="background-color: ${deptColor};">${
                 l
@@ -7414,6 +7632,9 @@ export default function App() {
                                 const sost = classLessons.find(
                                   (l) => l.type === 'sostegno'
                                 );
+                                const compres = classLessons.find(
+                                  (l) => l.type === 'compresenza'
+                                );
                                 const pmLesson = classLessons.find(
                                   (l) => l.type === 'pomeriggio_musica'
                                 );
@@ -7429,6 +7650,32 @@ export default function App() {
                                 const cellDeptColor = materia
                                   ? getDeptColor(materia.subject)
                                   : null;
+                                // Giorno corto: le ore che quel giorno la
+                                // classe non fa restano fuori dall'orario,
+                                // spente e non cliccabili.
+                                const fuoriGiornata =
+                                  !isRientroRow &&
+                                  hIdx >=
+                                    curricularSlotsOn(
+                                      getClassGrid(selectedClass),
+                                      dIdx
+                                    );
+                                if (
+                                  fuoriGiornata &&
+                                  !materia &&
+                                  !pmLesson &&
+                                  !sost
+                                )
+                                  return (
+                                    <td
+                                      key={dIdx}
+                                      className="p-3 border-r border-slate-200 text-center h-24 align-middle bg-slate-100/70"
+                                    >
+                                      <span className="text-[11px] text-slate-400 italic select-none">
+                                        Fuori orario
+                                      </span>
+                                    </td>
+                                  );
                                 if (pmLesson && !materia)
                                   return (
                                     <td
@@ -7543,6 +7790,15 @@ export default function App() {
                                               </p>
                                             )}
                                           </div>
+                                          {compres && (
+                                            <div className="mt-1.5 text-[10px] bg-sky-100 text-sky-800 font-semibold px-1.5 py-0.5 rounded-sm inline-block self-start">
+                                              👥{' '}
+                                              {allStaff.find(
+                                                (t) =>
+                                                  t.id === compres.teacherId
+                                              )?.name || compres.teacherId}
+                                            </div>
+                                          )}
                                           {sost && (
                                             <div className="mt-1.5 text-[10px] bg-purple-100 text-purple-800 font-semibold px-1.5 py-0.5 rounded-sm inline-block self-start">
                                               🤝{' '}
@@ -7650,7 +7906,8 @@ export default function App() {
                                     slot.teacherId === selectedTeacherId &&
                                     slot.day === dIdx &&
                                     slot.hour === hIdx &&
-                                    slot.type === 'materia'
+                                    (slot.type === 'materia' ||
+                                      slot.type === 'compresenza')
                                 );
                                 const deptColor = slotOccupied
                                   ? getDeptColor(slotOccupied.subject)
@@ -7669,6 +7926,12 @@ export default function App() {
                                         <span className="text-[10px] text-slate-500 uppercase tracking-wider">
                                           {slotOccupied.subject}
                                         </span>
+                                        {slotOccupied.type ===
+                                          'compresenza' && (
+                                          <span className="text-[10px] text-sky-700 font-semibold">
+                                            👥 in compresenza
+                                          </span>
+                                        )}
                                         {isNamedRoom(slotOccupied.room) && (
                                           <span
                                             className="text-[10px] text-indigo-700 font-semibold truncate max-w-full"
@@ -9585,6 +9848,48 @@ export default function App() {
                           Rientro pomeridiano
                         </label>
                       </div>
+                      <div className="mt-4 pt-4 border-t border-white/60">
+                        <p className="text-xs font-semibold text-slate-600 mb-1">
+                          Ore giorno per giorno (facoltativo)
+                        </p>
+                        <p className="text-[11px] text-slate-500 mb-2">
+                          Solo se qualche giorno è più lungo o più corto degli
+                          altri: per esempio 9 il martedì e il giovedì con il
+                          rientro pomeridiano. Lascia vuoto dove valgono le{' '}
+                          {grid.hours} ore qui sopra.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {DAYS.slice(0, grid.days).map((giorno, dIdx) => (
+                            <label
+                              key={giorno}
+                              className="flex flex-col gap-1 text-[11px] font-semibold text-slate-600"
+                            >
+                              {DAY_INITIALS[dIdx]}
+                              <input
+                                type="number"
+                                min={GRID_MIN_HOURS}
+                                max={GRID_MAX_HOURS}
+                                placeholder={String(grid.hours)}
+                                value={
+                                  (Array.isArray(grid.hoursByDay)
+                                    ? grid.hoursByDay[dIdx]
+                                    : null) ?? ''
+                                }
+                                onChange={(e) =>
+                                  handleUpdateModelDayHours(
+                                    model,
+                                    dIdx,
+                                    e.target.value
+                                  )
+                                }
+                                disabled={readOnlyMode}
+                                title={giorno}
+                                className="w-14 border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                       <p className="text-[11px] text-slate-500 mt-3">
                         Le etichette e gli orari delle singole ore si cambiano
                         in "Ore e Orari".
@@ -10807,6 +11112,70 @@ export default function App() {
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
                   Assegna Docente
                 </label>
+                {(() => {
+                  const cellaMateria = timetable.find(
+                    (s) =>
+                      s.classId === editingCell.classId &&
+                      s.day === editingCell.day &&
+                      s.hour === editingCell.hour &&
+                      (s.type === 'materia' || s.type === 'pomeriggio_musica')
+                  );
+                  const cellaCompresenza = timetable.find(
+                    (s) =>
+                      s.classId === editingCell.classId &&
+                      s.day === editingCell.day &&
+                      s.hour === editingCell.hour &&
+                      s.type === 'compresenza'
+                  );
+                  return (
+                    <div className="mb-3">
+                      {cellaCompresenza && (
+                        <div className="flex items-center justify-between gap-2 bg-sky-50 border border-sky-200 rounded-lg px-2 py-1.5 mb-2">
+                          <span className="text-xs font-semibold text-sky-800">
+                            👥 In compresenza:{' '}
+                            {allStaff.find(
+                              (t) => t.id === cellaCompresenza.teacherId
+                            )?.name || cellaCompresenza.teacherId}
+                          </span>
+                          {!readOnlyMode && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveCompresenza}
+                              className="text-[10px] font-bold text-rose-600 hover:text-rose-700 cursor-pointer"
+                            >
+                              Togli
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      <label
+                        className={`flex items-start gap-2 text-xs font-semibold rounded-lg px-2 py-1.5 border ${
+                          cellaMateria
+                            ? 'text-slate-600 border-slate-200'
+                            : 'text-slate-400 border-slate-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={compresenzaMode}
+                          onChange={(e) =>
+                            setCompresenzaMode(e.target.checked)
+                          }
+                          disabled={readOnlyMode || !cellaMateria}
+                          className="w-4 h-4 mt-0.5 accent-sky-600 disabled:opacity-50"
+                        />
+                        <span>
+                          Aggiungi in compresenza
+                          <span className="block font-normal text-[11px] text-slate-500">
+                            {cellaMateria
+                              ? 'Il docente che scegli si affianca alla lezione invece di sostituirla (CLIL, potenziamento).'
+                              : 'Prima metti la materia in questa cella, poi puoi affiancarle un secondo docente.'}
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                  );
+                })()}
                 <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                   {allStaff.map((t) => {
                     if (t.staffType === 'sostegno') return null;
@@ -10829,7 +11198,11 @@ export default function App() {
                     return (
                       <button
                         key={t.id}
-                        onClick={() => handleAssignTeacher(t.id, false)}
+                        onClick={() =>
+                          compresenzaMode
+                            ? handleAssignCompresenza(t.id)
+                            : handleAssignTeacher(t.id, false)
+                        }
                         disabled={isUnavailable}
                         className={`w-full flex items-center justify-between p-2 rounded-lg border text-left transition-all ${
                           isUnavailable
@@ -11490,7 +11863,23 @@ export default function App() {
         <SostieniProgetto />
         {' • '}
         <Feedback />
+        {' • '}
+        <button
+          type="button"
+          onClick={() => setNovitaAperte(true)}
+          className="underline hover:text-slate-700 cursor-pointer"
+        >
+          ✨ Novità
+        </button>
       </footer>
+
+      <Novita
+        aperto={novitaAperte}
+        onChiudi={() => {
+          segnaNovitaViste();
+          setNovitaAperte(false);
+        }}
+      />
 
       <Assistente />
     </div>
