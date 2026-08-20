@@ -8,7 +8,7 @@
  * Come si aggiorna: si aggiunge una voce in cima a `NOVITA` e si porta
  * `NOVITA_VERSIONE` alla data di quella voce. Nient'altro.
  */
-export const NOVITA_VERSIONE = '2026-08-20';
+export const NOVITA_VERSIONE = '2026-08-20b';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -21,11 +21,12 @@ export type VoceNovita = {
 
 export const NOVITA: VoceNovita[] = [
   {
-    versione: '2026-08-20',
+    versione: '2026-08-20b',
     data: '20 agosto 2026',
     voci: [
+      'Compresenze automatiche: nel Registro Cattedre, nel riquadro "Compresenze", si dice chi affianca il titolare, in quale classe, per quante ore e su quale materia. Da lì le piazza l\'Auto-Genera Orario, oppure il pulsante "Allinea Compresenze" se non si vuole rifare tutto l\'orario.',
       'Ore diverse da un giorno all\'altro: in Impostazioni → Modelli orario ogni giorno può avere il suo numero di ore (per esempio 5 il lunedì e 9 il martedì con il rientro). Lasciando i campi vuoti resta il valore unico di prima.',
-      'Compresenza di due docenti curricolari nella stessa ora (CLIL, potenziamento): si aggiunge a mano dalla cella dell\'orario, spuntando "in compresenza" prima di scegliere il secondo docente. Il generatore automatico non la crea da solo e la rigenerazione la cancella come le altre lezioni non bloccate.',
+      'Compresenza a mano: nella cella dell\'orario, spuntando "in compresenza" prima di scegliere il secondo docente, lo si affianca al titolare senza sostituirlo. Serve per i casi singoli; per quelle fisse di ogni settimana conviene il riquadro del Registro Cattedre.',
       'Questo pannello: da adesso, a ogni aggiornamento dell\'app, all\'apertura compare l\'elenco delle novità.',
     ],
   },

@@ -534,6 +534,36 @@ export const chapters: Chapter[] = [
         ),
       },
       {
+        title: 'Compresenze',
+        tag: 'due docenti nella stessa ora',
+        body: (
+          <>
+            <p>
+              Sotto la tabella c'è il riquadro <B>👥 Compresenze</B>: serve
+              quando due docenti curricolari stanno insieme nella stessa
+              classe nella stessa ora, come nella geografia in CLIL, nel
+              potenziamento o nei laboratori a classe intera.
+            </p>
+            <p className="mt-2">
+              Per ogni riga scegli il docente che si affianca, la classe, le
+              ore settimanali e, se vuoi, la materia: indicandola, quelle ore
+              finiscono solo sulle lezioni di quella materia, altrimenti su
+              una lezione qualunque della classe. Le piazza{' '}
+              <B>Auto-Genera Orario</B>; se hai già l'orario buono e non vuoi
+              rifarlo, usa <B>👥 Allinea Compresenze</B> nella barra in alto,
+              che rifà solo quelle.
+            </p>
+            <p className="mt-2">
+              La compresenza non aggiunge un'ora alla classe (l'ora è una
+              sola) ma conta nel monte ore di chi la fa, e la scheda Conflitti
+              segnala se quel docente in quell'ora è anche in un'altra classe.
+              Per un caso isolato puoi sempre aggiungerla a mano dalla cella
+              dell'orario, spuntando <B>Aggiungi in compresenza</B>.
+            </p>
+          </>
+        ),
+      },
+      {
         title: 'Ordine dei docenti (▲ ▼)',
         tag: 'anche nel quadro e nelle stampe',
         body: "Le frecce accanto a ogni nome spostano il docente su e giù nell'elenco. L'ordine che imposti qui è quello che vedi anche nell'Orario Generale e nella stampa A3, quindi serve a rimettere accanto ai colleghi di materia chi è stato inserito a metà anno. Il pulsante 🔤 Ordina per materia riordina in un colpo solo la sotto-scheda aperta, per materia e poi per nome.",

@@ -125,7 +125,12 @@ const DEFAULT_RULES: any = {
    */
   teacherHoursOff: {},
 };
-const DEFAULT_GEN_OPTIONS = { materie: true, sostegno: true, strumento: true };
+const DEFAULT_GEN_OPTIONS = {
+  materie: true,
+  sostegno: true,
+  strumento: true,
+  compresenze: true,
+};
 const DEFAULT_MIXED_CLASSES: any[] = [];
 const DEFAULT_SEDI: any[] = [{ id: 'sede-principale', name: 'Sede Principale' }];
 /**
@@ -1244,6 +1249,135 @@ const isMixedLesson = (
   );
 
 /**
+ * Ore di compresenza dichiarate da un docente: le righe "questo docente sta
+ * in questa classe insieme al titolare per N ore". Stanno sul docente, come
+ * le assegnazioni normali, cosi' si salvano e si condividono senza aggiungere
+ * niente al formato dei dati.
+ */
+const coTeachingRows = (staff: any) =>
+  ((staff?.coTeaching || []) as any[]).filter(
+    (row) => row && row.classId && Number(row.hours) > 0
+  );
+
+/** Ore di compresenza totali di un docente. */
+const coTeachingHours = (staff: any) =>
+  coTeachingRows(staff).reduce(
+    (sum: number, row: any) => sum + Number(row.hours),
+    0
+  );
+
+/**
+ * Piazza le ore di compresenza sopra le lezioni gia' in griglia.
+ *
+ * La compresenza non e' un'ora in piu' per la classe: e' un secondo docente
+ * dentro un'ora che esiste gia'. Quindi qui non si cercano celle libere, si
+ * cercano le lezioni del titolare (eventualmente solo quelle di una materia
+ * precisa, per il CLIL) e ci si affianca, se il docente in quell'ora e'
+ * libero e non sfonda i suoi limiti giornalieri.
+ *
+ * Restituisce quante ore erano richieste, quante ne ha piazzate e quali sono
+ * rimaste fuori, cosi' il report di generazione lo puo' dire.
+ */
+const placeCoTeaching = (
+  tt: any[],
+  teachersList: any[],
+  rules: any,
+  maxPerDayRule: number
+) => {
+  let requested = 0;
+  let assigned = 0;
+  const missing: any[] = [];
+
+  teachersList.forEach((teacher) => {
+    coTeachingRows(teacher).forEach((row) => {
+      const targetHours = Number(row.hours);
+      requested += targetHours;
+      const materiaFiltro = String(row.subject || '').trim().toUpperCase();
+
+      // Le lezioni su cui affiancarsi: quelle della classe tenute da un
+      // collega. Con la materia indicata (la geografia del CLIL, per dire) si
+      // resta su quelle ore soltanto.
+      let base = tt.filter(
+        (s) =>
+          s.classId === row.classId &&
+          s.type === 'materia' &&
+          s.teacherId !== teacher.id
+      );
+      if (materiaFiltro)
+        base = base.filter(
+          (s) => String(s.subject || '').toUpperCase() === materiaFiltro
+        );
+      base = [...base].sort(() => Math.random() - 0.5);
+
+      let placed = 0;
+      for (const slot of base) {
+        if (placed >= targetHours) break;
+        if (isTeacherOff(rules, teacher.id, slot.day, slot.hour)) continue;
+        // In quell'ora il docente e' gia' da un'altra parte (o proprio li').
+        if (
+          tt.some(
+            (s) =>
+              s.teacherId === teacher.id &&
+              s.day === slot.day &&
+              s.hour === slot.hour
+          )
+        )
+          continue;
+        // Una compresenza per cella: in tre nella stessa ora non e' orario,
+        // e' un ingorgo.
+        if (
+          tt.some(
+            (s) =>
+              s.classId === slot.classId &&
+              s.day === slot.day &&
+              s.hour === slot.hour &&
+              s.type === 'compresenza'
+          )
+        )
+          continue;
+        const hToday = hoursOfTeacherOnDay(tt, teacher.id, slot.day);
+        if (maxPerDayRule > 0 && hToday >= maxPerDayRule) continue;
+        // Lo stesso freno delle altre fasi: mai piu' di dieci ore in due
+        // giorni di fila.
+        const hYesterday =
+          slot.day > 0
+            ? hoursOfTeacherOnDay(tt, teacher.id, slot.day - 1)
+            : 0;
+        const hTomorrow = hoursOfTeacherOnDay(tt, teacher.id, slot.day + 1);
+        if (hYesterday + hToday + 1 > 10) continue;
+        if (hToday + hTomorrow + 1 > 10) continue;
+
+        tt.push({
+          classId: slot.classId,
+          day: slot.day,
+          hour: slot.hour,
+          teacherId: teacher.id,
+          subject: row.subject
+            ? String(row.subject)
+            : subjectForClass(teacher, slot.classId),
+          type: 'compresenza',
+          // "Aula" e' lo spazio generico: la compresenza sta dove sta la
+          // lezione e non prenota un laboratorio per conto suo.
+          room: 'Aula',
+        });
+        placed++;
+      }
+
+      assigned += placed;
+      if (placed < targetHours)
+        missing.push({
+          teacherName: teacher.name,
+          classId: row.classId,
+          subject: row.subject || '',
+          ore: targetHours - placed,
+        });
+    });
+  });
+
+  return { requested, assigned, missing };
+};
+
+/**
  * Vincoli rigidi per piazzare un'ora curricolare in una cella.
  *
  * ATTENZIONE: questi controlli rispecchiano uno per uno i filtri scritti
@@ -1990,6 +2124,11 @@ export default function App() {
   const [newSepB, setNewSepB] = useState('');
   const [assignClass, setAssignClass] = useState('');
   const [assignHours, setAssignHours] = useState(1);
+  /** Campi del riquadro "Compresenze" nel Registro Cattedre. */
+  const [coDocente, setCoDocente] = useState('');
+  const [coClasse, setCoClasse] = useState('');
+  const [coOre, setCoOre] = useState(1);
+  const [coMateria, setCoMateria] = useState('');
   const [groupConstraints, setGroupConstraints] = useState<any[]>([]);
   const [newGroupC1, setNewGroupC1] = useState('');
   const [newGroupC2, setNewGroupC2] = useState('');
@@ -2556,7 +2695,11 @@ export default function App() {
     const hours: any = {};
     allStaff.forEach((s) => {
       hours[s.id] =
-        s.assignments?.reduce((sum: number, a: any) => sum + a.hours, 0) || 0;
+        (s.assignments?.reduce((sum: number, a: any) => sum + a.hours, 0) ||
+          0) +
+        // Le ore di compresenza sono ore di servizio come le altre: il docente
+        // in quell'ora e' in classe.
+        coTeachingHours(s);
     });
     return hours;
   }, [allStaff]);
@@ -3106,6 +3249,11 @@ export default function App() {
               0,
               ...(staff.assignments || []).map(
                 (a: any) => getClassGrid(a.classId).days
+              ),
+              // Anche le classi in cui sta solo in compresenza sono giorni in
+              // cui puo' essere a scuola.
+              ...coTeachingRows(staff).map(
+                (row: any) => getClassGrid(row.classId).days
               )
             );
       const currentDaysOff = newRules.teacherDaysOff[staff.id] || [];
@@ -3142,6 +3290,11 @@ export default function App() {
         swaps: 0,
         consolidated: 0,
         shortDaysLeft: 0,
+        missing: [] as any[],
+      },
+      compresenze: {
+        requested: 0,
+        assigned: 0,
         missing: [] as any[],
       },
     };
@@ -3472,6 +3625,21 @@ export default function App() {
       report.materie.shortDaysLeft = consolidation.shortDaysLeft;
     }
 
+    // Compresenze: si piazzano dopo le materie, perche' si appoggiano alle
+    // lezioni gia' in griglia, e prima del sostegno, che a sua volta guarda le
+    // celle occupate.
+    if (generateOptions.compresenze !== false) {
+      const esito = placeCoTeaching(
+        newTimetable,
+        teachers,
+        newRules,
+        maxPerDayRule
+      );
+      report.compresenze.requested = esito.requested;
+      report.compresenze.assigned = esito.assigned;
+      report.compresenze.missing = esito.missing;
+    }
+
     if (generateOptions.sostegno) {
       sostegno.forEach((sos) => {
         const assigns = sos.assignments || [];
@@ -3627,6 +3795,54 @@ export default function App() {
       groupConstraints,
       mixedClasses
     );
+  };
+
+  /**
+   * Rifa' solo le ore di compresenza: cancella quelle in griglia e le
+   * ricolloca sulle lezioni di adesso. Serve dopo aver spostato le materie a
+   * mano, senza rigenerare tutto l'orario.
+   */
+  const handleAlignCompresenze = () => {
+    if (readOnlyMode) return;
+    const newTimetable = timetable.filter(
+      (s) => s.type !== 'compresenza' || s.locked
+    );
+    const esito = placeCoTeaching(
+      newTimetable,
+      teachers,
+      generationRules,
+      maxHoursPerDayFor(generationRules)
+    );
+    setTimetable(newTimetable);
+    pushDataToCloud(
+      newTimetable,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses
+    );
+    setConflictModal({
+      type: 'warning',
+      title: 'Compresenze ricollocate',
+      message:
+        esito.requested === 0
+          ? 'Non ci sono ore di compresenza impostate nel Registro Cattedre.'
+          : `${esito.assigned} ore su ${esito.requested} piazzate.` +
+            (esito.missing.length
+              ? ` Fuori: ${esito.missing
+                  .map((m: any) => `${m.teacherName} in ${m.classId} (${m.ore}h)`)
+                  .join(', ')}.`
+              : ''),
+      hideSwap: true,
+      soloOk: true,
+    });
   };
 
   const handleAlignSostegno = () => {
@@ -4760,6 +4976,72 @@ export default function App() {
       return;
     }
     executeAssignTeacher(teacherId, actualStaffType);
+  };
+
+  /**
+   * Righe di compresenza di un docente: "sta in 2A insieme al titolare per 2
+   * ore, sulla materia GEOGRAFIA". Stanno dentro l'oggetto docente, quindi si
+   * salvano e si condividono con tutto il resto senza aggiungere niente.
+   */
+  const salvaTeachers = (updated: any[]) => {
+    setTeachers(updated);
+    pushDataToCloud(
+      timetable,
+      updated,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses
+    );
+  };
+
+  const handleAddCoTeaching = (
+    teacherId: string,
+    classId: string,
+    hours: number,
+    subject: string
+  ) => {
+    if (readOnlyMode || !teacherId || !classId || hours <= 0) return;
+    const materia = subject.trim().toUpperCase();
+    salvaTeachers(
+      teachers.map((t) => {
+        if (t.id !== teacherId) return t;
+        const rows = [...(t.coTeaching || [])];
+        // Stessa classe e stessa materia: si aggiorna la riga invece di
+        // affiancarne una gemella.
+        const idx = rows.findIndex(
+          (r: any) =>
+            r.classId === classId &&
+            String(r.subject || '').toUpperCase() === materia
+        );
+        const row = { classId, hours, ...(materia ? { subject: materia } : {}) };
+        if (idx !== -1) rows[idx] = row;
+        else rows.push(row);
+        return { ...t, coTeaching: rows };
+      })
+    );
+  };
+
+  const handleRemoveCoTeaching = (teacherId: string, index: number) => {
+    if (readOnlyMode) return;
+    salvaTeachers(
+      teachers.map((t) =>
+        t.id === teacherId
+          ? {
+              ...t,
+              coTeaching: (t.coTeaching || []).filter(
+                (_: any, i: number) => i !== index
+              ),
+            }
+          : t
+      )
+    );
   };
 
   const handleUpdateAssignment = (
@@ -6814,6 +7096,14 @@ export default function App() {
               🔄 Allinea Sostegno
             </button>
             <button
+              onClick={handleAlignCompresenze}
+              disabled={readOnlyMode}
+              title="Ricolloca le ore di compresenza sulle lezioni di adesso"
+              className="bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              👥 Allinea Compresenze
+            </button>
+            <button
               onClick={() => handlePrintBypass('master')}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors text-sm cursor-pointer"
             >
@@ -7371,7 +7661,7 @@ export default function App() {
                 salvata subito nello spazio di lavoro attivo.
               </div>
               <span className="font-bold shrink-0 bg-amber-100 px-2 py-1 rounded">
-                EduTime v7.1
+                EduTime v7.2
               </span>
             </div>
           </div>
@@ -8988,6 +9278,122 @@ export default function App() {
                 )}
               </div>
             </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-sky-200 border-l-4 border-l-sky-500 shrink-0">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                👥 Compresenze
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 mb-4">
+                Ore in cui un docente sta in classe insieme al titolare: il
+                CLIL, il potenziamento, i laboratori a classe intera. Non sono
+                ore in più per la classe, sono ore di servizio per il docente.
+                Indicando la materia, l'orario le mette solo sulle lezioni di
+                quella materia. Le piazza l'Auto-Genera Orario, oppure il
+                pulsante "Allinea Compresenze" senza rifare tutto.
+              </p>
+              <div className="flex flex-wrap items-end gap-3 mb-4">
+                <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                  Docente
+                  <select
+                    value={coDocente}
+                    onChange={(e) => setCoDocente(e.target.value)}
+                    disabled={readOnlyMode}
+                    className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm min-w-[200px] disabled:opacity-50"
+                  >
+                    <option value="">Scegli...</option>
+                    {teachers.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({t.subject})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                  Classe
+                  <select
+                    value={coClasse}
+                    onChange={(e) => setCoClasse(e.target.value)}
+                    disabled={readOnlyMode}
+                    className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm disabled:opacity-50"
+                  >
+                    <option value="">Scegli...</option>
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                  Ore
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={coOre}
+                    onChange={(e) => setCoOre(Number(e.target.value) || 1)}
+                    disabled={readOnlyMode}
+                    className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-bold disabled:opacity-50"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                  Sulla materia (facoltativo)
+                  <input
+                    type="text"
+                    value={coMateria}
+                    placeholder="Es. GEOGRAFIA"
+                    onChange={(e) => setCoMateria(e.target.value)}
+                    disabled={readOnlyMode}
+                    className="w-48 border border-slate-300 rounded-lg px-2 py-1.5 text-sm uppercase disabled:opacity-50"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleAddCoTeaching(coDocente, coClasse, coOre, coMateria);
+                    setCoMateria('');
+                  }}
+                  disabled={readOnlyMode || !coDocente || !coClasse}
+                  className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  ➕ Aggiungi
+                </button>
+              </div>
+              {teachers.every((t) => coTeachingRows(t).length === 0) ? (
+                <p className="text-xs text-slate-400 italic">
+                  Nessuna compresenza impostata.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {teachers.flatMap((t) =>
+                    (t.coTeaching || []).map((row: any, i: number) =>
+                      row && row.classId ? (
+                        <div
+                          key={`${t.id}_${i}`}
+                          className="flex items-center justify-between gap-3 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2"
+                        >
+                          <span className="text-xs text-slate-700">
+                            <strong>{t.name}</strong> in{' '}
+                            <strong>{row.classId}</strong> per{' '}
+                            <strong>{row.hours}h</strong>
+                            {row.subject
+                              ? ` sulle ore di ${row.subject}`
+                              : ' su qualsiasi materia'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCoTeaching(t.id, i)}
+                            disabled={readOnlyMode}
+                            className="text-xs font-bold text-rose-600 hover:text-rose-700 disabled:opacity-50 cursor-pointer"
+                          >
+                            Rimuovi
+                          </button>
+                        </div>
+                      ) : null
+                    )
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
         {activeTab === 'config' && (
@@ -9035,6 +9441,11 @@ export default function App() {
                   Tedesco possono essere accorpate tra classi diverse se
                   configurato.
                 </li>
+                <li>
+                  <strong>Compresenze:</strong> le ore impostate nel Registro
+                  Cattedre vengono affiancate alle lezioni del titolare, sulla
+                  materia indicata quando c'è.
+                </li>
               </ul>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
                 <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
@@ -9065,6 +9476,18 @@ export default function App() {
                         className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
                       />
                       Genera Sostegno
+                    </label>
+                    <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={generateOptions.compresenze !== false}
+                        onChange={(e) =>
+                          handleUpdateGenOptions('compresenze', e.target.checked)
+                        }
+                        disabled={readOnlyMode}
+                        className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
+                      />
+                      Genera Compresenze
                     </label>
                     <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer select-none">
                       <input
@@ -11612,7 +12035,7 @@ export default function App() {
                   </button>
                 </>
               )}
-              {conflictModal.hideSwap && (
+              {conflictModal.hideSwap && !conflictModal.soloOk && (
                 <button
                   onClick={conflictModal.onConfirm}
                   className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
@@ -11620,12 +12043,23 @@ export default function App() {
                   ⚠️ Procedi Comunque
                 </button>
               )}
-              <button
-                onClick={() => setConflictModal(null)}
-                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3 px-4 rounded-xl transition-all mt-2 cursor-pointer"
-              >
-                ❌ Annulla
-              </button>
+              {/* Messaggi che raccontano e basta: un solo tasto, niente
+                  "procedi comunque" da leggere come un allarme. */}
+              {conflictModal.soloOk ? (
+                <button
+                  onClick={() => setConflictModal(null)}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  Ok
+                </button>
+              ) : (
+                <button
+                  onClick={() => setConflictModal(null)}
+                  className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3 px-4 rounded-xl transition-all mt-2 cursor-pointer"
+                >
+                  ❌ Annulla
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -11808,6 +12242,52 @@ export default function App() {
                   </div>
                 )}
               </div>
+              {generationReport.compresenze &&
+                generationReport.compresenze.requested > 0 && (
+                  <div className="bg-sky-50 border border-sky-200 p-4 rounded-lg">
+                    <h4 className="font-bold text-sky-900 mb-2">
+                      👥 Compresenze
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-slate-600">Ore richieste:</span>
+                        <span className="ml-2 font-bold text-sky-700">
+                          {generationReport.compresenze.requested}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">Ore assegnate:</span>
+                        <span className="ml-2 font-bold text-emerald-700">
+                          {generationReport.compresenze.assigned}
+                        </span>
+                      </div>
+                    </div>
+                    {generationReport.compresenze.missing.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-sky-200 space-y-1">
+                        <p className="text-xs text-rose-700 font-semibold">
+                          ⚠️ Ore di compresenza non piazzate:
+                        </p>
+                        {generationReport.compresenze.missing
+                          .slice(0, 10)
+                          .map((m: any, i: number) => (
+                            <div
+                              key={i}
+                              className="text-xs text-slate-600 bg-white p-2 rounded"
+                            >
+                              <strong>{m.teacherName}</strong> → Classe{' '}
+                              {m.classId}
+                              {m.subject ? ` (${m.subject})` : ''}: {m.ore} ore
+                            </div>
+                          ))}
+                        <p className="text-[11px] text-slate-500 italic">
+                          Di solito la classe non ha abbastanza ore di quella
+                          materia, oppure il docente in quelle ore è già
+                          impegnato altrove.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-sm text-amber-800">
                 <strong>💡 Suggerimento:</strong> Se alcune ore non sono state
                 assegnate, prova a:
