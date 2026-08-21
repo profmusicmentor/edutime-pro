@@ -8,7 +8,7 @@
  * Come si aggiorna: si aggiunge una voce in cima a `NOVITA` e si porta
  * `NOVITA_VERSIONE` alla data di quella voce. Nient'altro.
  */
-export const NOVITA_VERSIONE = '2026-08-20b';
+export const NOVITA_VERSIONE = '2026-08-21';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -20,6 +20,13 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-08-21',
+    data: '21 agosto 2026',
+    voci: [
+      'Segnalazioni sistemate: il filtro antispam del modulo "Segnala un bug o un suggerimento" scartava per errore qualche messaggio vero, che quindi non mi arrivava anche se l\'app rispondeva "ricevuto". Ora non succede più. Se mi hai scritto nei giorni scorsi e non ti ho risposto, rimandamelo: non l\'ho letto.',
+    ],
+  },
   {
     versione: '2026-08-20b',
     data: '20 agosto 2026',

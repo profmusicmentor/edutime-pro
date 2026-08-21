@@ -133,13 +133,24 @@ export default function Feedback() {
                   />
                 </div>
 
-                {/* Campo esca per i bot: resta vuoto per un utente vero. */}
+                {/*
+                  Campo esca per i bot: resta vuoto per un utente vero.
+                  Gli attributi data-* servono a tenere lontani i gestori di
+                  password (1Password, LastPass, Dashlane) e la compilazione
+                  automatica del browser, che riempiono anche gli input
+                  nascosti e facevano finire le segnalazioni vere fra lo spam.
+                */}
                 <input
                   type="text"
+                  name="edutime-campo-tecnico"
                   value={tranello}
                   onChange={(evento) => setTranello(evento.target.value)}
                   tabIndex={-1}
                   autoComplete="off"
+                  data-lpignore="true"
+                  data-1p-ignore
+                  data-bwignore
+                  data-form-type="other"
                   className="absolute -left-[9999px] w-px h-px opacity-0"
                   aria-hidden="true"
                 />

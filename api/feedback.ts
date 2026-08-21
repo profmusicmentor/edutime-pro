@@ -6,6 +6,11 @@
  * Ogni invio crea un contatto con email sintetica (mai la stessa due
  * volte), così due segnalazioni diverse non si sovrascrivono a vicenda
  * anche se arrivano dalla stessa persona.
+ *
+ * Il campo esca antispam non fa più buttare via il messaggio: lo segna
+ * come STATO "sospetto" invece di "nuovo". La compilazione automatica del
+ * browser riempie anche gli input nascosti, e con lo scarto in silenzio le
+ * segnalazioni vere sparivano mentre all'utente compariva «ricevuto».
  */
 
 export const config = { runtime: 'edge' };
@@ -36,9 +41,10 @@ export default async function handler(request: Request): Promise<Response> {
     return new Response('JSON non valido', { status: 400 });
   }
 
-  if (body.honeypot) {
-    return new Response(null, { status: 204 });
-  }
+  // Campo esca compilato: probabile bot, ma può essere anche la
+  // compilazione automatica del browser di una persona vera. Il messaggio
+  // si salva lo stesso, fuori dalla coda delle segnalazioni da leggere.
+  const sospetto = Boolean(body.honeypot);
 
   const message = (body.message ?? '').trim().slice(0, 4000);
   const email = (body.email ?? '').trim().slice(0, 200);
@@ -68,7 +74,7 @@ export default async function handler(request: Request): Promise<Response> {
         MESSAGGIO: message,
         EMAIL_RISPOSTA: email,
         PAGINA: pagina,
-        STATO: 'nuovo',
+        STATO: sospetto ? 'sospetto' : 'nuovo',
       },
     }),
   });
