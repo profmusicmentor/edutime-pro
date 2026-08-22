@@ -8,7 +8,7 @@
  * Come si aggiorna: si aggiunge una voce in cima a `NOVITA` e si porta
  * `NOVITA_VERSIONE` alla data di quella voce. Nient'altro.
  */
-export const NOVITA_VERSIONE = '2026-08-21';
+export const NOVITA_VERSIONE = '2026-08-21b';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -20,6 +20,15 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-08-21b',
+    data: '21 agosto 2026',
+    voci: [
+      'La classe si legge nell\'Orario Generale: nelle caselle del quadro comparivano solo le frecce blu del menu, e su uno schermo piccolo non si capiva quale classe fosse coinvolta. Ora la sigla della classe è sempre scritta nella casella, e il menu si apre cliccandoci sopra come prima.',
+      'Orario per laboratorio: in Viste Singole c\'è la vista "🔬 Laboratorio". Si sceglie un\'aula speciale (palestra, laboratori, aula magna) e si vede ora per ora quale classe c\'è e con quale docente. Con 🖨️ si stampa in A4 il foglio da attaccare dietro la porta.',
+      'Ore buco, entrate e uscite: in Viste Singole c\'è la vista "⚖️ Equità", che conta per ogni docente le ore buco, i giorni in cui entra dopo la prima ora e quelli in cui esce prima della fine delle lezioni. In rosso chi sta sopra la media; si ordina cliccando l\'intestazione delle colonne e si stampa con 🖨️.',
+    ],
+  },
   {
     versione: '2026-08-21',
     data: '21 agosto 2026',

@@ -430,7 +430,7 @@ export const chapters: Chapter[] = [
     ),
     cards: [
       {
-        title: 'I cinque tipi di vista',
+        title: 'I sette tipi di vista',
         tag: 'selettore',
         body: (
           <Ul
@@ -453,9 +453,28 @@ export const chapters: Chapter[] = [
                 <B>Dipartimento</B>: tutti i docenti di una materia in una sola
                 tabella.
               </>,
+              <>
+                <B>Laboratorio</B>: chi occupa un'aula speciale ora per ora,
+                con classe, docente e materia. È il foglio da attaccare dietro
+                la porta del laboratorio.
+              </>,
+              <>
+                <B>Equità</B>: quante ore buco, quante entrate posticipate e
+                quante uscite anticipate tocca a ciascun docente.
+              </>,
             ]}
           />
         ),
+      },
+      {
+        title: 'Orario di un laboratorio',
+        tag: 'da appendere alla porta',
+        body: "Nel menu «Laboratorio» compaiono solo le aule con un nome vero (palestra, laboratori, aula magna): «Aula» e «Classe» sono il default di chi non li usa. Le aule si creano in «Sezioni & Regole», nel riquadro Aule e Laboratori. Il pulsante 🖨️ ne stampa l'orario in A4, utile ai collaboratori per sapere dove trovare un collega o una classe.",
+      },
+      {
+        title: 'Ore buco, entrate e uscite',
+        tag: 'per distribuire i disagi',
+        body: "La vista «Equità» conta, per ogni docente di materia e di sostegno, le ore buco (ore libere fra la prima e l'ultima lezione dello stesso giorno), i giorni in cui entra dopo la prima ora e quelli in cui esce prima della fine della giornata scolastica. In rosso chi sta sopra la media della scuola; cliccando l'intestazione di una colonna si ordina per quel dato, e passando il mouse su una riga si vede in quali giorni capita. Serve a rispondere con i numeri al collega convinto di essere l'unico a uscire tardi.",
       },
       {
         title: 'Stampa singola A4',

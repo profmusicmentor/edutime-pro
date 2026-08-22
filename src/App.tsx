@@ -2081,6 +2081,10 @@ export default function App() {
   const [selectedSostegnoId, setSelectedSostegnoId] = useState('s1');
   const [selectedStrumentoId, setSelectedStrumentoId] = useState('m1');
   const [selectedDepartment, setSelectedDepartment] = useState('LETTERE');
+  /** Laboratorio scelto nella vista per aula, da appendere alla sua porta. */
+  const [selectedRoom, setSelectedRoom] = useState('');
+  /** Colonna su cui è ordinato il prospetto dell'equità. */
+  const [equitaSort, setEquitaSort] = useState('buchi');
   const [masterSearch, setMasterSearch] = useState('');
   const [masterHourFilter, setMasterHourFilter] = useState('diurno');
   /** Docente di cui è aperta la griglia delle ore di indisponibilità. */
@@ -2678,6 +2682,152 @@ export default function App() {
     () => Array.from(new Set(teachers.map((t) => t.subject))).sort(),
     [teachers]
   );
+
+  /**
+   * Le aule che hanno un nome vero: laboratori, palestra, aula magna. "Aula" e
+   * "Classe" sono il default di chi non usa i laboratori e non meritano un
+   * orario da attaccare alla porta.
+   */
+  const namedRooms = useMemo(
+    () => (rooms || []).filter((r: any) => isNamedRoom(r.name)),
+    [rooms]
+  );
+
+  /**
+   * Lezioni di ogni aula, per giorno e ora. L'indice si costruisce una volta
+   * sola: la vista per laboratorio interroga tutte le celle della settimana.
+   */
+  const lessonsByRoom = useMemo(() => {
+    const mappa: Record<string, any[]> = {};
+    timetable.forEach((slot: any) => {
+      if (!isNamedRoom(slot.room)) return;
+      (mappa[`${slot.room}_${slot.day}_${slot.hour}`] ||= []).push(slot);
+    });
+    return mappa;
+  }, [timetable]);
+
+  /** I docenti in compresenza su una lezione, per la vista del laboratorio. */
+  const coTeachersOf = (lesson: any) =>
+    timetable
+      .filter(
+        (s: any) =>
+          s.type === 'compresenza' &&
+          s.classId === lesson.classId &&
+          s.day === lesson.day &&
+          s.hour === lesson.hour
+      )
+      .map(
+        (s: any) =>
+          allStaff.find((t: any) => t.id === s.teacherId)?.name || s.teacherId
+      );
+
+  /** Il laboratorio in vista, con ripiego sul primo se quello scelto sparisce. */
+  const roomInView = namedRooms.some((r: any) => r.name === selectedRoom)
+    ? selectedRoom
+    : namedRooms[0]?.name || '';
+
+  /**
+   * Ore buco, entrate posticipate e uscite anticipate di ogni docente.
+   *
+   * Servono a distribuire i disagi in modo equo: dopo anni di orari fatti a
+   * mano, la lamentela ricorrente è sempre la stessa ("tizio esce sempre alle
+   * 11:15"), e senza un conteggio si discute a memoria.
+   *
+   * Il metro dell'uscita anticipata è la giornata della scuola, cioè il
+   * giorno più lungo fra i modelli in uso: è l'orario appeso in bacheca, non
+   * quello della singola sezione.
+   */
+  const equitaRows = useMemo(() => {
+    const oreDelGiorno = (day: number) =>
+      Math.max(...gridsInUse().map((g: any) => curricularSlotsOn(g, day)));
+    const oreOccupate: Record<string, Record<number, number[]>> = {};
+    timetable.forEach((slot: any) => {
+      if (!slot.teacherId) return;
+      const perGiorno = (oreOccupate[slot.teacherId] ||= {});
+      const ore = (perGiorno[slot.day] ||= []);
+      if (!ore.includes(slot.hour)) ore.push(slot.hour);
+    });
+    return allStaff
+      .filter(
+        (s: any) => s.staffType === 'materia' || s.staffType === 'sostegno'
+      )
+      .map((s: any) => {
+        const perGiorno = oreOccupate[s.id] || {};
+        let buchi = 0;
+        let entrate = 0;
+        let uscite = 0;
+        let giorniServizio = 0;
+        let oreInOrario = 0;
+        const dettaglio: string[] = [];
+        DAYS_IN_USE.forEach((nomeGiorno: string, day: number) => {
+          const ore = (perGiorno[day] || []).slice().sort((a, b) => a - b);
+          if (!ore.length) return;
+          const prima = ore[0];
+          const ultima = ore[ore.length - 1];
+          const buchiDelGiorno = ultima - prima + 1 - ore.length;
+          const entraDopo = prima > 0;
+          const escePrima = ultima < oreDelGiorno(day) - 1;
+          buchi += buchiDelGiorno;
+          giorniServizio += 1;
+          oreInOrario += ore.length;
+          if (entraDopo) entrate += 1;
+          if (escePrima) uscite += 1;
+          const note: string[] = [];
+          if (buchiDelGiorno)
+            note.push(
+              buchiDelGiorno === 1 ? '1 ora buco' : `${buchiDelGiorno} ore buco`
+            );
+          if (entraDopo)
+            note.push(`entra alla ${mergedHoursMap[prima]?.label || prima + 1}`);
+          if (escePrima)
+            note.push(`esce dopo la ${mergedHoursMap[ultima]?.label || ultima + 1}`);
+          if (note.length) dettaglio.push(`${nomeGiorno}: ${note.join(', ')}`);
+        });
+        return {
+          id: s.id,
+          name: s.name,
+          subject: s.subject,
+          staffType: s.staffType,
+          color: s.color,
+          buchi,
+          entrate,
+          uscite,
+          giorniServizio,
+          oreInOrario,
+          dettaglio,
+        };
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allStaff, timetable, sectionsConfig, modelGrids, maxGridDays, mergedHoursMap]);
+
+  /** Medie del prospetto equità: il metro per capire chi è sopra la riga. */
+  const equitaMedie = useMemo(() => {
+    if (!equitaRows.length) return { buchi: 0, entrate: 0, uscite: 0 };
+    const somma = equitaRows.reduce(
+      (acc: any, r: any) => ({
+        buchi: acc.buchi + r.buchi,
+        entrate: acc.entrate + r.entrate,
+        uscite: acc.uscite + r.uscite,
+      }),
+      { buchi: 0, entrate: 0, uscite: 0 }
+    );
+    return {
+      buchi: somma.buchi / equitaRows.length,
+      entrate: somma.entrate / equitaRows.length,
+      uscite: somma.uscite / equitaRows.length,
+    };
+  }, [equitaRows]);
+
+  /** Righe del prospetto ordinate come chiede la colonna cliccata. */
+  const equitaRowsOrdinate = useMemo(() => {
+    const righe = equitaRows.slice();
+    righe.sort((a: any, b: any) => {
+      if (equitaSort === 'nome') return a.name.localeCompare(b.name);
+      const diff = (b[equitaSort] || 0) - (a[equitaSort] || 0);
+      return diff !== 0 ? diff : a.name.localeCompare(b.name);
+    });
+    return righe;
+  }, [equitaRows, equitaSort]);
 
   const staffClassSummary = useMemo(() => {
     const summary: any = {};
@@ -6611,6 +6761,77 @@ export default function App() {
             }).join('')}</tr>`
         )
         .join('')}</tbody></table></body></html>`;
+    } else if (printType === 'single_room') {
+      // Il foglio da attaccare dietro la porta del laboratorio: chi c'e',
+      // con quale classe e per quale materia, ora per ora.
+      const nomeAula = id || '';
+      contentHtml = `<html><head><title>Orario ${escapeXml(
+        nomeAula
+      )}</title><style>@page { size: A4 portrait; margin: 15mm; } body { font-family: sans-serif; font-size: 12px; margin: 15mm; padding: 0; } table { width: 100%; border-collapse: collapse; page-break-inside: avoid; } th, td { border: 1px solid #ccc; padding: 6px; text-align: center; vertical-align: middle; } th { background-color: #f0f0f0; } tr { page-break-inside: avoid; } .cls { font-weight: bold; font-size: 13px; color: #3730a3; } .doc { font-size: 10px; } .mat { font-size: 9px; color: #555; text-transform: uppercase; }</style></head><body><h2 style="text-align:center;">📍 ${escapeXml(
+        nomeAula
+      )}</h2><table><thead><tr><th style="width:60px;">Ora</th>${DAYS_IN_USE.map(
+        (d) => `<th>${d}</th>`
+      ).join('')}</tr></thead><tbody>${gridHourRows
+        .map(
+          (dh: any) =>
+            `<tr><td style="font-weight:bold;">${
+              dh.label
+            }<br/><span style="font-size:8px;font-weight:normal;">${
+              dh.time
+            }</span></td>${DAYS_IN_USE.map((_day, dIdx) => {
+              const inAula = timetable.filter(
+                (slot: any) =>
+                  slot.room === nomeAula &&
+                  slot.day === dIdx &&
+                  slot.hour === dh.index &&
+                  (slot.type === 'materia' ||
+                    slot.type === 'pomeriggio_musica')
+              );
+              if (!inAula.length) return `<td>-</td>`;
+              return `<td style="background-color:#eef2ff;">${inAula
+                .map(
+                  (l: any) =>
+                    `<span class="cls">${escapeXml(
+                      l.classId
+                    )}</span><br/><span class="doc">${escapeXml(
+                      allStaff.find((t: any) => t.id === l.teacherId)?.name ||
+                        ''
+                    )}</span><br/><span class="mat">${escapeXml(
+                      l.subject
+                    )}</span>`
+                )
+                .join('<hr style="border:0;border-top:1px dashed #c7d2fe;margin:3px 0;"/>')}</td>`;
+            }).join('')}</tr>`
+        )
+        .join('')}</tbody></table></body></html>`;
+    } else if (printType === 'equita') {
+      // Il prospetto che si porta in riunione: quante ore buco, quante
+      // entrate posticipate e quante uscite anticipate per ciascuno.
+      contentHtml = `<html><head><title>Ore buco, entrate e uscite</title><style>@page { size: A4 portrait; margin: 15mm; } body { font-family: sans-serif; font-size: 11px; margin: 15mm; padding: 0; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ccc; padding: 5px; text-align: center; } th { background-color: #f0f0f0; } td.nome { text-align: left; font-weight: bold; } td.sopra { background-color: #ffe4e6; font-weight: bold; } tr { page-break-inside: avoid; } p.nota { font-size: 9px; color: #555; margin-top: 6mm; }</style></head><body><h2 style="text-align:center;">⚖️ Ore buco, entrate posticipate e uscite anticipate</h2><table><thead><tr><th style="text-align:left;">Docente</th><th>Ore</th><th>Giorni</th><th>Ore buco</th><th>Entra dopo</th><th>Esce prima</th></tr></thead><tbody>${equitaRowsOrdinate
+        .map((r: any) => {
+          const cl = (valore: number, media: number) =>
+            valore > Math.ceil(media) ? 'sopra' : '';
+          return `<tr><td class="nome">${escapeXml(
+            r.name
+          )}<br/><span style="font-weight:normal;font-size:9px;color:#555;">${escapeXml(
+            r.subject
+          )}</span></td><td>${r.oreInOrario}</td><td>${
+            r.giorniServizio
+          }</td><td class="${cl(r.buchi, equitaMedie.buchi)}">${
+            r.buchi
+          }</td><td class="${cl(r.entrate, equitaMedie.entrate)}">${
+            r.entrate
+          }</td><td class="${cl(r.uscite, equitaMedie.uscite)}">${
+            r.uscite
+          }</td></tr>`;
+        })
+        .join('')}<tr><td class="nome">Media della scuola</td><td>-</td><td>-</td><td>${equitaMedie.buchi.toFixed(
+        1
+      )}</td><td>${equitaMedie.entrate.toFixed(
+        1
+      )}</td><td>${equitaMedie.uscite.toFixed(
+        1
+      )}</td></tr></tbody></table><p class="nota">Ora buco: ora libera fra la prima e l'ultima lezione dello stesso giorno. Entra dopo: giorni in cui la prima lezione non è la prima ora. Esce prima: giorni in cui l'ultima lezione finisce prima della fine della giornata scolastica. In rosso chi sta sopra la media.</p></body></html>`;
     }
     printWindow.document.write(contentHtml);
     printWindow.document.close();
@@ -7503,46 +7724,71 @@ export default function App() {
                                   return (
                                     <td
                                       key={`${dIdx}_${currentHour}`}
-                                      className={`p-1 align-middle ${borderClass}`}
+                                      className={`px-0.5 py-1 align-middle ${borderClass}`}
                                     >
-                                      <select
-                                        value={
-                                          occupiedSlot
-                                            ? occupiedSlot.classId
-                                            : ''
-                                        }
-                                        onChange={(e) =>
-                                          handleUpdateCellDirectly(
-                                            staff.id,
-                                            dIdx,
-                                            currentHour,
-                                            e.target.value,
-                                            staff.staffType
-                                          )
-                                        }
-                                        disabled={readOnlyMode}
-                                        className={`w-full text-center text-xs font-bold rounded p-1 border cursor-pointer transition-all ${
-                                          occupiedSlot
-                                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
-                                            : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
-                                        } disabled:opacity-60 disabled:cursor-not-allowed`}
-                                      >
-                                        <option
-                                          value=""
-                                          className="bg-white text-slate-500"
+                                      {/*
+                                        La classe si legge sempre, anche su
+                                        uno schermo da 14 pollici. Il menu a
+                                        tendina sta sopra, trasparente: la
+                                        freccia del select mangiava tutta la
+                                        larghezza della colonna e lasciava
+                                        vedere solo se stessa.
+                                      */}
+                                      <div className="relative">
+                                        <div
+                                          title={
+                                            occupiedSlot
+                                              ? `Classe ${occupiedSlot.classId} — clicca per cambiarla`
+                                              : 'Nessuna classe — clicca per assegnarla'
+                                          }
+                                          className={`w-full text-center text-xs font-bold rounded px-0.5 py-1 border truncate tracking-tight transition-all ${
+                                            occupiedSlot
+                                              ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                                              : 'bg-white text-slate-400 border-slate-200'
+                                          } ${
+                                            readOnlyMode ? 'opacity-60' : ''
+                                          }`}
                                         >
-                                          -
-                                        </option>
-                                        {classes.map((c) => (
+                                          {occupiedSlot
+                                            ? occupiedSlot.classId
+                                            : '-'}
+                                        </div>
+                                        <select
+                                          value={
+                                            occupiedSlot
+                                              ? occupiedSlot.classId
+                                              : ''
+                                          }
+                                          onChange={(e) =>
+                                            handleUpdateCellDirectly(
+                                              staff.id,
+                                              dIdx,
+                                              currentHour,
+                                              e.target.value,
+                                              staff.staffType
+                                            )
+                                          }
+                                          disabled={readOnlyMode}
+                                          aria-label={`Classe di ${staff.name}, ${DAYS_IN_USE[dIdx]} ${hObj.label}`}
+                                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                                        >
                                           <option
-                                            key={c.id}
-                                            value={c.id}
-                                            className="bg-white text-slate-800"
+                                            value=""
+                                            className="bg-white text-slate-500"
                                           >
-                                            {c.id}
+                                            -
                                           </option>
-                                        ))}
-                                      </select>
+                                          {classes.map((c) => (
+                                            <option
+                                              key={c.id}
+                                              value={c.id}
+                                              className="bg-white text-slate-800"
+                                            >
+                                              {c.id}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
                                       {occupiedSlot &&
                                         staff.staffType === 'materia' && (
                                           <button
@@ -7722,6 +7968,26 @@ export default function App() {
                   >
                     📚 Dipartimento
                   </button>
+                  <button
+                    onClick={() => setViewType('aula')}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
+                      viewType === 'aula'
+                        ? 'bg-white text-indigo-700 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    🔬 Laboratorio
+                  </button>
+                  <button
+                    onClick={() => setViewType('equita')}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
+                      viewType === 'equita'
+                        ? 'bg-white text-indigo-700 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    ⚖️ Equità
+                  </button>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -7839,9 +8105,338 @@ export default function App() {
                     </select>
                   </>
                 )}
+                {viewType === 'aula' && namedRooms.length > 0 && (
+                  <>
+                    <span className="text-sm text-slate-500">Laboratorio:</span>
+                    <select
+                      value={roomInView}
+                      onChange={(e) => setSelectedRoom(e.target.value)}
+                      className="bg-white border border-slate-300 rounded-lg py-1.5 px-3 text-slate-700 font-semibold focus:ring-1 focus:ring-indigo-500"
+                    >
+                      {namedRooms.map((r: any) => (
+                        <option key={r.id || r.name} value={r.name}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => handlePrintBypass('single_room', roomInView)}
+                      title="Stampa l'orario di questo laboratorio in A4"
+                      className="ml-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 p-2 rounded-lg"
+                    >
+                      🖨️
+                    </button>
+                  </>
+                )}
+                {viewType === 'equita' && (
+                  <button
+                    onClick={() => handlePrintBypass('equita')}
+                    title="Stampa il prospetto in A4"
+                    className="ml-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 p-2 rounded-lg"
+                  >
+                    🖨️
+                  </button>
+                )}
               </div>
             </div>
-            {viewType !== 'department' ? (
+            {viewType === 'aula' ? (
+              namedRooms.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
+                  <p className="text-4xl mb-3">🔬</p>
+                  <p className="font-bold text-slate-700">
+                    Nessun laboratorio impostato
+                  </p>
+                  <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
+                    Questa vista mostra l'orario di un'aula speciale, quella da
+                    attaccare dietro la porta del laboratorio. Le aule si
+                    creano in «Sezioni &amp; Regole», nel riquadro Aule e
+                    Laboratori.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('config')}
+                    className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm py-2 px-4 rounded-lg transition-all"
+                  >
+                    Vai a Sezioni &amp; Regole
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="bg-indigo-50 border-b border-indigo-100 px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 className="font-bold text-indigo-900">
+                        📍 {roomInView}
+                      </h3>
+                      <p className="text-xs text-indigo-700/80">
+                        Chi c'è, con quale classe e per quale materia. È il
+                        foglio da appendere alla porta.
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold bg-white text-indigo-700 px-2 py-1 rounded-lg border border-indigo-200">
+                      {
+                        timetable.filter((s: any) => s.room === roomInView)
+                          .length
+                      }{' '}
+                      ore occupate
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse table-fixed min-w-[700px]">
+                      <thead>
+                        <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700">
+                          <th className="p-4 w-36 font-semibold border-r border-slate-200">
+                            Ora
+                          </th>
+                          {DAYS_IN_USE.map((day) => (
+                            <th
+                              key={day}
+                              className="p-4 font-semibold text-center border-r border-slate-200 last:border-0"
+                            >
+                              {day}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {gridHourRows.map((hObj: any) => (
+                          <tr
+                            key={hObj.index}
+                            className="hover:bg-slate-50/50 transition-colors"
+                          >
+                            <td className="p-4 font-medium text-slate-600 bg-slate-50/70 border-r border-slate-200 flex flex-col justify-center h-24">
+                              <span className="text-xs text-indigo-600 font-bold uppercase tracking-wider">
+                                {hObj.label}
+                              </span>
+                              <span className="text-[10px] text-slate-500 mt-1">
+                                {hObj.time}
+                              </span>
+                            </td>
+                            {DAYS_IN_USE.map((_day, dIdx) => {
+                              const inAula = (
+                                lessonsByRoom[
+                                  `${roomInView}_${dIdx}_${hObj.index}`
+                                ] || []
+                              ).filter(
+                                (l: any) =>
+                                  l.type === 'materia' ||
+                                  l.type === 'pomeriggio_musica'
+                              );
+                              return (
+                                <td
+                                  key={dIdx}
+                                  className="p-2 border-r border-slate-200 text-center h-24 align-middle"
+                                >
+                                  {inAula.length ? (
+                                    <div className="flex flex-col gap-1 h-full justify-center">
+                                      {inAula.map((l: any, i: number) => {
+                                        const docente =
+                                          allStaff.find(
+                                            (t: any) => t.id === l.teacherId
+                                          )?.name || l.teacherId;
+                                        const affianco = coTeachersOf(l);
+                                        return (
+                                          <div
+                                            key={i}
+                                            className="border-l-4 border-indigo-500 rounded-sm px-2 py-1 text-left"
+                                            style={{
+                                              backgroundColor: getDeptColor(
+                                                l.subject
+                                              ),
+                                            }}
+                                          >
+                                            <p className="font-bold text-indigo-800 text-sm leading-tight">
+                                              {l.classId}
+                                            </p>
+                                            <p className="text-[11px] text-slate-700 truncate">
+                                              {docente}
+                                            </p>
+                                            <p className="text-[10px] text-slate-500 uppercase tracking-wider truncate">
+                                              {l.subject}
+                                            </p>
+                                            {affianco.length > 0 && (
+                                              <p className="text-[10px] text-sky-700 font-semibold truncate">
+                                                👥 {affianco.join(', ')}
+                                              </p>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-slate-300 italic">
+                                      Libero
+                                    </span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )
+            ) : viewType === 'equita' ? (
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="bg-amber-50 border-b border-amber-100 px-5 py-3">
+                  <h3 className="font-bold text-amber-900">
+                    ⚖️ Ore buco, entrate e uscite
+                  </h3>
+                  <p className="text-xs text-amber-800/80 mt-1">
+                    Quanti disagi tocca a ciascuno, per distribuirli con
+                    equilibrio. In rosso chi sta sopra la media della scuola.
+                    Clicca l'intestazione di una colonna per ordinare.
+                  </p>
+                </div>
+                {equitaRows.length === 0 ? (
+                  <p className="p-8 text-center text-sm text-slate-500">
+                    Nessun docente da conteggiare: genera prima l'orario.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[720px]">
+                      <thead>
+                        <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 text-xs uppercase tracking-wider">
+                          {[
+                            { key: 'nome', label: 'Docente', align: 'left' },
+                            { key: 'oreInOrario', label: 'Ore in orario' },
+                            { key: 'giorniServizio', label: 'Giorni' },
+                            { key: 'buchi', label: '🕳️ Ore buco' },
+                            { key: 'entrate', label: '⏰ Entra dopo' },
+                            { key: 'uscite', label: '🚪 Esce prima' },
+                          ].map((col) => (
+                            <th
+                              key={col.key}
+                              onClick={() => setEquitaSort(col.key)}
+                              title="Ordina per questa colonna"
+                              className={`p-3 font-semibold border-r border-slate-200 last:border-0 cursor-pointer select-none hover:bg-slate-200/70 ${
+                                col.align === 'left'
+                                  ? 'text-left'
+                                  : 'text-center'
+                              } ${
+                                equitaSort === col.key
+                                  ? 'text-indigo-700 bg-white'
+                                  : ''
+                              }`}
+                            >
+                              {col.label}
+                              {equitaSort === col.key ? ' ▾' : ''}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-sm">
+                        {equitaRowsOrdinate.map((r: any) => {
+                          const sopra = (valore: number, media: number) =>
+                            valore > Math.ceil(media)
+                              ? 'bg-rose-50 text-rose-700 font-bold'
+                              : 'text-slate-600';
+                          return (
+                            <tr
+                              key={r.id}
+                              className="hover:bg-slate-50/60 transition-colors"
+                              title={
+                                r.dettaglio.length
+                                  ? r.dettaglio.join(' · ')
+                                  : 'Nessun disagio in settimana'
+                              }
+                            >
+                              <td className="p-3 border-r border-slate-200">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                                    style={{ backgroundColor: r.color }}
+                                  />
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-slate-800 truncate">
+                                      {r.name}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 uppercase truncate">
+                                      {r.subject}
+                                      {r.staffType === 'sostegno'
+                                        ? ' · sostegno'
+                                        : ''}
+                                    </p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-3 text-center border-r border-slate-200 text-slate-600">
+                                {r.oreInOrario}
+                              </td>
+                              <td className="p-3 text-center border-r border-slate-200 text-slate-600">
+                                {r.giorniServizio}
+                              </td>
+                              <td
+                                className={`p-3 text-center border-r border-slate-200 ${sopra(
+                                  r.buchi,
+                                  equitaMedie.buchi
+                                )}`}
+                              >
+                                {r.buchi}
+                              </td>
+                              <td
+                                className={`p-3 text-center border-r border-slate-200 ${sopra(
+                                  r.entrate,
+                                  equitaMedie.entrate
+                                )}`}
+                              >
+                                {r.entrate}
+                              </td>
+                              <td
+                                className={`p-3 text-center ${sopra(
+                                  r.uscite,
+                                  equitaMedie.uscite
+                                )}`}
+                              >
+                                {r.uscite}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="bg-slate-100 border-t-2 border-slate-300 text-xs font-bold text-slate-700">
+                          <td className="p-3 border-r border-slate-200">
+                            Media della scuola
+                          </td>
+                          <td className="p-3 text-center border-r border-slate-200">
+                            -
+                          </td>
+                          <td className="p-3 text-center border-r border-slate-200">
+                            -
+                          </td>
+                          <td className="p-3 text-center border-r border-slate-200">
+                            {equitaMedie.buchi.toFixed(1)}
+                          </td>
+                          <td className="p-3 text-center border-r border-slate-200">
+                            {equitaMedie.entrate.toFixed(1)}
+                          </td>
+                          <td className="p-3 text-center">
+                            {equitaMedie.uscite.toFixed(1)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div className="border-t border-slate-200 bg-slate-50 px-5 py-3 text-[11px] text-slate-500 space-y-1">
+                  <p>
+                    <strong>Ora buco</strong>: ora libera fra la prima e
+                    l'ultima lezione dello stesso giorno.
+                  </p>
+                  <p>
+                    <strong>Entra dopo</strong>: giorni in cui la prima lezione
+                    non è la prima ora. <strong>Esce prima</strong>: giorni in
+                    cui l'ultima lezione finisce prima della fine della
+                    giornata scolastica, cioè del giorno più lungo fra i
+                    modelli orario in uso.
+                  </p>
+                  <p>
+                    Passa il mouse su una riga per vedere in quali giorni
+                    capita. Il conteggio riguarda i docenti di materia e di
+                    sostegno.
+                  </p>
+                </div>
+              </div>
+            ) : viewType !== 'department' ? (
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse table-fixed min-w-[700px]">
