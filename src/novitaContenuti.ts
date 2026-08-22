@@ -5,8 +5,20 @@
  * apre EduTime Pro vede una volta sola il pannello con le ultime modifiche.
  * Il valore è la data del rilascio, così è leggibile anche a distanza di mesi.
  *
+ * Chi apre l'app vede solo i rilasci usciti dopo l'ultimo che ha già letto,
+ * non tutto l'elenco: il pannello non si allunga di visita in visita e
+ * nessuno rilegge due volte la stessa cosa. L'elenco intero resta a
+ * disposizione dal pulsante ✨ Novità in fondo alla pagina.
+ *
  * Come si aggiorna: si aggiunge una voce in cima a `NOVITA` e si porta
  * `NOVITA_VERSIONE` alla data di quella voce. Nient'altro.
+ *
+ * Due regole da rispettare:
+ * - `versione` va scritta AAAA-MM-GG, con una lettera in coda per il secondo
+ *   rilascio dello stesso giorno ('2026-08-21b'). Il confronto fra rilasci è
+ *   alfabetico, quindi questo formato è anche l'ordine cronologico.
+ * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
+ *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
 export const NOVITA_VERSIONE = '2026-08-21b';
 

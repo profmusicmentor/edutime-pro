@@ -3,7 +3,8 @@ import Assistente from './Assistente';
 import WorkspaceGate from './WorkspaceGate';
 import SostieniProgetto from './SostieniProgetto';
 import Feedback from './Feedback';
-import Novita, { novitaDaVedere, segnaNovitaViste } from './Novita';
+import Novita, { novitaAllAvvio, segnaNovitaViste } from './Novita';
+import type { ModoNovita } from './Novita';
 import {
   buildXlsx,
   type XlsxCell,
@@ -2110,8 +2111,13 @@ export default function App() {
   const [printAlertOpen, setPrintAlertOpen] = useState(false);
   const [sectionActionModal, setSectionActionModal] = useState<any>(null);
   const [conflictModal, setConflictModal] = useState<any>(null);
-  /** Pannello delle novità: si apre da solo dopo un aggiornamento dell'app. */
-  const [novitaAperte, setNovitaAperte] = useState(() => novitaDaVedere());
+  /**
+   * Pannello delle novità: all'avvio si apre da solo sui soli rilasci non
+   * ancora letti; dal pulsante in fondo alla pagina si apre su tutto l'elenco.
+   */
+  const [novitaAperte, setNovitaAperte] = useState<ModoNovita>(() =>
+    novitaAllAvvio()
+  );
   const [generationReport, setGenerationReport] = useState<any>(null);
   const [highlightedSlot, setHighlightedSlot] = useState<any>(null);
   const [tempRoom, setTempRoom] = useState('Aula');
@@ -12941,7 +12947,7 @@ export default function App() {
         {' • '}
         <button
           type="button"
-          onClick={() => setNovitaAperte(true)}
+          onClick={() => setNovitaAperte('tutte')}
           className="underline hover:text-slate-700 cursor-pointer"
         >
           ✨ Novità
@@ -12949,10 +12955,10 @@ export default function App() {
       </footer>
 
       <Novita
-        aperto={novitaAperte}
+        modo={novitaAperte}
         onChiudi={() => {
           segnaNovitaViste();
-          setNovitaAperte(false);
+          setNovitaAperte('');
         }}
       />
 
