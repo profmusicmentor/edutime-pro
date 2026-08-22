@@ -125,6 +125,16 @@ const DEFAULT_RULES: any = {
    * modo di dichiarare un giorno intero.
    */
   teacherHoursOff: {},
+  /**
+   * Preferenza oraria del docente: 'early' per chi vorrebbe le prime ore,
+   * 'late' per chi vorrebbe le ultime. Mappa id docente → preferenza; chi non
+   * c'è dentro non ha preferenze ed è il comportamento di sempre.
+   *
+   * È una penalità morbida, non un divieto: sposta la scelta fra celle tutte
+   * ammesse, non può far restare fuori un'ora. Chi ha bisogno di un vincolo
+   * netto usa teacherHoursOff.
+   */
+  teacherHourPreference: {},
 };
 const DEFAULT_GEN_OPTIONS = {
   materie: true,
@@ -1096,6 +1106,36 @@ const hasHoursOffOnDay = (rules: any, teacherId: string, day: number) =>
   );
 
 /**
+ * Quanto pesa la preferenza oraria di un docente su una singola cella.
+ *
+ * Il peso è volutamente basso: deve valere più della casualità e quanto una
+ * coppia di ore buca, ma molto meno del divieto sul buco lungo (9999) e delle
+ * penalità didattiche (400), così una preferenza non manda mai fuori un'ora e
+ * non stravolge l'orario di una classe. La forma è simmetrica: chi preferisce
+ * le prime ore paga a mano a mano che si scende, chi preferisce le ultime paga
+ * salendo verso la prima.
+ */
+const HOUR_PREF_WEIGHT = 6;
+
+const hourPreferencePenalty = (
+  rules: any,
+  teacherId: string,
+  hour: number,
+  slotsInDay?: number
+) => {
+  const pref = (rules?.teacherHourPreference || {})[teacherId];
+  if (!pref || !teacherId) return 0;
+  if (pref === 'early') return hour * HOUR_PREF_WEIGHT;
+  if (pref === 'late') {
+    // Senza il numero di ore del giorno non si sa quale sia l'ultima: la
+    // preferenza si spegne invece di indovinare.
+    const last = Math.max(hour, (Number(slotsInDay) || 0) - 1);
+    return (last - hour) * HOUR_PREF_WEIGHT;
+  }
+  return 0;
+};
+
+/**
  * Quante aule di quel tipo ha la scuola: due palestre, tre laboratori di
  * informatica. Finché il campo non c'è vale 1, com'era prima.
  */
@@ -1521,7 +1561,8 @@ const materiaPlacementPenalty = (
   day: number,
   hour: number,
   maxGapAllowed: number,
-  rules?: any
+  rules?: any,
+  slotsInDay?: number
 ) => {
   let penalty = didacticPenalty(tt, lesson.subject, classId, day, rules);
   const dailyLessons = tt.filter(
@@ -1546,6 +1587,11 @@ const materiaPlacementPenalty = (
     }
   } else {
     penalty += hour * 2;
+    // La preferenza oraria decide dove comincia la giornata del docente: una
+    // volta aperta, sono le ore buca a tenere insieme il resto. Pesarla anche
+    // sulle ore successive spezzerebbe le giornate senza avvicinarsi di più
+    // al desiderio.
+    penalty += hourPreferencePenalty(rules, lesson.teacherId, hour, slotsInDay);
   }
 
   const sameClassToday = tt.filter(
@@ -1606,6 +1652,13 @@ const repairUnplacedLessons = (
 
   const bestFreeCell = (lesson: any, cells: any[], skipCell?: any) => {
     let best: any = null;
+    // Le celle di questa classe arrivano già filtrate sul modello orario:
+    // l'ora più alta dice qual è l'ultima della giornata, che serve alla
+    // preferenza "ultime ore".
+    const slotsInDay = cells.reduce(
+      (max: number, c: any) => Math.max(max, c.hour + 1),
+      0
+    );
     for (const cell of cells) {
       if (skipCell && cell.day === skipCell.day && cell.hour === skipCell.hour)
         continue;
@@ -1618,7 +1671,8 @@ const repairUnplacedLessons = (
         cell.day,
         cell.hour,
         maxGapFor(lesson.teacherId),
-        ctx.rules
+        ctx.rules,
+        slotsInDay
       );
       if (!best || penalty < best.penalty) best = { ...cell, penalty };
     }
@@ -1789,7 +1843,8 @@ const findExchange = (
           victim.day,
           victim.hour,
           gapFor(teacherId),
-          ctx.rules
+          ctx.rules,
+          curricularSlots(grid)
         ) +
         materiaPlacementPenalty(
           tt,
@@ -1802,7 +1857,8 @@ const findExchange = (
           shortDay,
           slot.hour,
           gapFor(victim.teacherId),
-          ctx.rules
+          ctx.rules,
+          curricularSlots(grid)
         );
     }
 
@@ -1919,7 +1975,8 @@ const consolidateShortDays = (tt: any[], ctx: any, budgetMs = 1500) => {
               d,
               h,
               maxGapFor(teacherId),
-              ctx.rules
+              ctx.rules,
+              curricularSlots(grid)
             );
             if (!best || penalty < best.penalty)
               best = { day: d, hour: h, penalty };
@@ -2340,6 +2397,15 @@ export default function App() {
                 safeHoursOff[k] = Array.isArray(v) ? v.map(String) : [];
               });
             }
+            // Preferenza oraria per docente: i file salvati prima non ce
+            // l'hanno, e i valori diversi da 'early'/'late' si scartano.
+            const safeHourPreference: any = {};
+            if (rules.teacherHourPreference) {
+              Object.keys(rules.teacherHourPreference).forEach((k) => {
+                const v = rules.teacherHourPreference[k];
+                if (v === 'early' || v === 'late') safeHourPreference[k] = v;
+              });
+            }
             setGenerationRules({
               globalMaxGapHours: rules.globalMaxGapHours ?? 1,
               globalMaxHoursPerDay: rules.globalMaxHoursPerDay ?? 5,
@@ -2354,6 +2420,7 @@ export default function App() {
               teacherMaxGapHours: rules.teacherMaxGapHours || {},
               teacherDaysOff: safeDaysOff,
               teacherHoursOff: safeHoursOff,
+              teacherHourPreference: safeHourPreference,
             });
           }
           if (data.generateOptions) setGenerateOptions(data.generateOptions);
@@ -3665,6 +3732,16 @@ export default function App() {
                 }
               } else {
                 penalty += hour * 2;
+                // Preferenza oraria: vale sulla prima ora della giornata di
+                // quel docente, cioè su dove la giornata comincia. È morbida,
+                // pesa meno del divieto sul buco lungo e delle penalità
+                // didattiche, quindi non fa restare fuori nessuna ora.
+                penalty += hourPreferencePenalty(
+                  newRules,
+                  candidate.teacherId,
+                  hour,
+                  maxHoursPerDay
+                );
               }
 
               if (candidate.preferConsecutive) {
@@ -4469,11 +4546,20 @@ export default function App() {
     if (!newRules.teacherDaysOff) newRules.teacherDaysOff = {};
     if (!newRules.teacherHoursOff) newRules.teacherHoursOff = {};
     if (!newRules.teacherMaxGapHours) newRules.teacherMaxGapHours = {};
+    if (!newRules.teacherHourPreference) newRules.teacherHourPreference = {};
     if (teacherId) {
       if (field === 'teacherDaysOff')
         newRules.teacherDaysOff[teacherId] = value;
       else if (field === 'teacherHoursOff')
         newRules.teacherHoursOff[teacherId] = value;
+      else if (field === 'teacherHourPreference') {
+        // Stringa vuota = nessuna preferenza: si toglie la voce invece di
+        // salvare un valore che l'algoritmo dovrebbe poi ignorare.
+        const next = { ...newRules.teacherHourPreference };
+        if (value === 'early' || value === 'late') next[teacherId] = value;
+        else delete next[teacherId];
+        newRules.teacherHourPreference = next;
+      }
       else if (value === -1) delete newRules[field][teacherId];
       else newRules[field][teacherId] = value;
     } else {
@@ -10030,6 +10116,11 @@ export default function App() {
                   l'hanno attivata.
                 </li>
                 <li>
+                  Terrà conto della <strong>preferenza oraria</strong> di ogni
+                  docente (prime o ultime ore): decide dove comincia la sua
+                  giornata, ma resta un desiderio e non un vincolo.
+                </li>
+                <li>
                   <strong>Limite giorni liberi basato sulle ore:</strong> ≥18h =
                   max 1 giorno, ≥12h = max 2 giorni, altri = max 3 giorni.
                 </li>
@@ -10290,7 +10381,10 @@ export default function App() {
                       il sistema gliene assegnerà uno in automatico
                     </strong>
                     . Con ⏰ blocchi le singole ore, per chi è in comune con
-                    un altro istituto.
+                    un altro istituto. <strong>Preferisce</strong> invece è un
+                    desiderio, non un vincolo: l'algoritmo prova a dare a quel
+                    docente le prime o le ultime ore, ma se serve piazza
+                    l'ora altrove.
                   </p>
                   <div className="space-y-2 overflow-y-auto pr-2 flex-1">
                     {allStaff.map((staff) => {
@@ -10298,6 +10392,10 @@ export default function App() {
                         generationRules.teacherDaysOff[staff.id] || [];
                       const hoursOffArr =
                         (generationRules.teacherHoursOff || {})[staff.id] || [];
+                      const hourPref =
+                        (generationRules.teacherHourPreference || {})[
+                          staff.id
+                        ] || '';
                       const deptColor = getDeptColor(staff.subject);
                       const plannedHours = staffHoursPlanned[staff.id] || 0;
                       const maxDays = getMaxDaysOffForHours(plannedHours);
@@ -10404,6 +10502,32 @@ export default function App() {
                                 ⏰
                               </button>
                             </div>
+                          </div>
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className="text-[9px] text-slate-500 whitespace-nowrap">
+                              Preferisce
+                            </span>
+                            <select
+                              value={hourPref}
+                              onChange={(e) =>
+                                handleUpdateRules(
+                                  'teacherHourPreference',
+                                  e.target.value,
+                                  staff.id
+                                )
+                              }
+                              disabled={readOnlyMode}
+                              title="Preferenza morbida: l'algoritmo ci prova, ma se serve piazza l'ora altrove"
+                              className={`text-[9px] rounded border px-1 py-0.5 bg-white/90 ${
+                                hourPref
+                                  ? 'border-indigo-300 text-indigo-700 font-bold'
+                                  : 'border-slate-200 text-slate-500'
+                              } disabled:opacity-50`}
+                            >
+                              <option value="">nessuna preferenza</option>
+                              <option value="early">le prime ore</option>
+                              <option value="late">le ultime ore</option>
+                            </select>
                           </div>
                           {isHoursOpen && (
                             <div className="mt-2 pt-2 border-t border-white/70">

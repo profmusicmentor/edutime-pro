@@ -675,6 +675,11 @@ export const chapters: Chapter[] = [
         body: "Il tasto ⏰ accanto ai giorni apre una griglia giorno × ora: cliccando una cella dichiari che il docente in quell'ora non è a scuola. Serve per chi ha la cattedra in comune con un altro istituto — per esempio «il lunedì può esserci solo dopo le 11»: blocchi 1ª, 2ª e 3ª ora del lunedì e l'algoritmo userà solo le ore successive. Le ore bloccate non contano nel limite dei giorni liberi; se però le celle rimaste non bastano per le ore di cattedra, la scheda Conflitti lo segnala.",
       },
       {
+        title: '🕐 Preferenza oraria',
+        tag: 'desiderio, non vincolo',
+        body: "Il menu Preferisce accanto a ogni docente dice se vorrebbe le prime ore o le ultime. È una preferenza morbida: sposta l'inizio della sua giornata, ma se l'orario non regge in altro modo l'algoritmo piazza l'ora dove può, senza lasciarla fuori. Sulla scuola di esempio, con la metà dei docenti che chiede le prime ore e l'altra metà le ultime, la distanza fra i due gruppi è di circa un'ora e le ore piazzate restano le stesse. Se una preferenza va rispettata sempre — un docente che davvero non può esserci alla prima ora — non è questo il posto: si bloccano quelle ore con ⏰.",
+      },
+      {
         title: "🌴 Giorno libero d'ufficio",
         tag: 'settimana corta',
         body: (

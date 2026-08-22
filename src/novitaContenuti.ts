@@ -20,7 +20,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-08-21b';
+export const NOVITA_VERSIONE = '2026-08-22';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -32,6 +32,13 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-08-22',
+    data: '22 agosto 2026',
+    voci: [
+      'Preferenza oraria per docente: in Sezioni & Regole, nel riquadro "Indisponibilità", accanto a ogni docente c\'è il menu "Preferisce", con le prime ore o le ultime. È un desiderio, non un vincolo: l\'algoritmo prova a far cominciare lì la giornata di quel docente, ma se l\'orario non regge in altro modo piazza l\'ora dove può invece di lasciarla fuori. Per un vincolo vero restano le ore bloccate con ⏰.',
+    ],
+  },
   {
     versione: '2026-08-21b',
     data: '21 agosto 2026',

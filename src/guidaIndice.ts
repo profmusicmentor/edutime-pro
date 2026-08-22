@@ -177,6 +177,8 @@ const GRUPPI_SINONIMI: string[][] = [
   ['strumento', 'strumenti', 'musicale', 'musica', 'clarinetto', 'violino',
     'chitarra', 'pianoforte'],
   ['libero', 'liberi', 'indisponibilita', 'indisponibile', 'riposo'],
+  ['preferenza', 'preferenze', 'preferisce', 'prime', 'ultime', 'mattina',
+    'presto', 'tardi'],
   ['sostituzione', 'sostituzioni', 'sostituto', 'supplenza', 'supplenze',
     'supplente', 'assenza', 'assenze', 'assente', 'permesso', 'malattia',
     'sorveglianza', 'retribuita'],
