@@ -126,6 +126,12 @@ const DEFAULT_RULES: any = {
    */
   teacherHoursOff: {},
   /**
+   * Ore di disponibilità ("D") dichiarate a inizio anno: mappa id docente →
+   * elenco di chiavi "giorno_ora". Non vincolano il generatore, servono a
+   * marcarle nell'Orario Generale e a contarle per la segreteria.
+   */
+  teacherDisponibilita: {},
+  /**
    * Preferenza oraria del docente: 'early' per chi vorrebbe le prime ore,
    * 'late' per chi vorrebbe le ultime. Mappa id docente → preferenza; chi non
    * c'è dentro non ha preferenze ed è il comportamento di sempre.
@@ -1078,6 +1084,29 @@ const dailyCapFor = (rules: any, idealPerDay: any, teacherId: string) => {
 
 /** Chiave di una cella di indisponibilità oraria dentro teacherHoursOff. */
 const hourOffKey = (day: number, hour: number) => `${day}_${hour}`;
+
+/**
+ * Valore speciale del menu della cella nell'Orario Generale: invece di una
+ * classe segna l'ora come disponibilità (la "D" che le scuole assegnano a
+ * inizio anno sulle ore buca, da usare per le sostituzioni).
+ */
+const DISPONIBILITA_VALUE = '__D__';
+
+/**
+ * Ore di disponibilità dichiarate per un docente, dentro
+ * generationRules.teacherDisponibilita. Sono un'etichetta sull'orario, non
+ * un vincolo per il generatore: si mettono sulle ore buca che restano dopo
+ * la generazione, e servono a contare quante ne ha fatte ciascuno.
+ */
+const isDisponibilitaHour = (
+  rules: any,
+  teacherId: string,
+  day: number,
+  hour: number
+) =>
+  ((rules?.teacherDisponibilita || {})[teacherId] || []).includes(
+    hourOffKey(day, hour)
+  );
 
 /**
  * Il docente è indisponibile in questa cella? Vale sia per il giorno intero
@@ -2073,6 +2102,60 @@ const StaffOrderButtons = ({
   </div>
 );
 
+/**
+ * La giornata di un docente in una riga di caselle: ora per ora, con classe
+ * e laboratorio. Serve in Sostituzioni, dove prima di decidere chi copre
+ * bisogna vedere com'è fatta la giornata di chi manca e di chi si sposta.
+ */
+const GiornataDocente = ({
+  ore,
+  compatta,
+}: {
+  ore: any[];
+  compatta?: boolean;
+}) => (
+  <div className="flex flex-wrap gap-1">
+    {ore.map((o) => (
+      <div
+        key={o.hour}
+        title={
+          o.classId
+            ? `${o.label}: ${o.classId}, ${o.subject}${
+                o.room ? ` (${o.room})` : ''
+              }`
+            : o.disponibile
+            ? `${o.label}: ora di disponibilità (D)`
+            : o.bloccata
+            ? `${o.label}: ora non disponibile`
+            : `${o.label}: ora libera`
+        }
+        className={`rounded border text-center leading-tight ${
+          compatta ? 'px-1 py-0.5 min-w-[2.1rem]' : 'px-1.5 py-1 min-w-[2.8rem]'
+        } ${
+          o.classId
+            ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
+            : o.disponibile
+            ? 'bg-amber-50 border-amber-300 text-amber-800'
+            : o.bloccata
+            ? 'bg-rose-50 border-rose-200 text-rose-700'
+            : 'bg-slate-50 border-slate-200 text-slate-400'
+        }`}
+      >
+        <div className="text-[9px] font-semibold opacity-70">{o.label}</div>
+        <div className={`font-bold ${compatta ? 'text-[10px]' : 'text-xs'}`}>
+          {o.classId || (o.disponibile ? 'D' : o.bloccata ? '—' : '·')}
+        </div>
+        {!compatta && o.classId && (
+          <div className="text-[9px] font-medium opacity-80 truncate max-w-[5rem]">
+            {o.subject}
+            {isNamedRoom(o.room) ? ` · 📍${o.room}` : ''}
+          </div>
+        )}
+      </div>
+    ))}
+  </div>
+);
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('master-view');
   const [sectionsConfig, setSectionsConfig] = useState<any>(
@@ -2117,6 +2200,15 @@ export default function App() {
     INITIAL_AFTERNOON_HOURS
   );
   const [isFullWidth, setIsFullWidth] = useState(true);
+  /**
+   * Come sono ordinate le colonne delle classi in tutta l'app.
+   * 'anno': 1A 1B 1C 2A 2B... (storico). 'sezione': 1A 2A 3A 1B 2B 3B, che
+   * è come le tiene in testa chi lavora per corsi. È una preferenza di chi
+   * guarda, non un dato dell'istituto: sta nel browser, non nel cloud.
+   */
+  const [classOrderMode, setClassOrderMode] = useState<'anno' | 'sezione'>(
+    'anno'
+  );
   const [readOnlyMode, setReadOnlyMode] = useState(false);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [invitedCode] = useState<string | null>(() => codeFromUrl());
@@ -2216,6 +2308,15 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('eduTime_readOnlyMode', String(readOnlyMode));
   }, [readOnlyMode]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('eduTime_classOrderMode');
+    if (saved === 'sezione' || saved === 'anno') setClassOrderMode(saved);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('eduTime_classOrderMode', classOrderMode);
+  }, [classOrderMode]);
 
   // Ogni cella si apre in modalità normale: la compresenza si chiede ogni volta.
   useEffect(() => {
@@ -2397,6 +2498,16 @@ export default function App() {
                 safeHoursOff[k] = Array.isArray(v) ? v.map(String) : [];
               });
             }
+            // Ore di disponibilità ("D"): i file salvati prima non ce le
+            // hanno e partono vuote, come le ore di indisponibilità.
+            const safeDisponibilita: any = {};
+            if (rules.teacherDisponibilita) {
+              Object.keys(rules.teacherDisponibilita).forEach((k) => {
+                const v = rules.teacherDisponibilita[k];
+                if (Array.isArray(v) && v.length > 0)
+                  safeDisponibilita[k] = v.map(String);
+              });
+            }
             // Preferenza oraria per docente: i file salvati prima non ce
             // l'hanno, e i valori diversi da 'early'/'late' si scartano.
             const safeHourPreference: any = {};
@@ -2421,6 +2532,7 @@ export default function App() {
               teacherDaysOff: safeDaysOff,
               teacherHoursOff: safeHoursOff,
               teacherHourPreference: safeHourPreference,
+              teacherDisponibilita: safeDisponibilita,
             });
           }
           if (data.generateOptions) setGenerateOptions(data.generateOptions);
@@ -2691,10 +2803,16 @@ export default function App() {
       });
     });
     list.sort((a, b) =>
-      a.year !== b.year ? a.year - b.year : a.section.localeCompare(b.section)
+      classOrderMode === 'sezione'
+        ? a.section !== b.section
+          ? a.section.localeCompare(b.section)
+          : a.year - b.year
+        : a.year !== b.year
+        ? a.year - b.year
+        : a.section.localeCompare(b.section)
     );
     return list;
-  }, [sectionsConfig]);
+  }, [sectionsConfig, classOrderMode]);
 
   /** Griglia di una classe, cercata dalla sua sezione. */
   const getClassGrid = (classId: string) => {
@@ -4188,6 +4306,21 @@ export default function App() {
         room,
       });
     }
+    // Scrivere (o svuotare) la cella toglie la "D": in quell'ora il docente
+    // ha lezione, non è più a disposizione. Le regole si aggiornano qui e non
+    // in un secondo giro, altrimenti il salvataggio successivo rispedirebbe
+    // l'orario vecchio e la cella tornerebbe com'era.
+    let regoleAggiornate = generationRules;
+    if (isDisponibilitaHour(generationRules, teacherId, day, hour)) {
+      const mappa = { ...(generationRules.teacherDisponibilita || {}) };
+      const rimaste = (mappa[teacherId] || []).filter(
+        (k: string) => k !== hourOffKey(day, hour)
+      );
+      if (rimaste.length > 0) mappa[teacherId] = rimaste;
+      else delete mappa[teacherId];
+      regoleAggiornate = { ...generationRules, teacherDisponibilita: mappa };
+      setGenerationRules(regoleAggiornate);
+    }
     setTimetable(filtered);
     pushDataToCloud(
       filtered,
@@ -4197,7 +4330,53 @@ export default function App() {
       strumento,
       diurnalHours,
       afternoonHours,
-      generationRules,
+      regoleAggiornate,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses
+    );
+  };
+
+  /**
+   * Accende o spegne la "D" su una cella dell'Orario Generale. Le ore di
+   * disponibilità stanno nelle regole insieme ai giorni liberi, così vengono
+   * salvate e sincronizzate senza toccare la struttura dell'orario.
+   */
+  const handleToggleDisponibilita = (
+    teacherId: string,
+    day: number,
+    hour: number,
+    attiva: boolean,
+    timetableDaSalvare: any[] = timetable
+  ) => {
+    if (readOnlyMode) return;
+    const chiave = hourOffKey(day, hour);
+    const attuali: string[] =
+      (generationRules.teacherDisponibilita || {})[teacherId] || [];
+    const nuove = attiva
+      ? attuali.includes(chiave)
+        ? attuali
+        : [...attuali, chiave]
+      : attuali.filter((k) => k !== chiave);
+    const mappa = { ...(generationRules.teacherDisponibilita || {}) };
+    if (nuove.length > 0) mappa[teacherId] = nuove;
+    else delete mappa[teacherId];
+    const regoleAggiornate = {
+      ...generationRules,
+      teacherDisponibilita: mappa,
+    };
+    setGenerationRules(regoleAggiornate);
+    setTimetable(timetableDaSalvare);
+    pushDataToCloud(
+      timetableDaSalvare,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      regoleAggiornate,
       generateOptions,
       cellNotes,
       groupConstraints,
@@ -4213,6 +4392,21 @@ export default function App() {
     staffType: string
   ) => {
     if (readOnlyMode) return;
+    // La "D" non è una classe: libera la cella e ci lascia l'etichetta di
+    // disponibilità, che vive nelle regole e non nell'orario. Orario e
+    // regole si salvano insieme, in un solo giro.
+    if (newClassId === DISPONIBILITA_VALUE) {
+      const ripulito = timetable.filter(
+        (slot) =>
+          !(
+            slot.teacherId === teacherId &&
+            slot.day === day &&
+            slot.hour === hour
+          )
+      );
+      handleToggleDisponibilita(teacherId, day, hour, true, ripulito);
+      return;
+    }
     if (newClassId === '') {
       executeCellUpdate(teacherId, day, hour, newClassId, staffType);
       return;
@@ -4547,11 +4741,18 @@ export default function App() {
     if (!newRules.teacherHoursOff) newRules.teacherHoursOff = {};
     if (!newRules.teacherMaxGapHours) newRules.teacherMaxGapHours = {};
     if (!newRules.teacherHourPreference) newRules.teacherHourPreference = {};
+    if (!newRules.teacherDisponibilita) newRules.teacherDisponibilita = {};
     if (teacherId) {
       if (field === 'teacherDaysOff')
         newRules.teacherDaysOff[teacherId] = value;
       else if (field === 'teacherHoursOff')
         newRules.teacherHoursOff[teacherId] = value;
+      else if (field === 'teacherDisponibilita') {
+        const next = { ...newRules.teacherDisponibilita };
+        if (value.length > 0) next[teacherId] = value;
+        else delete next[teacherId];
+        newRules.teacherDisponibilita = next;
+      }
       else if (field === 'teacherHourPreference') {
         // Stringa vuota = nessuna preferenza: si toglie la voce invece di
         // salvare un valore che l'algoritmo dovrebbe poi ignorare.
@@ -5912,6 +6113,40 @@ export default function App() {
   };
 
   /**
+   * La giornata di un docente ora per ora: classe, materia e laboratorio
+   * dove ha lezione, casella vuota dove è libero, casella rossa dove è
+   * dichiarato non disponibile. È la fotografia che serve in Sostituzioni
+   * prima di decidere chi copre e chi si sposta.
+   */
+  const getGiornataDocente = (teacherId: string, day: number) => {
+    if (!teacherId || day < 0) return [];
+    return [...diurnalHours, ...afternoonHours]
+      .slice()
+      .sort((a, b) => a.index - b.index)
+      .map((h) => {
+        const slot = timetable.find(
+          (s) =>
+            s.teacherId === teacherId &&
+            s.day === day &&
+            s.hour === h.index &&
+            s.type !== 'compresenza'
+        );
+        return {
+          hour: h.index,
+          label: h.label,
+          classId: slot?.classId,
+          subject: slot?.subject,
+          room: slot?.room,
+          disponibile:
+            !slot &&
+            isDisponibilitaHour(generationRules, teacherId, day, h.index),
+          bloccata:
+            !slot && isTeacherOff(generationRules, teacherId, day, h.index),
+        };
+      });
+  };
+
+  /**
    * Per un'assenza di tipo assenza/permesso: le ore della cattedra del
    * docente in quel giorno, con stato di copertura (sostegno già presente,
    * già assegnato un sostituto, o da coprire) e candidati sostituti
@@ -6086,6 +6321,22 @@ export default function App() {
     });
     return counts;
   }, [substitutions]);
+
+  /**
+   * Ore di disponibilità ("D") dichiarate a settimana, docente per docente.
+   * È il monte ore che il docente mette a disposizione, non quello che ha
+   * davvero svolto: le ore svolte sono in paidSubstitutionHoursByTeacher.
+   */
+  const disponibilitaHoursByTeacher = useMemo(() => {
+    const counts: any = {};
+    Object.entries(generationRules.teacherDisponibilita || {}).forEach(
+      ([tid, chiavi]: any) => {
+        if (Array.isArray(chiavi) && chiavi.length > 0)
+          counts[tid] = chiavi.length;
+      }
+    );
+    return counts;
+  }, [generationRules.teacherDisponibilita]);
 
   const handleAddAbsence = (e: React.FormEvent) => {
     e.preventDefault();
@@ -7190,6 +7441,74 @@ export default function App() {
     printWindow.document.body.appendChild(script);
   };
 
+  /**
+   * Prospetto da mandare in segreteria: per ogni docente le ore di
+   * disponibilità dichiarate a settimana e le ore di supplenza retribuita
+   * davvero svolte, con il totale d'istituto in fondo. È il foglio che serve
+   * per far partire i pagamenti.
+   */
+  const handlePrintRiepilogoSegreteria = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      setPrintAlertOpen(true);
+      return;
+    }
+    const oggi = new Date().toLocaleDateString('it-IT');
+    const righe = teachers
+      .map((t) => ({
+        nome: t.name,
+        materia: t.subject,
+        disponibilita: disponibilitaHoursByTeacher[t.id] || 0,
+        svolte: paidSubstitutionHoursByTeacher[t.id] || 0,
+      }))
+      .filter((r) => r.disponibilita > 0 || r.svolte > 0)
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+    const totaleDisponibilita = righe.reduce(
+      (somma, r) => somma + r.disponibilita,
+      0
+    );
+    const totaleSvolte = righe.reduce((somma, r) => somma + r.svolte, 0);
+    const dateSostituzioni = substitutions
+      .filter((sub) => sub.paid && sub.date)
+      .map((sub) => sub.date)
+      .sort();
+    const periodo =
+      dateSostituzioni.length > 0
+        ? `dal ${dateSostituzioni[0]} al ${
+            dateSostituzioni[dateSostituzioni.length - 1]
+          }`
+        : 'nessuna supplenza retribuita registrata';
+
+    const css = `@page { size: A4 portrait; margin: 15mm; } body { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; font-size: 10pt; } h1 { font-size: 14pt; margin: 0 0 2mm 0; color: #1e3a8a; } p.sub { margin: 0 0 6mm 0; font-size: 9pt; color: #374151; } table { width: 100%; border-collapse: collapse; } th, td { border: 0.5pt solid #64748b; padding: 2mm; font-size: 9pt; } th { background: #e5e7eb; } td.num { text-align: center; font-weight: bold; } tr.totale td { background: #f1f5f9; font-weight: bold; } p.legend { margin-top: 6mm; font-size: 8pt; color: #374151; }`;
+
+    let html = `<html><head><title>Riepilogo ore di disponibilità e supplenze</title><style>${css}</style></head><body>`;
+    html += `<h1>Riepilogo ore di disponibilità e supplenze retribuite</h1>`;
+    html += `<p class="sub">Supplenze retribuite registrate: ${escapeXml(
+      periodo
+    )}. Prospetto generato il ${escapeXml(oggi)}.</p>`;
+    html += `<table><thead><tr><th>Docente</th><th>Materia</th><th style="width:70pt;">Ore D a settimana</th><th style="width:70pt;">Ore svolte</th></tr></thead><tbody>`;
+    if (righe.length === 0) {
+      html += `<tr><td colspan="4">Nessuna ora di disponibilità dichiarata e nessuna supplenza retribuita registrata.</td></tr>`;
+    }
+    righe.forEach((r) => {
+      html += `<tr><td>${escapeXml(r.nome)}</td><td>${escapeXml(
+        r.materia
+      )}</td><td class="num">${r.disponibilita}</td><td class="num">${
+        r.svolte
+      }</td></tr>`;
+    });
+    html += `<tr class="totale"><td colspan="2">Totale istituto</td><td class="num">${totaleDisponibilita}</td><td class="num">${totaleSvolte}</td></tr>`;
+    html += `</tbody></table>`;
+    html += `<p class="legend">«Ore D a settimana»: ore di disponibilità dichiarate nell'Orario Generale, ripetute ogni settimana. «Ore svolte»: ore di supplenza retribuita effettivamente assegnate in Sostituzioni. Prospetto di EduTime Pro.</p>`;
+    html += `</body></html>`;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    const script = printWindow.document.createElement('script');
+    script.innerHTML = 'window.onload = function() { window.print(); }';
+    printWindow.document.body.appendChild(script);
+  };
+
   if (!workspace) {
     return (
       <WorkspaceGate
@@ -7596,15 +7915,31 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-md flex-1 min-h-[400px] h-[65vh] resize-y relative flex flex-col">
+            {/*
+              Niente flex-1 qui: con flex-basis a zero dentro una colonna
+              senza altezza definita il riquadro cresceva fino a contenere
+              tutte le righe, quindi non scorreva mai al suo interno e
+              l'intestazione fissa non aveva un contenitore su cui restare
+              ferma. Con l'altezza a 65vh il riquadro scorre davvero e
+              l'intestazione tiene. resize-y continua a funzionare.
+            */}
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-md min-h-[400px] h-[65vh] resize-y relative flex flex-col">
               <div className="overflow-x-auto overflow-y-auto flex-1 h-full">
                 <table className="w-full text-left border-collapse table-fixed min-w-[1650px]">
-                  <thead className="sticky top-0 z-30">
+                  {/*
+                    Le due righe di intestazione restano attaccate in alto
+                    mentre si scorre l'elenco dei docenti. Il position:sticky
+                    sta sulle singole celle e non su <thead>/<tr>: su thead e
+                    tr lo ignorano parecchi browser da scrivania, ed è il
+                    motivo per cui l'intestazione teneva sul tablet e scappava
+                    via sul PC.
+                  */}
+                  <thead>
                     <tr className="bg-slate-100 border-b-2 border-slate-300 shadow-sm">
-                      <th className="p-3 w-80 min-w-[20rem] bg-slate-200 font-bold text-slate-800 border-r border-slate-300 sticky left-0 z-40 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
+                      <th className="p-3 h-12 w-80 min-w-[20rem] bg-slate-200 font-bold text-slate-800 border-r border-slate-300 sticky top-0 left-0 z-40 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
                         Docente / Materia
                       </th>
-                      <th className="p-3 w-16 bg-slate-200 font-bold text-center border-r-4 border-slate-300 text-indigo-800 sticky left-80 z-40 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
+                      <th className="p-3 h-12 w-16 bg-slate-200 font-bold text-center border-r-4 border-slate-300 text-indigo-800 sticky top-0 left-80 z-40 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
                         Ore
                       </th>
                       {DAYS_IN_USE.map((day, idx) => {
@@ -7617,7 +7952,7 @@ export default function App() {
                           <th
                             key={day}
                             colSpan={activeHours.length}
-                            className={`p-2 font-bold text-center text-slate-800 bg-slate-100 ${
+                            className={`p-2 h-12 font-bold text-center text-slate-800 bg-slate-100 sticky top-0 z-30 ${
                               !isLastDay ? 'border-r-4 border-slate-300' : ''
                             }`}
                           >
@@ -7626,11 +7961,11 @@ export default function App() {
                         );
                       })}
                     </tr>
-                    <tr className="bg-slate-50 text-[10px] border-b border-slate-200 sticky top-[48px] z-20">
-                      <th className="p-2 w-80 bg-slate-100 border-r border-slate-300 sticky left-0 z-30 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)] text-slate-500 font-medium">
+                    <tr className="bg-slate-50 text-[10px] border-b border-slate-200">
+                      <th className="p-2 w-80 bg-slate-100 border-r border-slate-300 sticky top-12 left-0 z-30 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)] text-slate-500 font-medium">
                         Dati Anagrafici
                       </th>
-                      <th className="p-2 w-16 bg-slate-100 border-r-4 border-slate-300 text-center text-slate-500 font-medium sticky left-80 z-30 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
+                      <th className="p-2 w-16 bg-slate-100 border-r-4 border-slate-300 text-center text-slate-500 font-medium sticky top-12 left-80 z-30 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
                         Tot.
                       </th>
                       {DAYS_IN_USE.map((day, dIdx) => {
@@ -7645,7 +7980,7 @@ export default function App() {
                           return (
                             <th
                               key={`${day}_h${hObj.index}`}
-                              className={`p-1 text-center font-semibold border-r border-slate-200 text-slate-600 truncate bg-slate-50 ${
+                              className={`p-1 text-center font-semibold border-r border-slate-200 text-slate-600 truncate bg-slate-50 sticky top-12 z-20 ${
                                 isLastHourOfDay
                                   ? 'border-r-4 border-slate-300'
                                   : 'border-r border-slate-200'
@@ -7813,6 +8148,14 @@ export default function App() {
                                       slot.day === dIdx &&
                                       slot.hour === currentHour
                                   );
+                                  const isDisponibilita =
+                                    !occupiedSlot &&
+                                    isDisponibilitaHour(
+                                      generationRules,
+                                      staff.id,
+                                      dIdx,
+                                      currentHour
+                                    );
                                   return (
                                     <td
                                       key={`${dIdx}_${currentHour}`}
@@ -7831,11 +8174,15 @@ export default function App() {
                                           title={
                                             occupiedSlot
                                               ? `Classe ${occupiedSlot.classId} — clicca per cambiarla`
+                                              : isDisponibilita
+                                              ? 'Ora di disponibilità (D): clicca per assegnare una classe o per toglierla'
                                               : 'Nessuna classe — clicca per assegnarla'
                                           }
                                           className={`w-full text-center text-xs font-bold rounded px-0.5 py-1 border truncate tracking-tight transition-all ${
                                             occupiedSlot
                                               ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                                              : isDisponibilita
+                                              ? 'bg-amber-100 text-amber-800 border-amber-300'
                                               : 'bg-white text-slate-400 border-slate-200'
                                           } ${
                                             readOnlyMode ? 'opacity-60' : ''
@@ -7843,12 +8190,16 @@ export default function App() {
                                         >
                                           {occupiedSlot
                                             ? occupiedSlot.classId
+                                            : isDisponibilita
+                                            ? 'D'
                                             : '-'}
                                         </div>
                                         <select
                                           value={
                                             occupiedSlot
                                               ? occupiedSlot.classId
+                                              : isDisponibilita
+                                              ? DISPONIBILITA_VALUE
                                               : ''
                                           }
                                           onChange={(e) =>
@@ -7870,6 +8221,14 @@ export default function App() {
                                           >
                                             -
                                           </option>
+                                          {staff.staffType === 'materia' && (
+                                            <option
+                                              value={DISPONIBILITA_VALUE}
+                                              className="bg-white text-amber-700"
+                                            >
+                                              D (disponibilità)
+                                            </option>
+                                          )}
                                           {classes.map((c) => (
                                             <option
                                               key={c.id}
@@ -9456,6 +9815,30 @@ export default function App() {
                     🎵 Strumento
                   </button>
                 </div>
+                <div className="inline-flex rounded-lg border border-slate-200 p-1 bg-slate-50 shrink-0">
+                  <button
+                    onClick={() => setClassOrderMode('anno')}
+                    title="Colonne delle classi in ordine di anno: 1A 1B 1C, poi 2A 2B 2C"
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                      classOrderMode === 'anno'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    1A 1B 1C
+                  </button>
+                  <button
+                    onClick={() => setClassOrderMode('sezione')}
+                    title="Colonne delle classi raggruppate per corso: 1A 2A 3A, poi 1B 2B 3B"
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                      classOrderMode === 'sezione'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    1A 2A 3A
+                  </button>
+                </div>
                 <button
                   onClick={() =>
                     handleSortStaffBySubject(
@@ -9477,26 +9860,39 @@ export default function App() {
                 </button>
               </div>
             </div>
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-md flex-1 min-h-[400px] h-[65vh] resize-y relative flex flex-col">
+            {/*
+              Niente flex-1 qui: con flex-basis a zero dentro una colonna
+              senza altezza definita il riquadro cresceva fino a contenere
+              tutte le righe, quindi non scorreva mai al suo interno e
+              l'intestazione fissa non aveva un contenitore su cui restare
+              ferma. Con l'altezza a 65vh il riquadro scorre davvero e
+              l'intestazione tiene. resize-y continua a funzionare.
+            */}
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-md min-h-[400px] h-[65vh] resize-y relative flex flex-col">
               <div className="overflow-x-auto overflow-y-auto flex-1 h-full">
                 {cattedreSubTab === 'diurne' && (
                   <table className="w-full text-left border-collapse min-w-[1200px]">
-                    <thead className="sticky top-0 bg-slate-100 z-20 border-b border-slate-200 shadow-sm">
+                    {/*
+                      Sticky sulle celle e non su <thead>: vedi la nota nella
+                      tabella dell'Orario Generale. Così la riga con le classi
+                      resta in alto anche su PC mentre si assegnano le ore.
+                    */}
+                    <thead className="bg-slate-100 border-b border-slate-200 shadow-sm">
                       <tr>
-                        <th className="p-3 w-64 bg-slate-200 font-bold text-slate-800 border-r border-slate-300 sticky left-0 z-30 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
+                        <th className="p-3 w-64 bg-slate-200 font-bold text-slate-800 border-r border-slate-300 sticky top-0 left-0 z-30 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
                           Docente
                         </th>
                         <th
-                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700"
+                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700 sticky top-0 z-20"
                           title="Preferenza 2 ore consecutive"
                         >
                           2h
                         </th>
-                        <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700">
+                        <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700 sticky top-0 z-20">
                           Totale
                         </th>
                         <th
-                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-amber-700"
+                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-amber-700 sticky top-0 z-20"
                           title="Disponibile per supplenze retribuite nell'ora buca"
                         >
                           🩹
@@ -9504,12 +9900,12 @@ export default function App() {
                         {classes.map((c) => (
                           <th
                             key={c.id}
-                            className="p-2 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-slate-600"
+                            className="p-2 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-slate-600 sticky top-0 z-20"
                           >
                             {c.id}
                           </th>
                         ))}
-                        <th className="p-3 w-16 bg-slate-100"></th>
+                        <th className="p-3 w-16 bg-slate-100 sticky top-0 z-20"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-sm">
@@ -9671,29 +10067,34 @@ export default function App() {
                 )}
                 {cattedreSubTab === 'sostegno' && (
                   <table className="w-full text-left border-collapse min-w-[1200px]">
-                    <thead className="sticky top-0 bg-slate-100 z-20 border-b border-slate-200 shadow-sm">
+                    {/*
+                      Sticky sulle celle e non su <thead>: vedi la nota nella
+                      tabella dell'Orario Generale. Così la riga con le classi
+                      resta in alto anche su PC mentre si assegnano le ore.
+                    */}
+                    <thead className="bg-slate-100 border-b border-slate-200 shadow-sm">
                       <tr>
-                        <th className="p-3 w-64 bg-slate-200 font-bold text-slate-800 border-r border-slate-300 sticky left-0 z-30 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
+                        <th className="p-3 w-64 bg-slate-200 font-bold text-slate-800 border-r border-slate-300 sticky top-0 left-0 z-30 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
                           Docente Sostegno
                         </th>
                         <th
-                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700"
+                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700 sticky top-0 z-20"
                           title="Preferenza 2 ore consecutive"
                         >
                           2h
                         </th>
-                        <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700">
+                        <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700 sticky top-0 z-20">
                           Totale
                         </th>
                         {classes.map((c) => (
                           <th
                             key={c.id}
-                            className="p-2 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-slate-600"
+                            className="p-2 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-slate-600 sticky top-0 z-20"
                           >
                             {c.id}
                           </th>
                         ))}
-                        <th className="p-3 w-16 bg-slate-100"></th>
+                        <th className="p-3 w-16 bg-slate-100 sticky top-0 z-20"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-sm">
@@ -9812,29 +10213,34 @@ export default function App() {
                 )}
                 {cattedreSubTab === 'strumento' && (
                   <table className="w-full text-left border-collapse min-w-[1200px]">
-                    <thead className="sticky top-0 bg-slate-100 z-20 border-b border-slate-200 shadow-sm">
+                    {/*
+                      Sticky sulle celle e non su <thead>: vedi la nota nella
+                      tabella dell'Orario Generale. Così la riga con le classi
+                      resta in alto anche su PC mentre si assegnano le ore.
+                    */}
+                    <thead className="bg-slate-100 border-b border-slate-200 shadow-sm">
                       <tr>
-                        <th className="p-3 w-64 bg-slate-200 font-bold text-slate-800 border-r border-slate-300 sticky left-0 z-30 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
+                        <th className="p-3 w-64 bg-slate-200 font-bold text-slate-800 border-r border-slate-300 sticky top-0 left-0 z-30 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
                           Docente Strumento
                         </th>
                         <th
-                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700"
+                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700 sticky top-0 z-20"
                           title="Preferenza 2 ore consecutive"
                         >
                           2h
                         </th>
-                        <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700">
+                        <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700 sticky top-0 z-20">
                           Totale
                         </th>
                         {classes.map((c) => (
                           <th
                             key={c.id}
-                            className="p-2 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-slate-600"
+                            className="p-2 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-slate-600 sticky top-0 z-20"
                           >
                             {c.id}
                           </th>
                         ))}
-                        <th className="p-3 w-16 bg-slate-100"></th>
+                        <th className="p-3 w-16 bg-slate-100 sticky top-0 z-20"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-sm">
@@ -11928,6 +12334,22 @@ export default function App() {
                           </button>
                         </div>
 
+                        {!isClassBased && (
+                          <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                              La giornata di {teacher?.name || absence.teacherId}
+                              {', '}
+                              {DAYS[getDayIndexFromDate(absence.date)] || ''}
+                            </p>
+                            <GiornataDocente
+                              ore={getGiornataDocente(
+                                absence.teacherId,
+                                getDayIndexFromDate(absence.date)
+                              )}
+                            />
+                          </div>
+                        )}
+
                         {isClassBased ? (
                           <p className="text-xs text-slate-600 mt-3 bg-sky-50 border border-sky-100 rounded-lg p-2">
                             Nessuna supplenza da cercare: la classe{' '}
@@ -12134,8 +12556,11 @@ export default function App() {
                                   )}
                                   <div className="flex flex-col gap-1.5">
                                     {anticipoCandidati.map((c: any) => (
-                                      <button
+                                      <div
                                         key={`${c.teacherId}_${c.fromHour}`}
+                                        className="space-y-1"
+                                      >
+                                      <button
                                         onClick={() =>
                                           handleConfirmAnticipo(
                                             absence,
@@ -12183,6 +12608,25 @@ export default function App() {
                                               }ª resta scoperta, la classe non esce.`}
                                         </span>
                                       </button>
+                                      {/*
+                                        La giornata della collega che si
+                                        sposta, sotto la sua proposta: senza
+                                        non si capisce se lo spostamento le
+                                        lascia un buco o le allunga la mattina.
+                                      */}
+                                      <div className="pl-1">
+                                        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                                          La giornata di {c.name}
+                                        </p>
+                                        <GiornataDocente
+                                          compatta
+                                          ore={getGiornataDocente(
+                                            c.teacherId,
+                                            s.day
+                                          )}
+                                        />
+                                      </div>
+                                      </div>
                                     ))}
                                   </div>
                                   <button
@@ -12205,17 +12649,44 @@ export default function App() {
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <h2 className="text-lg font-bold text-slate-800 mb-4">
-                💰 Ore di supplenza retribuita per docente
-              </h2>
-              {Object.keys(paidSubstitutionHoursByTeacher).length === 0 ? (
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">
+                    💰 Ore di disponibilità e supplenze per docente
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Le ore «D» si segnano nell'Orario Generale, scegliendo «D
+                    — disponibilità» al posto della classe in un'ora buca.
+                  </p>
+                </div>
+                <button
+                  onClick={handlePrintRiepilogoSegreteria}
+                  title="Stampa o salva in PDF il prospetto da mandare in segreteria"
+                  className="shrink-0 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  🖨️ Prospetto per la segreteria
+                </button>
+              </div>
+              {Object.keys(paidSubstitutionHoursByTeacher).length === 0 &&
+              Object.keys(disponibilitaHoursByTeacher).length === 0 ? (
                 <p className="text-xs text-slate-400 italic">
-                  Nessuna supplenza retribuita registrata finora.
+                  Nessuna ora di disponibilità dichiarata e nessuna supplenza
+                  retribuita registrata finora.
                 </p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {Object.entries(paidSubstitutionHoursByTeacher).map(
-                    ([tid, count]: any) => (
+                  {Array.from(
+                    new Set([
+                      ...Object.keys(disponibilitaHoursByTeacher),
+                      ...Object.keys(paidSubstitutionHoursByTeacher),
+                    ])
+                  )
+                    .sort((a, b) =>
+                      (teachers.find((t) => t.id === a)?.name || a).localeCompare(
+                        teachers.find((t) => t.id === b)?.name || b
+                      )
+                    )
+                    .map((tid) => (
                       <div
                         key={tid}
                         className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-center"
@@ -12223,12 +12694,28 @@ export default function App() {
                         <div className="text-xs font-bold text-slate-700">
                           {teachers.find((t) => t.id === tid)?.name || tid}
                         </div>
-                        <div className="text-lg font-black text-indigo-600">
-                          {count}h
+                        <div className="flex items-baseline justify-center gap-3 mt-1">
+                          <span
+                            className="text-lg font-black text-amber-600"
+                            title="Ore di disponibilità dichiarate a settimana"
+                          >
+                            {disponibilitaHoursByTeacher[tid] || 0}
+                            <span className="text-[10px] font-bold ml-0.5">
+                              D
+                            </span>
+                          </span>
+                          <span
+                            className="text-lg font-black text-indigo-600"
+                            title="Ore di supplenza retribuita svolte"
+                          >
+                            {paidSubstitutionHoursByTeacher[tid] || 0}
+                            <span className="text-[10px] font-bold ml-0.5">
+                              h
+                            </span>
+                          </span>
                         </div>
                       </div>
-                    )
-                  )}
+                    ))}
                 </div>
               )}
             </div>

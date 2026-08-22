@@ -7,10 +7,12 @@
  * volte), così due segnalazioni diverse non si sovrascrivono a vicenda
  * anche se arrivano dalla stessa persona.
  *
- * Il campo esca antispam non fa più buttare via il messaggio: lo segna
- * come STATO "sospetto" invece di "nuovo". La compilazione automatica del
- * browser riempie anche gli input nascosti, e con lo scarto in silenzio le
- * segnalazioni vere sparivano mentre all'utente compariva «ricevuto».
+ * Il campo esca antispam da solo non basta più a marcare il messaggio come
+ * "sospetto". La compilazione automatica del browser e i gestori di password
+ * riempiono anche gli input nascosti: una segnalazione vera e dettagliata è
+ * finita fuori dalla coda per questo motivo, e nessuno l'ha letta per giorni.
+ * Ora serve anche la fretta tipica del bot (form compilato in meno di
+ * SOGLIA_BOT_MS): una persona che scrive davvero ci mette molto di più.
  */
 
 export const config = { runtime: 'edge' };
@@ -19,6 +21,12 @@ const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const LIST_ID = process.env.BREVO_FEEDBACK_LIST_ID;
 
 const emailValida = (valore: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valore);
+
+/**
+ * Sotto questa soglia il modulo è stato compilato troppo in fretta perché
+ * dietro ci sia una persona che scrive una segnalazione.
+ */
+const SOGLIA_BOT_MS = 2000;
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
@@ -34,6 +42,7 @@ export default async function handler(request: Request): Promise<Response> {
     email?: string;
     pagina?: string;
     honeypot?: string;
+    msDaApertura?: number;
   };
   try {
     body = await request.json();
@@ -41,10 +50,16 @@ export default async function handler(request: Request): Promise<Response> {
     return new Response('JSON non valido', { status: 400 });
   }
 
-  // Campo esca compilato: probabile bot, ma può essere anche la
-  // compilazione automatica del browser di una persona vera. Il messaggio
-  // si salva lo stesso, fuori dalla coda delle segnalazioni da leggere.
-  const sospetto = Boolean(body.honeypot);
+  // Campo esca compilato: da solo non decide niente, perché lo riempiono
+  // anche l'autofill del browser e i gestori di password di persone vere.
+  // Serve anche che il modulo sia stato spedito in un lampo. Le versioni
+  // vecchie dell'app non mandano msDaApertura: in quel caso il messaggio
+  // resta nella coda normale, meglio una segnalazione di spam in più che
+  // una vera persa.
+  const msDaApertura = Number(body.msDaApertura);
+  const troppoVeloce =
+    Number.isFinite(msDaApertura) && msDaApertura >= 0 && msDaApertura < SOGLIA_BOT_MS;
+  const sospetto = Boolean(body.honeypot) && troppoVeloce;
 
   const message = (body.message ?? '').trim().slice(0, 4000);
   const email = (body.email ?? '').trim().slice(0, 200);

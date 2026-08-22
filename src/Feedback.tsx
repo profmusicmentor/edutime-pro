@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 
 /**
  * Pulsante «Segnala un bug o un suggerimento».
@@ -16,6 +16,17 @@ export default function Feedback() {
   const [email, setEmail] = useState('');
   const [tranello, setTranello] = useState('');
   const [stato, setStato] = useState<Stato>('idle');
+  /**
+   * Istante in cui il modulo si è aperto. Il server lo usa insieme al campo
+   * esca: solo un invio in un lampo tradisce il bot, perché l'autofill del
+   * browser riempie l'esca anche a chi sta scrivendo davvero.
+   */
+  const apertoDa = useRef(0);
+
+  const apri = () => {
+    apertoDa.current = Date.now();
+    setAperto(true);
+  };
 
   const chiudi = () => {
     setAperto(false);
@@ -38,6 +49,7 @@ export default function Feedback() {
           email: email.trim(),
           pagina: window.location.pathname,
           honeypot: tranello,
+          msDaApertura: apertoDa.current ? Date.now() - apertoDa.current : -1,
         }),
       });
       if (!risposta.ok) throw new Error('invio fallito');
@@ -51,7 +63,7 @@ export default function Feedback() {
     <>
       <button
         type="button"
-        onClick={() => setAperto(true)}
+        onClick={apri}
         className="underline hover:text-slate-700 cursor-pointer"
       >
         🐞 Segnala un bug o un suggerimento
