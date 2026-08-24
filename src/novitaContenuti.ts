@@ -20,7 +20,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-08-22b';
+export const NOVITA_VERSIONE = '2026-08-24';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -32,6 +32,13 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-08-24',
+    data: '24 agosto 2026',
+    voci: [
+      'Indisponibilità anche al pomeriggio: nel riquadro Indisponibilità, il tasto con l\'orologio apriva una griglia con le sole ore del mattino. Chi ha impostato ore pomeridiane non riusciva a bloccarle e non poteva dire, per esempio, che un docente non c\'è mai all\'ultima ora del pomeriggio. Ora la griglia mostra le stesse ore dell\'orario, mattino e pomeriggio.',
+    ],
+  },
   {
     versione: '2026-08-22b',
     data: '22 agosto 2026',

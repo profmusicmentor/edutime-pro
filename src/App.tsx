@@ -10807,10 +10807,14 @@ export default function App() {
                       const maxDays = getMaxDaysOffForHours(plannedHours);
                       const isLimitReached = daysOffArr.length >= maxDays;
                       const isHoursOpen = hoursOffEditorId === staff.id;
+                      // Le stesse righe della griglia oraria: se la scuola ha
+                      // ore al pomeriggio devono poter essere bloccate anche
+                      // dai docenti di materia, non solo da quelli di
+                      // strumento.
                       const staffHoursList =
                         staff.staffType === 'strumento'
                           ? afternoonHours
-                          : diurnalHours;
+                          : gridHourRows;
                       const toggleHour = (day: number, hour: number) => {
                         if (readOnlyMode) return;
                         const key = hourOffKey(day, hour);
