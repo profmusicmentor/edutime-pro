@@ -4,6 +4,17 @@ import WorkspaceGate from './WorkspaceGate';
 import SostieniProgetto from './SostieniProgetto';
 import Feedback from './Feedback';
 import Novita, { novitaAllAvvio, segnaNovitaViste } from './Novita';
+import Assemblee, {
+  DEFAULT_ASSEMBLEE_CONFIG,
+  normalizeAssemblee,
+  normalizeAssembleeConfig,
+  normalizePersonaleExtra,
+} from './Assemblee';
+import type {
+  Assemblea,
+  AssembleeConfig,
+  PersonaExtra,
+} from './Assemblee';
 import type { ModoNovita } from './Novita';
 import {
   buildXlsx,
@@ -2178,6 +2189,12 @@ export default function App() {
   const [sedi, setSedi] = useState<any[]>(DEFAULT_SEDI);
   const [absences, setAbsences] = useState<any[]>([]);
   const [substitutions, setSubstitutions] = useState<any[]>([]);
+  /** Assemblee sindacali, il personale fuori orario e i due limiti. */
+  const [assemblee, setAssemblee] = useState<Assemblea[]>([]);
+  const [personaleExtra, setPersonaleExtra] = useState<PersonaExtra[]>([]);
+  const [assembleeConfig, setAssembleeConfig] = useState<AssembleeConfig>(
+    DEFAULT_ASSEMBLEE_CONFIG
+  );
   /** Ora per cui è aperto l'elenco di chi può anticipare la lezione. */
   const [anticipoPanel, setAnticipoPanel] = useState<any>(null);
   const [substitutionsDate, setSubstitutionsDate] = useState<string>(() =>
@@ -2460,6 +2477,9 @@ export default function App() {
     sedi: DEFAULT_SEDI,
     absences: [],
     substitutions: [],
+    assemblee: [],
+    personaleExtra: [],
+    assembleeConfig: DEFAULT_ASSEMBLEE_CONFIG,
     lastUpdatedAt: new Date().toISOString(),
   });
 
@@ -2553,6 +2573,11 @@ export default function App() {
           if (data.sedi) setSedi(data.sedi);
           if (data.absences) setAbsences(data.absences);
           if (data.substitutions) setSubstitutions(data.substitutions);
+          // I documenti salvati prima delle assemblee sindacali non hanno
+          // questi campi: restano vuoti e la sezione parte pulita.
+          setAssemblee(normalizeAssemblee(data.assemblee));
+          setPersonaleExtra(normalizePersonaleExtra(data.personaleExtra));
+          setAssembleeConfig(normalizeAssembleeConfig(data.assembleeConfig));
   };
 
   /** Riapre l'ultimo spazio di lavoro usato (o quello del link di invito). */
@@ -2647,7 +2672,10 @@ export default function App() {
     newRooms?: any[],
     newSedi?: any[],
     newAbsences?: any[],
-    newSubstitutions?: any[]
+    newSubstitutions?: any[],
+    newAssemblee?: Assemblea[],
+    newPersonaleExtra?: PersonaExtra[],
+    newAssembleeConfig?: AssembleeConfig
   ) => {
     if (!workspace || isInitialLoad) return;
     await persistWorkspace(
@@ -2675,6 +2703,13 @@ export default function App() {
         absences: newAbsences !== undefined ? newAbsences : absences,
         substitutions:
           newSubstitutions !== undefined ? newSubstitutions : substitutions,
+        assemblee: newAssemblee !== undefined ? newAssemblee : assemblee,
+        personaleExtra:
+          newPersonaleExtra !== undefined ? newPersonaleExtra : personaleExtra,
+        assembleeConfig:
+          newAssembleeConfig !== undefined
+            ? newAssembleeConfig
+            : assembleeConfig,
         lastUpdatedAt: new Date().toISOString(),
       },
       setCloudStatus
@@ -2701,6 +2736,9 @@ export default function App() {
       sedi,
       absences,
       substitutions,
+      assemblee,
+      personaleExtra,
+      assembleeConfig,
       lastUpdatedAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -6093,6 +6131,47 @@ export default function App() {
   };
 
   /**
+   * Salva le assemblee sindacali. In modalità locale il documento si
+   * riscrive per intero, quindi si rimanda tutto lo stato corrente e si
+   * cambiano solo i campi passati.
+   */
+  const handleAssembleeChange = (next: {
+    assemblee?: Assemblea[];
+    personale?: PersonaExtra[];
+    config?: AssembleeConfig;
+  }) => {
+    const nuoveAssemblee =
+      next.assemblee !== undefined ? next.assemblee : assemblee;
+    const nuovoPersonale =
+      next.personale !== undefined ? next.personale : personaleExtra;
+    const nuovaConfig = next.config !== undefined ? next.config : assembleeConfig;
+    if (next.assemblee !== undefined) setAssemblee(nuoveAssemblee);
+    if (next.personale !== undefined) setPersonaleExtra(nuovoPersonale);
+    if (next.config !== undefined) setAssembleeConfig(nuovaConfig);
+    pushDataToCloud(
+      timetable,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses,
+      rooms,
+      sedi,
+      absences,
+      substitutions,
+      nuoveAssemblee,
+      nuovoPersonale,
+      nuovaConfig
+    );
+  };
+
+  /**
    * Chi è già occupato in quell'ora: le lezioni dell'orario, ma anche le
    * supplenze e gli anticipi già decisi per quella data. Senza la seconda
    * metà lo stesso docente poteva essere proposto due volte nella stessa
@@ -7858,6 +7937,16 @@ export default function App() {
                   {absences.length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveTab('assemblee')}
+              className={`py-4 px-1 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
+                activeTab === 'assemblee'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              🗳️ Assemblee
             </button>
           </nav>
         </div>
@@ -12724,6 +12813,19 @@ export default function App() {
               )}
             </div>
           </div>
+        )}
+
+        {activeTab === 'assemblee' && (
+          <Assemblee
+            assemblee={assemblee}
+            personale={personaleExtra}
+            config={assembleeConfig}
+            staff={allStaff}
+            timetable={timetable}
+            hoursMap={mergedHoursMap}
+            days={DAYS}
+            onChange={handleAssembleeChange}
+          />
         )}
       </main>
       {editingCell && (

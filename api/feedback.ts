@@ -13,6 +13,10 @@
  * finita fuori dalla coda per questo motivo, e nessuno l'ha letta per giorni.
  * Ora serve anche la fretta tipica del bot (form compilato in meno di
  * SOGLIA_BOT_MS): una persona che scrive davvero ci mette molto di più.
+ *
+ * Lo screenshot non può stare dentro un attributo Brevo, che tiene solo
+ * testo: arriva già ridotto e in base64 dal browser e viene spedito come
+ * allegato di una mail di avviso. Nel contatto resta scritto che c'è.
  */
 
 export const config = { runtime: 'edge' };
@@ -27,6 +31,54 @@ const emailValida = (valore: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valore
  * dietro ci sia una persona che scrive una segnalazione.
  */
 const SOGLIA_BOT_MS = 2000;
+
+/** Dove arriva l'avviso con lo screenshot allegato. */
+const NOTIFICA_A = process.env.FEEDBACK_NOTIFY_EMAIL || 'walter@biscottodigitale.com';
+
+/** Tetto dell'allegato in base64: oltre, Vercel rifiuta già il corpo. */
+const MAX_SCREENSHOT_B64 = 3_500_000;
+
+const escapeHtml = (valore: string) =>
+  valore
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+/**
+ * Manda a Walter la segnalazione con lo screenshot allegato. Se fallisce non
+ * si blocca niente: il contatto Brevo è già stato creato e il messaggio non
+ * va perso.
+ */
+const inviaScreenshot = async (
+  message: string,
+  email: string,
+  pagina: string,
+  nomeFile: string,
+  contenutoBase64: string
+) => {
+  try {
+    await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': BREVO_API_KEY as string,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: 'EduTime Pro', email: NOTIFICA_A },
+        to: [{ email: NOTIFICA_A }],
+        subject: 'EduTime Pro: segnalazione con screenshot',
+        htmlContent:
+          `<p><strong>Pagina:</strong> ${escapeHtml(pagina || '/')}</p>` +
+          `<p><strong>Email per la risposta:</strong> ${escapeHtml(email || 'non lasciata')}</p>` +
+          `<p><strong>Messaggio:</strong></p><p>${escapeHtml(message).replace(/\n/g, '<br>')}</p>` +
+          `<p>Lo screenshot è in allegato.</p>`,
+        attachment: [{ content: contenutoBase64, name: nomeFile }],
+      }),
+    });
+  } catch {
+    /* l'avviso è un di più: la segnalazione è già salvata su Brevo */
+  }
+};
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
@@ -43,6 +95,7 @@ export default async function handler(request: Request): Promise<Response> {
     pagina?: string;
     honeypot?: string;
     msDaApertura?: number;
+    screenshot?: { name?: string; data?: string };
   };
   try {
     body = await request.json();
@@ -60,6 +113,19 @@ export default async function handler(request: Request): Promise<Response> {
   const troppoVeloce =
     Number.isFinite(msDaApertura) && msDaApertura >= 0 && msDaApertura < SOGLIA_BOT_MS;
   const sospetto = Boolean(body.honeypot) && troppoVeloce;
+
+  // Lo screenshot arriva già ridotto e in JPEG dal browser. Qui si controlla
+  // solo che sia base64 e che non sia troppo grosso per l'invio.
+  const screenshotB64 = String(body.screenshot?.data ?? '').trim();
+  const screenshotValido =
+    screenshotB64.length > 0 &&
+    screenshotB64.length <= MAX_SCREENSHOT_B64 &&
+    /^[A-Za-z0-9+/=]+$/.test(screenshotB64);
+  const screenshotNome = screenshotValido
+    ? String(body.screenshot?.name || 'screenshot.jpg')
+        .replace(/[^A-Za-z0-9._-]/g, '_')
+        .slice(0, 80)
+    : '';
 
   const message = (body.message ?? '').trim().slice(0, 4000);
   const email = (body.email ?? '').trim().slice(0, 200);
@@ -86,7 +152,9 @@ export default async function handler(request: Request): Promise<Response> {
       email: emailSintetica,
       listIds: [Number(LIST_ID)],
       attributes: {
-        MESSAGGIO: message,
+        MESSAGGIO: screenshotValido
+          ? `${message}\n\n[Screenshot allegato: inviato per email a ${NOTIFICA_A}]`
+          : message,
         EMAIL_RISPOSTA: email,
         PAGINA: pagina,
         STATO: sospetto ? 'sospetto' : 'nuovo',
@@ -96,6 +164,16 @@ export default async function handler(request: Request): Promise<Response> {
 
   if (!risposta.ok) {
     return new Response('Errore invio', { status: 502 });
+  }
+
+  if (screenshotValido && !sospetto) {
+    await inviaScreenshot(
+      message,
+      email,
+      pagina,
+      screenshotNome,
+      screenshotB64
+    );
   }
 
   return new Response(null, { status: 204 });

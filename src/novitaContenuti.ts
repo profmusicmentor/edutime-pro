@@ -20,7 +20,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-08-24';
+export const NOVITA_VERSIONE = '2026-08-25';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -32,6 +32,14 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-08-25',
+    data: '25 agosto 2026',
+    voci: [
+      'Assemblee sindacali: c\'è una scheda nuova in alto, «Assemblee». Si registra l\'assemblea con data e orario, si spuntano le persone che aderiscono e le ore si contano da sole, prese dall\'orario di quel giorno. L\'app avvisa in rosso quando qualcuno supera il tetto di ore dell\'anno o il numero di assemblee nello stesso mese: i due limiti si impostano in alto e partono da 10 ore e 2 assemblee. Il prospetto si scarica in Excel per la segreteria. Per chi non è nell\'orario dell\'app (infanzia, primaria, personale ATA) c\'è la scheda «Personale fuori orario», dove si scrive una fascia di servizio per ogni giorno: da lì in poi il conteggio è automatico anche per loro.',
+      'Screenshot nelle segnalazioni: nel modulo «Segnala un bug o un suggerimento» ora si può allegare un\'immagine, scegliendo il file oppure incollandola con Ctrl+V (Cmd+V sul Mac). Prima si poteva solo descrivere il problema a parole.',
+    ],
+  },
   {
     versione: '2026-08-24',
     data: '24 agosto 2026',
@@ -70,16 +78,6 @@ export const NOVITA: VoceNovita[] = [
     data: '21 agosto 2026',
     voci: [
       'Segnalazioni sistemate: il filtro antispam del modulo "Segnala un bug o un suggerimento" scartava per errore qualche messaggio vero, che quindi non mi arrivava anche se l\'app rispondeva "ricevuto". Ora non succede più. Se mi hai scritto nei giorni scorsi e non ti ho risposto, rimandamelo: non l\'ho letto.',
-    ],
-  },
-  {
-    versione: '2026-08-20b',
-    data: '20 agosto 2026',
-    voci: [
-      'Compresenze automatiche: nel Registro Cattedre, nel riquadro "Compresenze", si dice chi affianca il titolare, in quale classe, per quante ore e su quale materia. Da lì le piazza l\'Auto-Genera Orario, oppure il pulsante "Allinea Compresenze" se non si vuole rifare tutto l\'orario.',
-      'Ore diverse da un giorno all\'altro: in Impostazioni → Modelli orario ogni giorno può avere il suo numero di ore (per esempio 5 il lunedì e 9 il martedì con il rientro). Lasciando i campi vuoti resta il valore unico di prima.',
-      'Compresenza a mano: nella cella dell\'orario, spuntando "in compresenza" prima di scegliere il secondo docente, lo si affianca al titolare senza sostituirlo. Serve per i casi singoli; per quelle fisse di ogni settimana conviene il riquadro del Registro Cattedre.',
-      'Questo pannello: da adesso, a ogni aggiornamento dell\'app, all\'apertura compare l\'elenco delle novità.',
     ],
   },
 ];
