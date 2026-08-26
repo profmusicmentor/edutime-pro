@@ -20,6 +20,38 @@ export interface Workspace {
   label: string;
 }
 
+/**
+ * Elenco dei campi che le regole di sicurezza Firestore accettano nel
+ * documento di una scuola. Va tenuto uguale a quello in `firestore.rules`:
+ * se l'app manda un campo che le regole non prevedono, Firestore rifiuta
+ * l'intero salvataggio con «Missing or insufficient permissions» e la scuola
+ * si ritrova con il badge ❌ ERRORE e nessun dato salvato.
+ */
+export const CLOUD_FIELDS = [
+  'timetable',
+  'teachers',
+  'sostegno',
+  'sectionsConfig',
+  'generationRules',
+  'generateOptions',
+  'strumento',
+  'diurnalHours',
+  'afternoonHours',
+  'cellNotes',
+  'groupConstraints',
+  'mixedClasses',
+  'rooms',
+  'modelGrids',
+  'sedi',
+  'absences',
+  'substitutions',
+  'assemblee',
+  'personaleExtra',
+  'assembleeConfig',
+  'lastUpdatedAt',
+  'lastUpdatedBy',
+] as const;
+
 export type CloudStatus =
   | 'connessione'
   | 'sincronizzato'
@@ -168,6 +200,28 @@ const writeLocal = (code: string, data: any) => {
   localStorage.setItem(localKey(code), JSON.stringify(data));
 };
 
+/**
+ * Toglie dai dati i valori `undefined`, a qualunque profondità.
+ *
+ * Serve perché Firestore rifiuta l'intero salvataggio se trova un campo
+ * `undefined` da qualche parte (per esempio la sede di una sezione che non ne
+ * ha una): un dettaglio invisibile in un angolo del documento faceva fallire
+ * il salvataggio di tutta la scuola. In locale non cambia niente, perché
+ * `JSON.stringify` quei campi li scartava già.
+ */
+export const stripUndefined = (value: any): any => {
+  if (Array.isArray(value)) return value.map(stripUndefined);
+  if (value && typeof value === 'object' && !(value instanceof Date)) {
+    const out: any = {};
+    Object.entries(value).forEach(([k, v]) => {
+      if (v === undefined) return;
+      out[k] = stripUndefined(v);
+    });
+    return out;
+  }
+  return value;
+};
+
 let cloudPromise: Promise<any> | null = null;
 
 /** Carica Firebase una sola volta e solo quando serve davvero. */
@@ -194,7 +248,7 @@ export interface SubscribeHandlers {
   onData: (data: any) => void;
   /** spazio di lavoro nuovo: nessun dato ancora salvato */
   onEmpty: () => void;
-  onStatus: (status: CloudStatus) => void;
+  onStatus: (status: CloudStatus, detail?: string) => void;
 }
 
 /**
@@ -230,10 +284,11 @@ export const subscribeWorkspace = (
           else onEmpty();
           onStatus('sincronizzato');
         },
-        () => onStatus('errore')
+        (err: any) =>
+          onStatus('errore', describeCloudError(err, 'lettura'))
       );
     })
-    .catch(() => onStatus('errore'));
+    .catch((err: any) => onStatus('errore', describeCloudError(err, 'lettura')));
 
   return () => {
     stopped = true;
@@ -241,18 +296,44 @@ export const subscribeWorkspace = (
   };
 };
 
+/**
+ * Traduce l'errore tecnico di Firestore in una frase che dice a chi usa
+ * l'app che cosa è successo davvero e che cosa può fare.
+ */
+export const describeCloudError = (err: any, fase: string): string => {
+  const code = String(err?.code || '');
+  if (code.includes('permission-denied')) {
+    return `Il database ha rifiutato la ${fase}: le regole di sicurezza del progetto Firebase non sono aggiornate all'ultima versione dell'app.`;
+  }
+  if (code.includes('unavailable') || code.includes('network')) {
+    return `Connessione assente o instabile: la ${fase} non è riuscita. Le modifiche restano sullo schermo ma non sono ancora al sicuro.`;
+  }
+  if (code.includes('resource-exhausted')) {
+    return 'Il documento della scuola ha superato il limite di Firestore (1 MB). Serve alleggerire i dati.';
+  }
+  return err?.message
+    ? `${err.message}`
+    : `Salvataggio non riuscito durante la ${fase}.`;
+};
+
 /** Salva i dati dello spazio di lavoro (locale o cloud). */
 export const persistWorkspace = async (
   ws: Workspace,
   data: any,
-  onStatus: (status: CloudStatus) => void
+  onStatus: (status: CloudStatus, detail?: string) => void
 ) => {
+  const clean = stripUndefined(data);
   if (ws.mode === 'locale') {
     try {
-      writeLocal(ws.code, data);
+      writeLocal(ws.code, clean);
       onStatus('locale');
-    } catch {
-      onStatus('errore');
+    } catch (err: any) {
+      onStatus(
+        'errore',
+        String(err?.name || '').includes('Quota')
+          ? 'La memoria del browser è piena: i dati di questa scuola non stanno più in locale. Scarica un backup e passa alla modalità cloud.'
+          : 'Il browser non ha permesso di salvare in locale (navigazione privata o memoria piena).'
+      );
     }
     return;
   }
@@ -260,12 +341,12 @@ export const persistWorkspace = async (
   onStatus('salvataggio');
   try {
     const { db, storeMod } = await getCloud();
-    await storeMod.setDoc(storeMod.doc(db, CLOUD_COLLECTION, ws.code), data, {
+    await storeMod.setDoc(storeMod.doc(db, CLOUD_COLLECTION, ws.code), clean, {
       merge: true,
     });
     onStatus('sincronizzato');
-  } catch {
-    onStatus('errore');
+  } catch (err: any) {
+    onStatus('errore', describeCloudError(err, 'scrittura'));
   }
 };
 

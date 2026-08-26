@@ -20,7 +20,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-08-25';
+export const NOVITA_VERSIONE = '2026-08-26';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -32,6 +32,16 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-08-26',
+    data: '26 agosto 2026',
+    voci: [
+      'Salvataggio riparato. Chi lavora in modalità cloud non riusciva più a salvare niente: le modifiche restavano sullo schermo, compariva il badge rosso e al rientro nell\'app tornavano i dati di esempio. Era il database che rifiutava le funzioni aggiunte negli ultimi giorni. Ora il salvataggio funziona di nuovo, e se qualcosa va storto l\'app lo dice con una fascia rossa in cima alla pagina, spiega il motivo e offre il pulsante per scaricare subito un backup: nessuno lavora più per ore credendo di aver salvato.',
+      'Foglio supplenze in Excel. Accanto a «Stampa foglio» c\'è il pulsante «Excel»: il foglio del giorno si scarica in tre schede (assenti, sostituzioni, comunicazioni alle famiglie) e si corregge a mano prima di stamparlo, per le situazioni che l\'app non poteva prevedere.',
+      'La classe entra dopo o esce prima, direttamente dalla sostituzione. Quando l\'ora scoperta è la prima o l\'ultima della classe, accanto a «Sorveglianza» e «Dividi alunni» compaiono «Entra alla ...» e «Esce dopo la ...», con l\'orario vero scritto sul pulsante. La variazione finisce da sola nel riquadro delle comunicazioni alle famiglie, sul foglio del giorno e nell\'Excel.',
+      'Ore a recupero dei permessi brevi. In Sostituzioni c\'è un nuovo riquadro: per ogni permesso l\'app conta le ore dalle lezioni che il docente aveva in quella fascia, segnala quando si supera la metà dell\'orario di servizio della giornata e tiene il saldo di chi deve ancora restituire le ore. Si spunta «recuperato» e il saldo scende. Il prospetto per la segreteria ora include anche questa tabella.',
+    ],
+  },
   {
     versione: '2026-08-25',
     data: '25 agosto 2026',
@@ -71,13 +81,6 @@ export const NOVITA: VoceNovita[] = [
       'La classe si legge nell\'Orario Generale: nelle caselle del quadro comparivano solo le frecce blu del menu, e su uno schermo piccolo non si capiva quale classe fosse coinvolta. Ora la sigla della classe è sempre scritta nella casella, e il menu si apre cliccandoci sopra come prima.',
       'Orario per laboratorio: in Viste Singole c\'è la vista "🔬 Laboratorio". Si sceglie un\'aula speciale (palestra, laboratori, aula magna) e si vede ora per ora quale classe c\'è e con quale docente. Con 🖨️ si stampa in A4 il foglio da attaccare dietro la porta.',
       'Ore buco, entrate e uscite: in Viste Singole c\'è la vista "⚖️ Equità", che conta per ogni docente le ore buco, i giorni in cui entra dopo la prima ora e quelli in cui esce prima della fine delle lezioni. In rosso chi sta sopra la media; si ordina cliccando l\'intestazione delle colonne e si stampa con 🖨️.',
-    ],
-  },
-  {
-    versione: '2026-08-21',
-    data: '21 agosto 2026',
-    voci: [
-      'Segnalazioni sistemate: il filtro antispam del modulo "Segnala un bug o un suggerimento" scartava per errore qualche messaggio vero, che quindi non mi arrivava anche se l\'app rispondeva "ricevuto". Ora non succede più. Se mi hai scritto nei giorni scorsi e non ti ho risposto, rimandamelo: non l\'ho letto.',
     ],
   },
 ];

@@ -21,6 +21,13 @@ service cloud.firestore {
       allow list: if false;
 
       // Scrittura: solo i campi previsti dall'app.
+      //
+      // ATTENZIONE: questo elenco va tenuto uguale a CLOUD_FIELDS in
+      // src/workspace.ts. Se l'app manda un campo che non c'è qui, Firestore
+      // rifiuta TUTTO il salvataggio (permission-denied) e la scuola non
+      // salva più niente, non solo il campo nuovo. Ogni volta che si aggiunge
+      // un dato al documento vanno aggiornati tutti e due i posti, e le
+      // regole vanno ripubblicate dalla console Firebase.
       allow create, update: if request.auth != null
         && codiceScuola.size() >= 12
         && request.resource.data.keys().hasOnly([
@@ -37,9 +44,13 @@ service cloud.firestore {
              'groupConstraints',
              'mixedClasses',
              'rooms',
+             'modelGrids',
              'sedi',
              'absences',
              'substitutions',
+             'assemblee',
+             'personaleExtra',
+             'assembleeConfig',
              'lastUpdatedAt',
              'lastUpdatedBy'
            ]);

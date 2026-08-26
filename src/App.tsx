@@ -1009,6 +1009,16 @@ const HOUR_DEFAULT_MINUTES = 60;
 const HOUR_DURATION_OPTIONS = [60, 30];
 
 /**
+ * Ore scritte come si leggono in italiano: «1 ora», «2 ore», «1,5 ore».
+ * Le mezze ore esistono davvero (la primaria), quindi il numero si arrotonda
+ * al mezzo e non all'intero.
+ */
+const fmtOreRecupero = (ore: number) => {
+  const n = Math.round(Number(ore) * 2) / 2;
+  return `${n.toLocaleString('it-IT')} ${n === 1 ? 'ora' : 'ore'}`;
+};
+
+/**
  * Monte ore curricolare settimanale atteso per una sezione, quando non è
  * stato impostato: 30 ore, il tempo normale della secondaria di primo grado.
  * È il valore con cui l'app è nata, quindi le scuole già avviate non vedono
@@ -2230,6 +2240,12 @@ export default function App() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [invitedCode] = useState<string | null>(() => codeFromUrl());
   const [cloudStatus, setCloudStatus] = useState<CloudStatus>('connessione');
+  /**
+   * Perché l'ultimo salvataggio non è riuscito, scritto in italiano. Il
+   * badge ❌ ERRORE da solo non bastava: chi lo vedeva non sapeva se erano
+   * andate perse le modifiche appena fatte né a chi chiedere aiuto.
+   */
+  const [cloudError, setCloudError] = useState('');
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [showWorkspacePanel, setShowWorkspacePanel] = useState(false);
   const [restoreError, setRestoreError] = useState('');
@@ -2598,8 +2614,8 @@ export default function App() {
    * lasciando il badge su "errore": meglio un avviso che un ciclo infinito.
    */
   const seedWorkspace = (ws: Workspace, initial: any, attempt = 0) => {
-    persistWorkspace(ws, initial, (status) => {
-      setCloudStatus(status);
+    persistWorkspace(ws, initial, (status, detail) => {
+      handleCloudStatus(status, detail);
       if (status === 'errore' && attempt < 2) {
         window.setTimeout(
           () => seedWorkspace(ws, initial, attempt + 1),
@@ -2629,7 +2645,7 @@ export default function App() {
         setIsInitialLoad(false);
         seedWorkspace(workspace, initial);
       },
-      onStatus: setCloudStatus,
+      onStatus: handleCloudStatus,
     });
     return () => unsubscribe();
   }, [workspace]);
@@ -2643,7 +2659,7 @@ export default function App() {
     if (importedData) {
       applyData(importedData);
       setIsInitialLoad(false);
-      persistWorkspace(ws, importedData, setCloudStatus);
+      persistWorkspace(ws, importedData, handleCloudStatus);
     }
   };
 
@@ -2654,6 +2670,16 @@ export default function App() {
     setWorkspace(null);
     setShowWorkspacePanel(false);
     setIsInitialLoad(true);
+  };
+
+  /** Tiene insieme il badge di stato e il motivo dell'eventuale errore. */
+  const handleCloudStatus = (status: CloudStatus, detail?: string) => {
+    setCloudStatus(status);
+    setCloudError(
+      status === 'errore'
+        ? detail || 'Le ultime modifiche non sono state salvate.'
+        : ''
+    );
   };
 
   const pushDataToCloud = async (
@@ -2712,7 +2738,7 @@ export default function App() {
             : assembleeConfig,
         lastUpdatedAt: new Date().toISOString(),
       },
-      setCloudStatus
+      handleCloudStatus
     );
   };
 
@@ -2766,7 +2792,7 @@ export default function App() {
           throw new Error('formato');
         }
         applyData(data);
-        if (workspace) persistWorkspace(workspace, data, setCloudStatus);
+        if (workspace) persistWorkspace(workspace, data, handleCloudStatus);
       } catch {
         setRestoreError('File non valido: serve un backup .json di EduTime Pro.');
       }
@@ -6391,6 +6417,82 @@ export default function App() {
       );
   };
 
+  /**
+   * Se l'ora scoperta è la prima o l'ultima della giornata della classe, la
+   * scuola può risolverla senza sostituto: la classe entra più tardi o esce
+   * prima, avvisando le famiglie. È la richiesta arrivata dalle segreterie —
+   * "la classe entra alle 9:15" — accanto a sorveglianza e divisione alunni.
+   *
+   * Restituisce le due possibilità applicabili a quell'ora, con l'ora vera
+   * di entrata o di uscita presa dalla griglia oraria.
+   */
+  const getVariazioniClasse = (
+    absence: any,
+    hour: number,
+    classId: string
+  ) => {
+    const day = getDayIndexFromDate(absence.date);
+    if (day < 0) return { entrata: null as any, uscita: null as any };
+    const classDayHours = timetable
+      .filter(
+        (s) =>
+          s.classId === classId &&
+          s.day === day &&
+          (s.type === 'materia' || s.type === 'pomeriggio_musica') &&
+          diurnalHours.some((dh) => dh.index === s.hour)
+      )
+      .map((s) => s.hour);
+    if (classDayHours.length === 0)
+      return { entrata: null as any, uscita: null as any };
+    // Le ore già risolte con entrata posticipata o uscita anticipata contano
+    // come "fuori orario": se la prima ora è già stata tolta, la seconda ora
+    // scoperta diventa a sua volta un possibile posticipo dell'entrata.
+    const variazioni = substitutions.filter(
+      (sub) =>
+        sub.date === absence.date &&
+        sub.classId === classId &&
+        (sub.method === 'entrata_posticipata' ||
+          sub.method === 'uscita_anticipata')
+    );
+    const oreTolteInizio = variazioni
+      .filter((sub) => sub.method === 'entrata_posticipata')
+      .map((sub) => sub.hour);
+    const oreTolteFine = variazioni
+      .filter((sub) => sub.method === 'uscita_anticipata')
+      .map((sub) => sub.hour);
+    const inizioEffettivo = classDayHours
+      .filter((h) => !oreTolteInizio.includes(h))
+      .reduce((min, h) => Math.min(min, h), Number.POSITIVE_INFINITY);
+    const fineEffettiva = classDayHours
+      .filter((h) => !oreTolteFine.includes(h))
+      .reduce((max, h) => Math.max(max, h), Number.NEGATIVE_INFINITY);
+
+    const oreDopo = classDayHours
+      .filter((h) => h > hour && !oreTolteInizio.includes(h))
+      .sort((a, b) => a - b);
+    const orePrima = classDayHours
+      .filter((h) => h < hour && !oreTolteFine.includes(h))
+      .sort((a, b) => a - b);
+
+    const entrata =
+      hour === inizioEffettivo && oreDopo.length > 0
+        ? {
+            entryFromHour: oreDopo[0],
+            label: `${oreDopo[0] + 1}ª`,
+            time: mergedHoursMap[oreDopo[0]]?.time || '',
+          }
+        : null;
+    const uscita =
+      hour === fineEffettiva && orePrima.length > 0
+        ? {
+            exitAfterHour: orePrima[orePrima.length - 1],
+            label: `${orePrima[orePrima.length - 1] + 1}ª`,
+            time: mergedHoursMap[orePrima[orePrima.length - 1]]?.time || '',
+          }
+        : null;
+    return { entrata, uscita };
+  };
+
   const paidSubstitutionHoursByTeacher = useMemo(() => {
     const counts: any = {};
     substitutions.forEach((s) => {
@@ -6416,6 +6518,116 @@ export default function App() {
     );
     return counts;
   }, [generationRules.teacherDisponibilita]);
+
+  /**
+   * Permessi brevi e ore da recuperare, docente per docente.
+   *
+   * Quando un docente chiede un permesso orario le ore non svolte vanno
+   * recuperate: chi gestisce le sostituzioni deve avere sotto gli occhi chi
+   * ha un debito e quanto vale. Le ore si contano dalle lezioni che il
+   * docente aveva in orario nella fascia del permesso (mezz'ora vale 0,5) e
+   * si possono correggere a mano quando la scuola conta diversamente.
+   *
+   * Il contratto consente il permesso breve fino a metà dell'orario di
+   * servizio di quella giornata: le richieste che vanno oltre restano
+   * registrate, ma vengono segnalate.
+   */
+  const permessiOrari = useMemo(() => {
+    const righe = absences
+      .filter((a: any) => a.type === 'permesso' && a.teacherId)
+      .map((a: any) => {
+        const day = getDayIndexFromDate(a.date);
+        const lezioniGiorno = timetable.filter(
+          (slot) =>
+            slot.teacherId === a.teacherId &&
+            slot.day === day &&
+            (slot.type === 'materia' || slot.type === 'pomeriggio_musica')
+        );
+        const lezioniPermesso = lezioniGiorno.filter(
+          (slot) =>
+            (a.fromHour === undefined || slot.hour >= a.fromHour) &&
+            (a.toHour === undefined || slot.hour <= a.toHour)
+        );
+        const oreServizio = lezioniGiorno.reduce(
+          (tot, slot) => tot + hourWeight(slot.hour),
+          0
+        );
+        const oreCalcolate = lezioniPermesso.reduce(
+          (tot, slot) => tot + hourWeight(slot.hour),
+          0
+        );
+        const ore =
+          Number(a.recuperoOre) > 0 ? Number(a.recuperoOre) : oreCalcolate;
+        return {
+          id: a.id,
+          teacherId: a.teacherId,
+          nome:
+            teachers.find((t) => t.id === a.teacherId)?.name || a.teacherId,
+          date: a.date,
+          ore,
+          oreServizio,
+          oltreMeta: oreServizio > 0 && ore > oreServizio / 2,
+          recuperata: !!a.recuperata,
+          recuperoDate: a.recuperoDate || '',
+          note: a.note || '',
+        };
+      })
+      .sort((x, y) => (x.date < y.date ? 1 : -1));
+
+    const perDocente: any[] = [];
+    righe.forEach((r) => {
+      let voce = perDocente.find((v) => v.teacherId === r.teacherId);
+      if (!voce) {
+        voce = {
+          teacherId: r.teacherId,
+          nome: r.nome,
+          ore: 0,
+          recuperate: 0,
+          saldo: 0,
+        };
+        perDocente.push(voce);
+      }
+      voce.ore += r.ore;
+      if (r.recuperata) voce.recuperate += r.ore;
+      voce.saldo = voce.ore - voce.recuperate;
+    });
+    perDocente.sort((x, y) => x.nome.localeCompare(y.nome));
+    return { righe, perDocente };
+  }, [absences, timetable, teachers, mergedHoursMap]);
+
+  /** Segna un permesso come recuperato, o torna indietro. */
+  const handleToggleRecupero = (absenceId: string) => {
+    if (readOnlyMode) return;
+    const oggi = new Date().toISOString().slice(0, 10);
+    const newAbsences = absences.map((a: any) =>
+      a.id === absenceId
+        ? a.recuperata
+          ? { ...a, recuperata: false, recuperoDate: '' }
+          : { ...a, recuperata: true, recuperoDate: oggi }
+        : a
+    );
+    setAbsences(newAbsences);
+    pushAbsencesSubs(newAbsences, substitutions);
+  };
+
+  /** Corregge a mano le ore da recuperare di un permesso. */
+  const handleSetRecuperoOre = (absenceId: string, value: string) => {
+    if (readOnlyMode) return;
+    const numero = Number(value);
+    const newAbsences = absences.map((a: any) =>
+      a.id === absenceId
+        ? {
+            ...a,
+            recuperoOre:
+              value === '' || !Number.isFinite(numero) || numero <= 0
+                ? undefined
+                : numero,
+          }
+        : a
+    );
+    setAbsences(newAbsences);
+    pushAbsencesSubs(newAbsences, substitutions);
+  };
 
   const handleAddAbsence = (e: React.FormEvent) => {
     e.preventDefault();
@@ -6549,6 +6761,41 @@ export default function App() {
     setSubstitutions(newSubstitutions);
     pushAbsencesSubs(absences, newSubstitutions);
     setAnticipoPanel(null);
+  };
+
+  /**
+   * Registra la variazione d'orario della classe: invece di cercare un
+   * sostituto, la classe entra più tardi o esce prima. Finisce nel foglio del
+   * giorno, nel riquadro delle comunicazioni alle famiglie.
+   */
+  const handleConfirmVariazioneClasse = (
+    absence: any,
+    hour: number,
+    classId: string,
+    subject: string,
+    tipo: 'entrata_posticipata' | 'uscita_anticipata',
+    dettaglio: any
+  ) => {
+    if (readOnlyMode) return;
+    const day = getDayIndexFromDate(absence.date);
+    const newSub: any = {
+      id: `sub_${Date.now()}`,
+      absenceId: absence.id,
+      date: absence.date,
+      day,
+      hour,
+      classId,
+      subjectOriginal: subject,
+      teacherOriginal: absence.teacherId,
+      method: tipo,
+      paid: false,
+    };
+    if (tipo === 'entrata_posticipata')
+      newSub.entryFromHour = dettaglio.entryFromHour;
+    else newSub.exitAfterHour = dettaglio.exitAfterHour;
+    const newSubstitutions = [...substitutions, newSub];
+    setSubstitutions(newSubstitutions);
+    pushAbsencesSubs(absences, newSubstitutions);
   };
 
   const handleRemoveSubstitution = (id: string) => {
@@ -7265,6 +7512,325 @@ export default function App() {
     }
   };
 
+  /**
+   * Lo stesso foglio del giorno, ma in Excel invece che in PDF.
+   *
+   * Le scuole lo hanno chiesto per un motivo pratico: la mattina succede
+   * sempre qualcosa che l'app non poteva prevedere, e sul file si corregge a
+   * mano prima di stampare. Una riga per ogni ora, così le celle si
+   * modificano una per una.
+   */
+  const handleExportSostituzioniExcel = () => {
+    const day = getDayIndexFromDate(substitutionsDate);
+    const [yyyy, mm, dd] = substitutionsDate.split('-');
+    const dateLabel =
+      day >= 0 ? `${DAYS[day]} ${dd}.${mm}.${yyyy}` : substitutionsDate;
+    const dayAbsences = absences.filter((a) => a.date === substitutionsDate);
+    const teacherAbsences = dayAbsences.filter(
+      (a) => a.type === 'assenza' || a.type === 'permesso'
+    );
+    const classAbsences = dayAbsences.filter(
+      (a) =>
+        a.type === 'entrata_posticipata' || a.type === 'uscita_anticipata'
+    );
+    const daySubs = substitutions.filter((s2) => s2.date === substitutionsDate);
+
+    const stili: Record<string, XlsxStyle> = {
+      titolo: { bold: true, size: 14, color: '#1E3A8A' },
+      intestazione: {
+        bold: true,
+        color: '#FFFFFF',
+        fill: '#1E3A8A',
+        align: 'center',
+        border: true,
+      },
+      cella: { border: true, wrap: true },
+      cellaCentro: { border: true, align: 'center' },
+      attenzione: {
+        border: true,
+        bold: true,
+        fill: '#FEF3C7',
+        color: '#92400E',
+      },
+    };
+
+    const oraLabel = (h: number) =>
+      `${mergedHoursMap[h]?.label || `${h + 1}ª`}${
+        mergedHoursMap[h]?.time ? ` (${mergedHoursMap[h].time})` : ''
+      }`;
+
+    const nomeDi = (id?: string) =>
+      allStaff.find((t) => t.id === id)?.name || id || '';
+
+    /* ------------------------------------------------ foglio 1: assenti */
+    const righeAssenti: XlsxRow[] = [
+      {
+        cells: [
+          {
+            value: `Predisposizione supplenze · ${dateLabel}`,
+            style: 'titolo',
+            mergeAcross: 5,
+          },
+        ],
+      },
+      { cells: [] },
+      {
+        cells: [
+          { value: 'Docente assente', style: 'intestazione' },
+          { value: 'Motivo', style: 'intestazione' },
+          { value: 'Ora', style: 'intestazione' },
+          { value: 'Classe', style: 'intestazione' },
+          { value: 'Materia', style: 'intestazione' },
+          { value: 'Come è coperta', style: 'intestazione' },
+        ],
+      },
+    ];
+    teacherAbsences.forEach((absence) => {
+      const lezioni = getSubstitutionSuggestions(absence);
+      if (lezioni.length === 0) {
+        righeAssenti.push({
+          cells: [
+            { value: nomeDi(absence.teacherId), style: 'cella' },
+            {
+              value: absence.type === 'assenza' ? 'Assenza' : 'Permesso',
+              style: 'cella',
+            },
+            { value: '—', style: 'cellaCentro' },
+            { value: '—', style: 'cellaCentro' },
+            { value: '—', style: 'cella' },
+            { value: 'Nessuna lezione in orario', style: 'cella' },
+          ],
+        });
+        return;
+      }
+      lezioni.forEach((l: any) => {
+        const sub = l.existingSub;
+        const copertura = l.coveredBySostegno
+          ? 'Coperta dal sostegno'
+          : !sub
+          ? 'DA COPRIRE'
+          : sub.method === 'docente_disponibile'
+          ? `Supplenza (D): ${nomeDi(sub.teacherSubstitute)}`
+          : sub.method === 'sorveglianza'
+          ? 'Sorveglianza collaboratori'
+          : sub.method === 'divisione_alunni'
+          ? 'Alunni divisi tra le classi'
+          : sub.method === 'anticipo'
+          ? `Anticipa ${nomeDi(sub.teacherSubstitute)} dalla ${
+              sub.movedFromHour + 1
+            }ª`
+          : sub.method === 'entrata_posticipata'
+          ? `La classe entra alla ${(sub.entryFromHour ?? l.hour) + 1}ª`
+          : `La classe esce dopo la ${(sub.exitAfterHour ?? l.hour) + 1}ª`;
+        righeAssenti.push({
+          cells: [
+            { value: nomeDi(absence.teacherId), style: 'cella' },
+            {
+              value: absence.type === 'assenza' ? 'Assenza' : 'Permesso',
+              style: 'cella',
+            },
+            { value: oraLabel(l.hour), style: 'cellaCentro' },
+            { value: l.classId, style: 'cellaCentro' },
+            { value: l.subject || '', style: 'cella' },
+            {
+              value: copertura,
+              style:
+                !sub && !l.coveredBySostegno ? 'attenzione' : 'cella',
+            },
+          ],
+        });
+      });
+    });
+    if (teacherAbsences.length === 0) {
+      righeAssenti.push({
+        cells: [
+          { value: 'Nessuna assenza segnalata per questa data.', style: 'cella' },
+        ],
+      });
+    }
+
+    /* --------------------------------------------- foglio 2: sostituti */
+    const righeSubs: XlsxRow[] = [
+      {
+        cells: [
+          {
+            value: `Sostituzioni assegnate · ${dateLabel}`,
+            style: 'titolo',
+            mergeAcross: 4,
+          },
+        ],
+      },
+      { cells: [] },
+      {
+        cells: [
+          { value: 'Ora', style: 'intestazione' },
+          { value: 'Classe', style: 'intestazione' },
+          { value: 'Chi entra', style: 'intestazione' },
+          { value: 'Modalità', style: 'intestazione' },
+          { value: 'Retribuita', style: 'intestazione' },
+        ],
+      },
+    ];
+    daySubs
+      .slice()
+      .sort((a, b) => a.hour - b.hour)
+      .forEach((sub) => {
+        const modalita =
+          sub.method === 'docente_disponibile'
+            ? 'Supplenza su ora di disponibilità'
+            : sub.method === 'sorveglianza'
+            ? 'Sorveglianza collaboratori scolastici'
+            : sub.method === 'divisione_alunni'
+            ? 'Alunni divisi tra le classi'
+            : sub.method === 'anticipo'
+            ? `Lezione anticipata dalla ${sub.movedFromHour + 1}ª${
+                sub.exitAfterHour !== undefined
+                  ? `; la classe esce dopo la ${sub.exitAfterHour + 1}ª`
+                  : ''
+              }`
+            : sub.method === 'entrata_posticipata'
+            ? `La classe entra alla ${(sub.entryFromHour ?? sub.hour) + 1}ª`
+            : `La classe esce dopo la ${(sub.exitAfterHour ?? sub.hour) + 1}ª`;
+        righeSubs.push({
+          cells: [
+            { value: oraLabel(sub.hour), style: 'cellaCentro' },
+            { value: sub.classId, style: 'cellaCentro' },
+            {
+              value: sub.teacherSubstitute
+                ? nomeDi(sub.teacherSubstitute)
+                : '—',
+              style: 'cella',
+            },
+            { value: modalita, style: 'cella' },
+            { value: sub.paid ? 'SÌ (D)' : 'no', style: 'cellaCentro' },
+          ],
+        });
+      });
+    if (daySubs.length === 0) {
+      righeSubs.push({
+        cells: [
+          {
+            value: 'Nessuna sostituzione assegnata per questa data.',
+            style: 'cella',
+          },
+        ],
+      });
+    }
+
+    /* ----------------------------------------- foglio 3: comunicazioni */
+    const righeComunicazioni: XlsxRow[] = [
+      {
+        cells: [
+          {
+            value: `Comunicazioni alle famiglie · ${dateLabel}`,
+            style: 'titolo',
+            mergeAcross: 3,
+          },
+        ],
+      },
+      { cells: [] },
+      {
+        cells: [
+          { value: 'Classe', style: 'intestazione' },
+          { value: 'Cosa cambia', style: 'intestazione' },
+          { value: 'Quando', style: 'intestazione' },
+          { value: 'Note', style: 'intestazione' },
+        ],
+      },
+    ];
+    classAbsences.forEach((a) => {
+      righeComunicazioni.push({
+        cells: [
+          { value: a.classId, style: 'cellaCentro' },
+          {
+            value:
+              a.type === 'entrata_posticipata'
+                ? 'Entra più tardi'
+                : 'Esce prima',
+            style: 'cella',
+          },
+          {
+            value:
+              a.fromHour !== undefined || a.toHour !== undefined
+                ? `${(a.fromHour ?? 0) + 1}ª – ${
+                    (a.toHour ?? diurnalHours.length - 1) + 1
+                  }ª`
+                : 'Tutta la giornata',
+            style: 'cellaCentro',
+          },
+          { value: a.note || '', style: 'cella' },
+        ],
+      });
+    });
+    daySubs
+      .filter(
+        (sub) =>
+          sub.method === 'entrata_posticipata' ||
+          sub.method === 'uscita_anticipata' ||
+          (sub.method === 'anticipo' && sub.exitAfterHour !== undefined)
+      )
+      .forEach((sub) => {
+        const entra = sub.method === 'entrata_posticipata';
+        const oraRif = entra ? sub.entryFromHour : sub.exitAfterHour;
+        righeComunicazioni.push({
+          cells: [
+            { value: sub.classId, style: 'cellaCentro' },
+            {
+              value: entra ? 'Entra più tardi' : 'Esce prima',
+              style: 'cella',
+            },
+            {
+              value: entra
+                ? `dalla ${oraLabel(oraRif)}`
+                : `dopo la ${oraLabel(oraRif)}`,
+              style: 'cellaCentro',
+            },
+            {
+              value:
+                sub.method === 'anticipo'
+                  ? `${nomeDi(sub.teacherSubstitute)} anticipa la lezione della ${
+                      sub.movedFromHour + 1
+                    }ª`
+                  : `Ora scoperta (${sub.hour + 1}ª) di ${nomeDi(
+                      sub.teacherOriginal
+                    )}: nessun sostituto`,
+              style: 'cella',
+            },
+          ],
+        });
+      });
+    if (righeComunicazioni.length === 3) {
+      righeComunicazioni.push({
+        cells: [
+          { value: 'Nessuna comunicazione per questa data.', style: 'cella' },
+        ],
+      });
+    }
+
+    const sheets: XlsxSheet[] = [
+      { name: 'Assenti', colWidthsPx: [190, 90, 130, 70, 150, 260], rows: righeAssenti },
+      { name: 'Sostituzioni', colWidthsPx: [130, 70, 190, 300, 90], rows: righeSubs },
+      {
+        name: 'Comunicazioni',
+        colWidthsPx: [70, 140, 170, 320],
+        rows: righeComunicazioni,
+      },
+    ];
+
+    const data = buildXlsx(sheets, stili);
+    const blob = new Blob([data as BlobPart], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `supplenze-${substitutionsDate}.xlsx`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   /** Foglio giornaliero di predisposizione supplenze, A4 orizzontale, stampabile/salvabile in PDF. */
   const handlePrintSostituzioni = () => {
     const printWindow = window.open('', '_blank');
@@ -7463,9 +8029,37 @@ export default function App() {
     const usciteDaAnticipo = anticipoSubs.filter(
       (sub) => sub.exitAfterHour !== undefined
     );
-    if (classAbsences.length === 0 && usciteDaAnticipo.length === 0) {
+    // Ore scoperte risolte mandando la classe a casa prima o facendola
+    // entrare più tardi: qui sta la comunicazione da dare alle famiglie.
+    const variazioniClasse = daySubs.filter(
+      (s2) =>
+        s2.method === 'entrata_posticipata' ||
+        s2.method === 'uscita_anticipata'
+    );
+    if (
+      classAbsences.length === 0 &&
+      usciteDaAnticipo.length === 0 &&
+      variazioniClasse.length === 0
+    ) {
       html += `<tr><td class="empty-row" colspan="3">Nessuna comunicazione per questa data.</td></tr>`;
     }
+    variazioniClasse.forEach((sub) => {
+      const entra = sub.method === 'entrata_posticipata';
+      const oraRif = entra ? sub.entryFromHour : sub.exitAfterHour;
+      const orario = mergedHoursMap[oraRif]?.time || '';
+      const docente = teachers.find((t) => t.id === sub.teacherOriginal);
+      html += `<tr><td class="name-cell">Classe ${escapeXml(
+        sub.classId
+      )} — ${escapeXml(entra ? 'ENTRA più tardi' : 'ESCE prima')}</td><td>${escapeXml(
+        entra
+          ? `dalla ${oraRif + 1}ª${orario ? ` (${orario})` : ''}`
+          : `dopo la ${oraRif + 1}ª${orario ? ` (${orario})` : ''}`
+      )}</td><td class="note-cell">${escapeXml(
+        `Ora scoperta (${sub.hour + 1}ª) di ${
+          docente?.name || 'docente assente'
+        }: nessun sostituto, avvisare le famiglie`
+      )}</td></tr>`;
+    });
     classAbsences.forEach((absence) => {
       const action =
         absence.type === 'entrata_posticipata'
@@ -7578,7 +8172,38 @@ export default function App() {
     });
     html += `<tr class="totale"><td colspan="2">Totale istituto</td><td class="num">${totaleDisponibilita}</td><td class="num">${totaleSvolte}</td></tr>`;
     html += `</tbody></table>`;
-    html += `<p class="legend">«Ore D a settimana»: ore di disponibilità dichiarate nell'Orario Generale, ripetute ogni settimana. «Ore svolte»: ore di supplenza retribuita effettivamente assegnate in Sostituzioni. Prospetto di EduTime Pro.</p>`;
+    // Secondo prospetto: i permessi brevi e le ore ancora da restituire.
+    const righeRecupero = permessiOrari.perDocente.filter(
+      (v: any) => v.ore > 0
+    );
+    if (righeRecupero.length > 0) {
+      const totaleOre = righeRecupero.reduce(
+        (somma: number, v: any) => somma + v.ore,
+        0
+      );
+      const totaleSaldo = righeRecupero.reduce(
+        (somma: number, v: any) => somma + v.saldo,
+        0
+      );
+      html += `<h1 style="margin-top:10mm;">Permessi brevi e ore da recuperare</h1>`;
+      html += `<table><thead><tr><th>Docente</th><th style="width:70pt;">Ore di permesso</th><th style="width:70pt;">Ore recuperate</th><th style="width:70pt;">Ore da recuperare</th></tr></thead><tbody>`;
+      righeRecupero.forEach((v: any) => {
+        html += `<tr><td>${escapeXml(v.nome)}</td><td class="num">${escapeXml(
+          fmtOreRecupero(v.ore)
+        )}</td><td class="num">${escapeXml(
+          fmtOreRecupero(v.recuperate)
+        )}</td><td class="num">${escapeXml(fmtOreRecupero(v.saldo))}</td></tr>`;
+      });
+      html += `<tr class="totale"><td>Totale istituto</td><td class="num">${escapeXml(
+        fmtOreRecupero(totaleOre)
+      )}</td><td class="num">${escapeXml(
+        fmtOreRecupero(totaleOre - totaleSaldo)
+      )}</td><td class="num">${escapeXml(
+        fmtOreRecupero(totaleSaldo)
+      )}</td></tr>`;
+      html += `</tbody></table>`;
+    }
+    html += `<p class="legend">«Ore D a settimana»: ore di disponibilità dichiarate nell'Orario Generale, ripetute ogni settimana. «Ore svolte»: ore di supplenza retribuita effettivamente assegnate in Sostituzioni. «Ore da recuperare»: ore di permesso breve non ancora restituite. Prospetto di EduTime Pro.</p>`;
     html += `</body></html>`;
 
     printWindow.document.write(html);
@@ -7740,7 +8365,7 @@ export default function App() {
                 )}
                 {cloudStatus === 'errore' && (
                   <span className="inline-flex items-center gap-1 text-[10px] bg-rose-500/20 text-rose-300 font-bold px-1.5 py-0.5 rounded-sm">
-                    ❌ ERRORE
+                    ❌ NON SALVATO
                   </span>
                 )}
                 {readOnlyMode && (
@@ -7855,6 +8480,28 @@ export default function App() {
           </div>
         </div>
       </header>
+      {/*
+        Avviso di salvataggio fallito. Sta sotto l'intestazione, largo quanto
+        la pagina, perché il badge piccolo nell'angolo non bastava: chi non lo
+        notava continuava a lavorare credendo che tutto fosse al sicuro.
+      */}
+      {cloudStatus === 'errore' && (
+        <div className="bg-rose-600 text-white px-4 py-2.5 shrink-0 print:hidden">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+            <p className="text-xs sm:text-sm font-semibold">
+              ⚠️ Le ultime modifiche <u>non sono state salvate</u>.{' '}
+              <span className="font-normal">{cloudError}</span>
+            </p>
+            <button
+              onClick={handleBackupDownload}
+              className="shrink-0 bg-white/15 hover:bg-white/25 border border-white/30 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
+              title="Scarica sul computer una copia di tutto il lavoro, così non si perde niente"
+            >
+              💾 Scarica subito un backup
+            </button>
+          </div>
+        </div>
+      )}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs shrink-0 print:hidden">
         <div
           className={`mx-auto flex overflow-x-auto justify-start sm:justify-center transition-all duration-300 ${
@@ -12249,6 +12896,13 @@ export default function App() {
                   >
                     🖨️ Stampa foglio
                   </button>
+                  <button
+                    onClick={handleExportSostituzioniExcel}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                    title="Scarica il foglio del giorno in Excel, per correggerlo a mano prima di stamparlo"
+                  >
+                    📊 Excel
+                  </button>
                 </div>
               </div>
 
@@ -12530,6 +13184,38 @@ export default function App() {
                                         : s.existingSub.method ===
                                           'sorveglianza'
                                         ? 'Sorveglianza collaboratori'
+                                        : s.existingSub.method ===
+                                          'entrata_posticipata'
+                                        ? `🚪 La classe entra alla ${
+                                            (s.existingSub.entryFromHour ??
+                                              s.hour) + 1
+                                          }ª${
+                                            mergedHoursMap[
+                                              s.existingSub.entryFromHour
+                                            ]?.time
+                                              ? ` (${
+                                                  mergedHoursMap[
+                                                    s.existingSub.entryFromHour
+                                                  ].time
+                                                })`
+                                              : ''
+                                          }`
+                                        : s.existingSub.method ===
+                                          'uscita_anticipata'
+                                        ? `🚪 La classe esce dopo la ${
+                                            (s.existingSub.exitAfterHour ??
+                                              s.hour) + 1
+                                          }ª${
+                                            mergedHoursMap[
+                                              s.existingSub.exitAfterHour
+                                            ]?.time
+                                              ? ` (${
+                                                  mergedHoursMap[
+                                                    s.existingSub.exitAfterHour
+                                                  ].time
+                                                })`
+                                              : ''
+                                          }`
                                         : 'Alunni divisi tra le classi'}
                                     </span>
                                     <button
@@ -12632,6 +13318,70 @@ export default function App() {
                                     >
                                       ⏪ Anticipa lezione
                                     </button>
+                                    {/*
+                                      Quando l'ora scoperta è la prima o
+                                      l'ultima della classe si può chiudere
+                                      la giornata senza sostituto: la classe
+                                      entra più tardi o esce prima. L'orario
+                                      vero di entrata e di uscita è scritto
+                                      sul pulsante, così chi avvisa le
+                                      famiglie non deve andarlo a cercare.
+                                    */}
+                                    {(() => {
+                                      const v = getVariazioniClasse(
+                                        absence,
+                                        s.hour,
+                                        s.classId
+                                      );
+                                      return (
+                                        <>
+                                          {v.entrata && (
+                                            <button
+                                              onClick={() =>
+                                                handleConfirmVariazioneClasse(
+                                                  absence,
+                                                  s.hour,
+                                                  s.classId,
+                                                  s.subject,
+                                                  'entrata_posticipata',
+                                                  v.entrata
+                                                )
+                                              }
+                                              disabled={readOnlyMode}
+                                              title="Nessun sostituto: la classe entra all'ora successiva. Va avvisata la famiglia."
+                                              className="text-xs font-bold px-2 py-1 rounded-lg border bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100 cursor-pointer disabled:opacity-50"
+                                            >
+                                              🚪 Entra alla {v.entrata.label}
+                                              {v.entrata.time
+                                                ? ` (${v.entrata.time})`
+                                                : ''}
+                                            </button>
+                                          )}
+                                          {v.uscita && (
+                                            <button
+                                              onClick={() =>
+                                                handleConfirmVariazioneClasse(
+                                                  absence,
+                                                  s.hour,
+                                                  s.classId,
+                                                  s.subject,
+                                                  'uscita_anticipata',
+                                                  v.uscita
+                                                )
+                                              }
+                                              disabled={readOnlyMode}
+                                              title="Nessun sostituto: la classe esce al termine dell'ora precedente. Va avvisata la famiglia."
+                                              className="text-xs font-bold px-2 py-1 rounded-lg border bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100 cursor-pointer disabled:opacity-50"
+                                            >
+                                              🚪 Esce dopo la {v.uscita.label}
+                                              {v.uscita.time
+                                                ? ` (${v.uscita.time})`
+                                                : ''}
+                                            </button>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
                                   </div>
                                 )}
                               </div>
@@ -12810,6 +13560,137 @@ export default function App() {
                       </div>
                     ))}
                 </div>
+              )}
+            </div>
+
+            {/*
+              Ore a recupero dei permessi brevi: chi gestisce le sostituzioni
+              deve sapere a colpo d'occhio chi ha un debito di ore e quanto
+              vale, per chiamarlo quando la scuola ne ha bisogno.
+            */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="mb-4">
+                <h2 className="text-lg font-bold text-slate-800">
+                  ⏳ Ore a recupero (permessi brevi)
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Le ore si contano da sole dalle lezioni che il docente aveva
+                  nella fascia del permesso. Il numero si può correggere a
+                  mano. Quando le ore vengono restituite si spunta
+                  «recuperato» e il saldo scende.
+                </p>
+              </div>
+              {permessiOrari.righe.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">
+                  Nessun permesso breve registrato. I permessi si segnano qui
+                  sopra, scegliendo «Permesso» come tipo di assenza.
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-5">
+                    {permessiOrari.perDocente.map((v: any) => (
+                      <div
+                        key={v.teacherId}
+                        className={`p-3 rounded-lg border text-center ${
+                          v.saldo > 0
+                            ? 'bg-amber-50 border-amber-200'
+                            : 'bg-emerald-50 border-emerald-200'
+                        }`}
+                      >
+                        <div className="text-xs font-bold text-slate-700">
+                          {v.nome}
+                        </div>
+                        <div
+                          className={`text-lg font-black ${
+                            v.saldo > 0 ? 'text-amber-700' : 'text-emerald-700'
+                          }`}
+                          title="Ore ancora da recuperare"
+                        >
+                          {fmtOreRecupero(v.saldo)}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          su {fmtOreRecupero(v.ore)} di permesso
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-left text-slate-500 border-b border-slate-200">
+                          <th className="py-1.5 pr-2 font-bold">Data</th>
+                          <th className="py-1.5 pr-2 font-bold">Docente</th>
+                          <th className="py-1.5 pr-2 font-bold">Ore</th>
+                          <th className="py-1.5 pr-2 font-bold">Stato</th>
+                          <th className="py-1.5 font-bold">Note</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {permessiOrari.righe.map((r: any) => (
+                          <tr
+                            key={r.id}
+                            className="border-b border-slate-100 align-top"
+                          >
+                            <td className="py-2 pr-2 whitespace-nowrap">
+                              {r.date.split('-').reverse().join('.')}
+                            </td>
+                            <td className="py-2 pr-2 font-semibold">
+                              {r.nome}
+                            </td>
+                            <td className="py-2 pr-2">
+                              <input
+                                type="number"
+                                min={0.5}
+                                max={12}
+                                step={0.5}
+                                value={r.ore}
+                                onChange={(e) =>
+                                  handleSetRecuperoOre(r.id, e.target.value)
+                                }
+                                disabled={readOnlyMode}
+                                title="Ore da recuperare per questo permesso"
+                                className="w-16 border border-slate-300 rounded p-1 text-center disabled:opacity-50"
+                              />
+                              {r.oltreMeta && (
+                                <span
+                                  className="block text-[10px] font-bold text-rose-600 mt-0.5"
+                                  title={`Quel giorno il docente era in servizio ${fmtOreRecupero(
+                                    r.oreServizio
+                                  )}`}
+                                >
+                                  ⚠️ oltre metà servizio
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2 pr-2">
+                              <button
+                                onClick={() => handleToggleRecupero(r.id)}
+                                disabled={readOnlyMode}
+                                className={`px-2 py-1 rounded-lg border font-bold cursor-pointer disabled:opacity-50 ${
+                                  r.recuperata
+                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                    : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                                }`}
+                              >
+                                {r.recuperata
+                                  ? `✅ Recuperato${
+                                      r.recuperoDate
+                                        ? ` il ${r.recuperoDate
+                                            .split('-')
+                                            .reverse()
+                                            .join('.')}`
+                                        : ''
+                                    }`
+                                  : '⏳ Da recuperare'}
+                              </button>
+                            </td>
+                            <td className="py-2 text-slate-500">{r.note}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           </div>
