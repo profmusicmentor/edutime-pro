@@ -186,7 +186,7 @@ export default function Feedback() {
       {aperto && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 print:hidden">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full overflow-hidden text-left">
-            <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-start gap-4">
+            <div className="bg-brand-50 px-6 py-4 border-b border-brand-100 flex justify-between items-start gap-4">
               <div>
                 <h3 className="font-bold text-slate-800">
                   🐞 Scrivimi
@@ -216,7 +216,7 @@ export default function Feedback() {
                 <button
                   type="button"
                   onClick={chiudi}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-all cursor-pointer"
+                  className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2 px-4 rounded-lg transition-all cursor-pointer"
                 >
                   Chiudi
                 </button>
@@ -239,7 +239,7 @@ export default function Feedback() {
                     value={messaggio}
                     onChange={(evento) => setMessaggio(evento.target.value)}
                     placeholder="Es: nella stampa PDF le ore del sabato si sovrappongono..."
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300"
                   />
                 </div>
 
@@ -256,7 +256,7 @@ export default function Feedback() {
                     value={email}
                     onChange={(evento) => setEmail(evento.target.value)}
                     placeholder="nome@provider.it"
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300"
                   />
                 </div>
 
@@ -276,7 +276,7 @@ export default function Feedback() {
                         <button
                           type="button"
                           onClick={togliScreenshot}
-                          className="mt-1 text-red-600 hover:underline font-semibold cursor-pointer"
+                          className="mt-1 text-fucsia-600 hover:underline font-semibold cursor-pointer"
                         >
                           Togli l'immagine
                         </button>
@@ -292,7 +292,7 @@ export default function Feedback() {
                         onChange={(evento) =>
                           void prendiFile(evento.target.files?.[0])
                         }
-                        className="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 file:cursor-pointer"
+                        className="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 file:cursor-pointer"
                       />
                       <p className="text-[11px] text-slate-400 mt-1">
                         {caricando
@@ -302,7 +302,7 @@ export default function Feedback() {
                     </>
                   )}
                   {erroreFile && (
-                    <p className="text-xs text-red-600 mt-1">{erroreFile}</p>
+                    <p className="text-xs text-fucsia-600 mt-1">{erroreFile}</p>
                   )}
                 </div>
 
@@ -329,7 +329,7 @@ export default function Feedback() {
                 />
 
                 {stato === 'errore' && (
-                  <p className="text-xs text-red-600">
+                  <p className="text-xs text-fucsia-600">
                     Non sono riuscito a inviarlo. Riprova tra un minuto.
                   </p>
                 )}
@@ -341,7 +341,7 @@ export default function Feedback() {
                     caricando ||
                     messaggio.trim().length < 3
                   }
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-all cursor-pointer"
+                  className="w-full bg-brand-600 hover:bg-brand-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-all cursor-pointer"
                 >
                   {stato === 'inviando' ? 'Invio...' : 'Invia'}
                 </button>

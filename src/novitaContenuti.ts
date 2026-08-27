@@ -20,7 +20,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-08-26';
+export const NOVITA_VERSIONE = '2026-08-27';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -32,6 +32,15 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-08-27',
+    data: '27 agosto 2026',
+    voci: [
+      'Faccia nuova. EduTime Pro ha finalmente un marchio suo: tre caselle d\'orario e il cerchio del tempo. Prima al suo posto c\'era ancora l\'icona di default dello strumento con cui l\'app è costruita.',
+      'Colori di casa. Tutta l\'app passa alla palette di biscottodigitale.com: blu scuro per le testate, blu medio per i pulsanti, giallo lime per «Auto-Genera Orario». Verde salvia per le conferme, arancio per gli avvisi, rosa per gli errori. Cambia solo l\'aspetto: dati, orari, stampa A3 ed Excel funzionano esattamente come prima.',
+      'Carattere unico per tutti. L\'app ora carica il carattere Inter invece di usare quello del computer di chi la apre: le tabelle dell\'orario si vedono uguali su Windows, Mac e telefono.',
+    ],
+  },
   {
     versione: '2026-08-26',
     data: '26 agosto 2026',
@@ -72,15 +81,6 @@ export const NOVITA: VoceNovita[] = [
     data: '22 agosto 2026',
     voci: [
       'Preferenza oraria per docente: in Sezioni & Regole, nel riquadro "Indisponibilità", accanto a ogni docente c\'è il menu "Preferisce", con le prime ore o le ultime. È un desiderio, non un vincolo: l\'algoritmo prova a far cominciare lì la giornata di quel docente, ma se l\'orario non regge in altro modo piazza l\'ora dove può invece di lasciarla fuori. Per un vincolo vero restano le ore bloccate con ⏰.',
-    ],
-  },
-  {
-    versione: '2026-08-21b',
-    data: '21 agosto 2026',
-    voci: [
-      'La classe si legge nell\'Orario Generale: nelle caselle del quadro comparivano solo le frecce blu del menu, e su uno schermo piccolo non si capiva quale classe fosse coinvolta. Ora la sigla della classe è sempre scritta nella casella, e il menu si apre cliccandoci sopra come prima.',
-      'Orario per laboratorio: in Viste Singole c\'è la vista "🔬 Laboratorio". Si sceglie un\'aula speciale (palestra, laboratori, aula magna) e si vede ora per ora quale classe c\'è e con quale docente. Con 🖨️ si stampa in A4 il foglio da attaccare dietro la porta.',
-      'Ore buco, entrate e uscite: in Viste Singole c\'è la vista "⚖️ Equità", che conta per ogni docente le ore buco, i giorni in cui entra dopo la prima ora e quelli in cui esce prima della fine delle lezioni. In rosso chi sta sopra la media; si ordina cliccando l\'intestazione delle colonne e si stampa con 🖨️.',
     ],
   },
 ];

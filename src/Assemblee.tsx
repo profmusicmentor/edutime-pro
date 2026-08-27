@@ -610,7 +610,7 @@ export default function Assemblee({
       onClick={() => setSubTab(key)}
       className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
         subTab === key
-          ? 'bg-indigo-600 text-white shadow-sm'
+          ? 'bg-brand-600 text-white shadow-sm'
           : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
       }`}
     >
@@ -684,7 +684,7 @@ export default function Assemblee({
             </label>
             <button
               onClick={esportaExcel}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm"
+              className="bg-salvia-600 hover:bg-salvia-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm"
             >
               Esporta Excel 📊
             </button>
@@ -692,7 +692,7 @@ export default function Assemblee({
         </div>
 
         {inRegola.length > 0 && (
-          <div className="mt-4 bg-rose-50 border border-rose-200 rounded-lg p-3 text-sm text-rose-800">
+          <div className="mt-4 bg-fucsia-50 border border-fucsia-200 rounded-lg p-3 text-sm text-fucsia-800">
             <span className="font-bold">
               {inRegola.length} {inRegola.length === 1 ? 'persona' : 'persone'}{' '}
               oltre i limiti:
@@ -759,13 +759,13 @@ export default function Assemblee({
               </label>
               <button
                 onClick={aggiungiAssemblea}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-sm"
+                className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-sm"
               >
                 Aggiungi
               </button>
             </div>
             {formErr && (
-              <p className="mt-2 text-sm font-semibold text-rose-600">
+              <p className="mt-2 text-sm font-semibold text-fucsia-600">
                 {formErr}
               </p>
             )}
@@ -799,7 +799,7 @@ export default function Assemblee({
                       {a.titolo || 'Assemblea sindacale'}
                     </div>
                     {domenica && (
-                      <div className="text-xs font-semibold text-amber-600 mt-1">
+                      <div className="text-xs font-semibold text-bruciato-600 mt-1">
                         Attenzione: questa data è una domenica, le ore di
                         servizio non si possono calcolare.
                       </div>
@@ -818,7 +818,7 @@ export default function Assemblee({
                   </button>
                   <button
                     onClick={() => eliminaAssemblea(a.id)}
-                    className="text-rose-600 hover:bg-rose-50 px-3 py-2 rounded-lg text-sm font-bold"
+                    className="text-fucsia-600 hover:bg-fucsia-50 px-3 py-2 rounded-lg text-sm font-bold"
                   >
                     Elimina
                   </button>
@@ -849,14 +849,14 @@ export default function Assemblee({
                           <label
                             key={p.id}
                             className={`flex flex-wrap items-center gap-3 px-3 py-2 cursor-pointer ${
-                              scelta ? 'bg-indigo-50/50' : 'hover:bg-slate-50'
+                              scelta ? 'bg-brand-50/50' : 'hover:bg-slate-50'
                             }`}
                           >
                             <input
                               type="checkbox"
                               checked={scelta}
                               onChange={() => togglePartecipante(a, p.id)}
-                              className="w-4 h-4 accent-indigo-600"
+                              className="w-4 h-4 accent-brand-600"
                             />
                             <span className="flex-1 min-w-[160px] text-sm font-semibold text-slate-700">
                               {p.name}
@@ -870,7 +870,7 @@ export default function Assemblee({
                                 <span className="text-sm font-bold text-slate-700">
                                   {fmtOreEstese(ore)}
                                   {manuale && (
-                                    <span className="ml-1 text-xs font-normal text-amber-600">
+                                    <span className="ml-1 text-xs font-normal text-bruciato-600">
                                       (a mano)
                                     </span>
                                   )}
@@ -889,12 +889,12 @@ export default function Assemblee({
                                   className="w-24 border border-slate-300 rounded-lg px-2 py-1 text-sm"
                                 />
                                 {riga && riga.oltreOre && (
-                                  <span className="text-xs font-bold text-rose-600">
+                                  <span className="text-xs font-bold text-fucsia-600">
                                     oltre le {config.maxOreAnno} ore
                                   </span>
                                 )}
                                 {riga && riga.mesiOltre.length > 0 && (
-                                  <span className="text-xs font-bold text-rose-600">
+                                  <span className="text-xs font-bold text-fucsia-600">
                                     più di {config.maxAlMese} nel mese
                                   </span>
                                 )}
@@ -956,7 +956,7 @@ export default function Assemblee({
             </label>
             <button
               onClick={aggiungiPersona}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-sm"
+              className="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-sm"
             >
               Aggiungi
             </button>
@@ -992,7 +992,7 @@ export default function Assemblee({
                           onChange={(e) =>
                             aggiornaPersona(p.id, { name: e.target.value })
                           }
-                          className="w-44 border border-transparent hover:border-slate-300 focus:border-indigo-400 rounded px-2 py-1 font-semibold text-slate-700"
+                          className="w-44 border border-transparent hover:border-slate-300 focus:border-brand-400 rounded px-2 py-1 font-semibold text-slate-700"
                         />
                       </td>
                       <td className="px-3 py-2">
@@ -1002,7 +1002,7 @@ export default function Assemblee({
                           onChange={(e) =>
                             aggiornaPersona(p.id, { ruolo: e.target.value })
                           }
-                          className="w-32 border border-transparent hover:border-slate-300 focus:border-indigo-400 rounded px-2 py-1 text-slate-600"
+                          className="w-32 border border-transparent hover:border-slate-300 focus:border-brand-400 rounded px-2 py-1 text-slate-600"
                         />
                       </td>
                       {days.map((_, i) => (
@@ -1022,7 +1022,7 @@ export default function Assemblee({
                             title="Doppio clic per copiare questa fascia da lunedì a venerdì"
                             className={`w-28 border rounded px-2 py-1 text-center ${
                               p.orario[i] && !parseRange(p.orario[i])
-                                ? 'border-rose-400 bg-rose-50 text-rose-700'
+                                ? 'border-fucsia-400 bg-fucsia-50 text-fucsia-700'
                                 : 'border-slate-200'
                             }`}
                           />
@@ -1031,7 +1031,7 @@ export default function Assemblee({
                       <td className="px-3 py-2 text-right">
                         <button
                           onClick={() => eliminaPersona(p.id)}
-                          className="text-rose-600 hover:bg-rose-50 px-2 py-1 rounded font-bold"
+                          className="text-fucsia-600 hover:bg-fucsia-50 px-2 py-1 rounded font-bold"
                         >
                           ✕
                         </button>
@@ -1083,7 +1083,7 @@ export default function Assemblee({
                       key={r.id}
                       className={
                         r.oltreOre || r.mesiOltre.length > 0
-                          ? 'bg-rose-50'
+                          ? 'bg-fucsia-50'
                           : 'hover:bg-slate-50'
                       }
                     >
@@ -1102,12 +1102,12 @@ export default function Assemblee({
                       </td>
                       <td className="px-3 py-2 text-center">
                         {r.oltreOre && (
-                          <span className="inline-block bg-rose-100 text-rose-800 rounded-full px-2 py-0.5 text-xs font-bold mr-1">
+                          <span className="inline-block bg-fucsia-100 text-fucsia-800 rounded-full px-2 py-0.5 text-xs font-bold mr-1">
                             oltre le ore
                           </span>
                         )}
                         {r.mesiOltre.length > 0 && (
-                          <span className="inline-block bg-rose-100 text-rose-800 rounded-full px-2 py-0.5 text-xs font-bold">
+                          <span className="inline-block bg-fucsia-100 text-fucsia-800 rounded-full px-2 py-0.5 text-xs font-bold">
                             {r.mesiOltre.length === 1
                               ? 'mese pieno'
                               : 'mesi pieni'}

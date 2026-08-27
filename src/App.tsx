@@ -48,30 +48,30 @@ const escapeXml = (str: any) => {
 };
 
 const DEPARTMENT_COLORS: Record<string, string> = {
-  LETTERE: '#dbeafe',
-  'MATEM. SCI.': '#ede9fe',
-  MATEMATICA: '#ede9fe',
-  SCIENZE: '#ede9fe',
-  INGLESE: '#d1fae5',
-  SPAGNOLO: '#fef3c7',
+  LETTERE: '#e3eef5',
+  'MATEM. SCI.': '#e3eef5',
+  MATEMATICA: '#e3eef5',
+  SCIENZE: '#e3eef5',
+  INGLESE: '#e8eee5',
+  SPAGNOLO: '#f7e8e3',
   TEDESCO: '#fce7f3',
   FRANCESE: '#e9d5ff',
-  TECNOLOGIA: '#ffedd5',
+  TECNOLOGIA: '#f7e8e3',
   ARTE: '#fae8ff',
   MUSICA: '#ccfbf1',
   'ED. FISICA': '#dcfce7',
   RELIGIONE: '#fef9c3',
   SOSTEGNO: '#fed7aa',
-  CLARINETTO: '#e0e7ff',
-  VIOLINO: '#e0e7ff',
-  CHITARRA: '#e0e7ff',
-  PIANOFORTE: '#e0e7ff',
+  CLARINETTO: '#e3eef5',
+  VIOLINO: '#e3eef5',
+  CHITARRA: '#e3eef5',
+  PIANOFORTE: '#e3eef5',
 };
 const getDeptColor = (subject: string) =>
   DEPARTMENT_COLORS[subject] || '#f1f5f9';
-const DAY_OFF_COLOR = '#fee2e2';
-/** Cella di un'ora bloccata: ambra, per distinguerla dal giorno libero. */
-const HOUR_OFF_COLOR = '#fef3c7';
+const DAY_OFF_COLOR = '#fbe4eb';
+/** Cella di un'ora bloccata: arancio, per distinguerla dal giorno libero. */
+const HOUR_OFF_COLOR = '#f7e8e3';
 
 /**
  * Anni di corso che una sezione può contenere. Arriva fino al quinto per la
@@ -191,7 +191,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't1',
     name: 'PROF. ROSSI',
     subject: 'LETTERE',
-    color: '#3b82f6',
+    color: '#2b7fb3',
     preferConsecutive: true,
     assignments: [
       { classId: '1E', hours: 10 },
@@ -202,7 +202,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't2',
     name: 'PROF. BIANCHI',
     subject: 'LETTERE',
-    color: '#2563eb',
+    color: '#195275',
     preferConsecutive: true,
     assignments: [
       { classId: '1B', hours: 4 },
@@ -214,7 +214,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't3',
     name: 'PROF. VERDI',
     subject: 'LETTERE',
-    color: '#1d4ed8',
+    color: '#14425f',
     preferConsecutive: true,
     assignments: [
       { classId: '1F', hours: 10 },
@@ -226,7 +226,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't4',
     name: 'PROF. NERI',
     subject: 'LETTERE',
-    color: '#60a5fa',
+    color: '#65aad5',
     preferConsecutive: true,
     assignments: [
       { classId: '1A', hours: 8 },
@@ -238,7 +238,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't5',
     name: 'PROF. RUSSO',
     subject: 'LETTERE',
-    color: '#3b82f6',
+    color: '#2b7fb3',
     preferConsecutive: true,
     assignments: [
       { classId: '1B', hours: 6 },
@@ -250,7 +250,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't6',
     name: 'PROF. FERRARI',
     subject: 'LETTERE',
-    color: '#2563eb',
+    color: '#195275',
     preferConsecutive: true,
     assignments: [
       { classId: '2E', hours: 8 },
@@ -261,7 +261,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't7',
     name: 'PROF. ESPOSITO',
     subject: 'LETTERE',
-    color: '#1d4ed8',
+    color: '#14425f',
     preferConsecutive: true,
     assignments: [
       { classId: '1C', hours: 6 },
@@ -273,7 +273,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't8',
     name: 'PROF. ROMANO',
     subject: 'LETTERE',
-    color: '#60a5fa',
+    color: '#65aad5',
     preferConsecutive: true,
     assignments: [
       { classId: '2F', hours: 8 },
@@ -284,7 +284,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't9',
     name: 'PROF. COLOMBO',
     subject: 'LETTERE',
-    color: '#3b82f6',
+    color: '#2b7fb3',
     preferConsecutive: true,
     assignments: [
       { classId: '1G', hours: 10 },
@@ -296,7 +296,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't10',
     name: 'PROF. RICCI',
     subject: 'LETTERE',
-    color: '#2563eb',
+    color: '#195275',
     preferConsecutive: true,
     assignments: [
       { classId: '2E', hours: 2 },
@@ -307,7 +307,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't11',
     name: 'PROF. MARINO',
     subject: 'LETTERE',
-    color: '#1d4ed8',
+    color: '#14425f',
     preferConsecutive: true,
     assignments: [{ classId: '2G', hours: 2 }],
   },
@@ -315,7 +315,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't12',
     name: 'PROF. GRECO',
     subject: 'LETTERE',
-    color: '#60a5fa',
+    color: '#65aad5',
     preferConsecutive: true,
     assignments: [
       { classId: '2D', hours: 10 },
@@ -327,7 +327,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't13',
     name: 'PROF. BRUNO',
     subject: 'MATEM. SCI.',
-    color: '#a855f7',
+    color: '#2b7fb3',
     preferConsecutive: true,
     assignments: [
       { classId: '1C', hours: 6 },
@@ -339,7 +339,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't14',
     name: 'PROF. GALLO',
     subject: 'MATEM. SCI.',
-    color: '#9333ea',
+    color: '#195275',
     preferConsecutive: true,
     assignments: [
       { classId: '1G', hours: 6 },
@@ -351,7 +351,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't15',
     name: 'PROF. CONTI',
     subject: 'MATEM. SCI.',
-    color: '#7e22ce',
+    color: '#14425f',
     preferConsecutive: true,
     assignments: [
       { classId: '1D', hours: 4 },
@@ -363,7 +363,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't16',
     name: 'PROF. DE LUCA',
     subject: 'MATEM. SCI.',
-    color: '#c084fc',
+    color: '#a0c8e1',
     preferConsecutive: true,
     assignments: [
       { classId: '3A', hours: 6 },
@@ -375,7 +375,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't17',
     name: 'PROF. MANCINI',
     subject: 'MATEM. SCI.',
-    color: '#a855f7',
+    color: '#2b7fb3',
     preferConsecutive: true,
     assignments: [
       { classId: '1B', hours: 4 },
@@ -389,7 +389,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't18',
     name: 'PROF. COSTA',
     subject: 'MATEM. SCI.',
-    color: '#9333ea',
+    color: '#195275',
     preferConsecutive: true,
     assignments: [
       { classId: '1F', hours: 6 },
@@ -401,7 +401,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't19',
     name: 'PROF. GIORDANO',
     subject: 'MATEM. SCI.',
-    color: '#7e22ce',
+    color: '#14425f',
     preferConsecutive: true,
     assignments: [
       { classId: '1A', hours: 6 },
@@ -412,7 +412,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't20',
     name: 'PROF. FONTANA',
     subject: 'MATEM. SCI.',
-    color: '#c084fc',
+    color: '#a0c8e1',
     preferConsecutive: true,
     assignments: [
       { classId: '1B', hours: 2 },
@@ -425,7 +425,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't21',
     name: 'PROF. SERRA',
     subject: 'INGLESE',
-    color: '#10b981',
+    color: '#6ea54b',
     assignments: [
       { classId: '3A', hours: 3 },
       { classId: '1F', hours: 3 },
@@ -439,7 +439,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't22',
     name: 'PROF. SANTORO',
     subject: 'INGLESE',
-    color: '#059669',
+    color: '#598b39',
     assignments: [
       { classId: '1B', hours: 3 },
       { classId: '2B', hours: 3 },
@@ -453,7 +453,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't23',
     name: 'PROF. MARINI',
     subject: 'INGLESE',
-    color: '#047857',
+    color: '#48722c',
     assignments: [
       { classId: '1C', hours: 3 },
       { classId: '2C', hours: 3 },
@@ -530,7 +530,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't29',
     name: 'PROF. FERRARA',
     subject: 'TECNOLOGIA',
-    color: '#f59e0b',
+    color: '#d8613c',
     assignments: [
       { classId: '1G', hours: 2 },
       { classId: '2G', hours: 2 },
@@ -540,7 +540,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't30',
     name: 'PROF. SANTINI',
     subject: 'TECNOLOGIA',
-    color: '#d97706',
+    color: '#c04c28',
     assignments: [
       { classId: '1B', hours: 2 },
       { classId: '2B', hours: 2 },
@@ -557,7 +557,7 @@ const DEFAULT_TEACHERS: any[] = [
     id: 't31',
     name: 'PROF. PARODI',
     subject: 'TECNOLOGIA',
-    color: '#b45309',
+    color: '#9a4125',
     assignments: [
       { classId: '1A', hours: 2 },
       { classId: '2A', hours: 2 },
@@ -750,7 +750,7 @@ const DEFAULT_SOSTEGNO: any[] = [
     id: 's1',
     name: 'SOSTEGNO 1',
     subject: 'SOSTEGNO',
-    color: '#f59e0b',
+    color: '#d8613c',
     assignments: [
       { classId: '1D', hours: 9 },
       { classId: '3F', hours: 9 },
@@ -760,7 +760,7 @@ const DEFAULT_SOSTEGNO: any[] = [
     id: 's2',
     name: 'SOSTEGNO 2',
     subject: 'SOSTEGNO',
-    color: '#f59e0b',
+    color: '#d8613c',
     assignments: [
       { classId: '3A', hours: 9 },
       { classId: '2A', hours: 9 },
@@ -770,21 +770,21 @@ const DEFAULT_SOSTEGNO: any[] = [
     id: 's3',
     name: 'SOSTEGNO 3',
     subject: 'SOSTEGNO',
-    color: '#f59e0b',
+    color: '#d8613c',
     assignments: [{ classId: '3E', hours: 18 }],
   },
   {
     id: 's4',
     name: 'SOSTEGNO 4',
     subject: 'SOSTEGNO',
-    color: '#f59e0b',
+    color: '#d8613c',
     assignments: [{ classId: '3E', hours: 18 }],
   },
   {
     id: 's6',
     name: 'SOSTEGNO 6',
     subject: 'SOSTEGNO',
-    color: '#f59e0b',
+    color: '#d8613c',
     assignments: [
       { classId: '1C', hours: 9 },
       { classId: '2E', hours: 9 },
@@ -794,14 +794,14 @@ const DEFAULT_SOSTEGNO: any[] = [
     id: 's5',
     name: 'SOSTEGNO 5',
     subject: 'SOSTEGNO',
-    color: '#f59e0b',
+    color: '#d8613c',
     assignments: [{ classId: '2G', hours: 18 }],
   },
   {
     id: 's7',
     name: 'SOSTEGNO 7',
     subject: 'SOSTEGNO',
-    color: '#f59e0b',
+    color: '#d8613c',
     assignments: [
       { classId: '2B', hours: 9 },
       { classId: '3C', hours: 9 },
@@ -811,7 +811,7 @@ const DEFAULT_SOSTEGNO: any[] = [
     id: 's8',
     name: 'SOSTEGNO 8',
     subject: 'SOSTEGNO',
-    color: '#f59e0b',
+    color: '#d8613c',
     assignments: [
       { classId: '1A', hours: 6 },
       { classId: '1E', hours: 6 },
@@ -822,28 +822,28 @@ const DEFAULT_SOSTEGNO: any[] = [
     id: 's9',
     name: 'SOSTEGNO 9',
     subject: 'SOSTEGNO',
-    color: '#f59e0b',
+    color: '#d8613c',
     assignments: [{ classId: '1C', hours: 12 }],
   },
   {
     id: 's10',
     name: 'SOSTEGNO 10',
     subject: 'SOSTEGNO',
-    color: '#f59e0b',
+    color: '#d8613c',
     assignments: [{ classId: '1F', hours: 18 }],
   },
   {
     id: 's11',
     name: 'SOSTEGNO 11',
     subject: 'SOSTEGNO',
-    color: '#f59e0b',
+    color: '#d8613c',
     assignments: [{ classId: '3F', hours: 18 }],
   },
   {
     id: 's12',
     name: 'SOSTEGNO 12',
     subject: 'SOSTEGNO',
-    color: '#f59e0b',
+    color: '#d8613c',
     assignments: [{ classId: '3D', hours: 18 }],
   },
 ];
@@ -859,7 +859,7 @@ const DEFAULT_STRUMENTO: any[] = [
     id: 'm2',
     name: 'DOCENTE VIOLINO',
     subject: 'VIOLINO',
-    color: '#b45309',
+    color: '#9a4125',
     assignments: [],
   },
   {
@@ -2154,11 +2154,11 @@ const GiornataDocente = ({
           compatta ? 'px-1 py-0.5 min-w-[2.1rem]' : 'px-1.5 py-1 min-w-[2.8rem]'
         } ${
           o.classId
-            ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
+            ? 'bg-brand-50 border-brand-200 text-brand-800'
             : o.disponibile
-            ? 'bg-amber-50 border-amber-300 text-amber-800'
+            ? 'bg-bruciato-50 border-bruciato-300 text-bruciato-800'
             : o.bloccata
-            ? 'bg-rose-50 border-rose-200 text-rose-700'
+            ? 'bg-fucsia-50 border-fucsia-200 text-fucsia-700'
             : 'bg-slate-50 border-slate-200 text-slate-400'
         }`}
       >
@@ -2275,7 +2275,7 @@ export default function App() {
   const [newTeacherName, setNewTeacherName] = useState('');
   const [newTeacherSubject, setNewTeacherSubject] = useState('');
   const [newTeacherType, setNewTeacherType] = useState('materia');
-  const [newTeacherColor, setNewTeacherColor] = useState('#4f46e5');
+  const [newTeacherColor, setNewTeacherColor] = useState('#195275');
   const [newSectionName, setNewSectionName] = useState('');
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomSubjects, setNewRoomSubjects] = useState('');
@@ -6934,11 +6934,11 @@ export default function App() {
   /** Stili condivisi dai due fogli dell'export Excel. */
   const buildExcelStyles = (): Record<string, XlsxStyle> => {
     const styles: Record<string, XlsxStyle> = {
-      Title: { bold: true, size: 14, color: '#1E3A8A', align: 'left' },
+      Title: { bold: true, size: 14, color: '#13233c', align: 'left' },
       Header: {
         bold: true,
         color: '#FFFFFF',
-        fill: '#1E3A8A',
+        fill: '#13233c',
         align: 'center',
         wrap: true,
         border: true,
@@ -6953,7 +6953,7 @@ export default function App() {
       },
       HoursCell: {
         bold: true,
-        color: '#1E3A8A',
+        color: '#13233c',
         fill: '#F0F4FF',
         align: 'center',
         border: true,
@@ -6961,7 +6961,7 @@ export default function App() {
       ClassList: {
         bold: true,
         size: 9,
-        color: '#4F46E5',
+        color: '#195275',
         fill: '#EEF2F6',
         align: 'left',
         wrap: true,
@@ -6969,8 +6969,8 @@ export default function App() {
       },
       ActiveLesson: {
         bold: true,
-        color: '#1E3A8A',
-        fill: '#DBEAFE',
+        color: '#13233c',
+        fill: '#e3eef5',
         align: 'center',
         border: true,
       },
@@ -6979,12 +6979,12 @@ export default function App() {
         bold: true,
         italic: true,
         size: 9,
-        color: '#991B1B',
+        color: '#911a40',
         fill: DAY_OFF_COLOR,
         align: 'center',
         border: true,
       },
-      DeptSeparator: { fill: '#1E3A8A' },
+      DeptSeparator: { fill: '#13233c' },
     };
     Object.entries(DEPARTMENT_COLORS).forEach(([dept, color]) => {
       styles[`Dept_${dept.replace(/[^A-Za-z0-9]/g, '_')}`] = {
@@ -7159,7 +7159,7 @@ export default function App() {
       setPrintAlertOpen(true);
       return;
     }
-    let css = `@page { size: A3 landscape; margin: 6mm; } * { box-sizing: border-box; } body { background-color: white; color: black; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 6mm; font-size: 7.5pt; } h1 { font-size: 14pt; font-weight: bold; margin: 0 0 4mm 0; color: #1e3a8a; text-align: center; } h2 { font-size: 9pt; margin: 0 0 2mm 0; color: #1e3a8a; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #1e3a8a; padding-bottom: 1mm; } table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 3mm; } tr { page-break-inside: auto; } td, th { border: 0.5pt solid #64748b; padding: 1.5pt 2pt; text-align: center; font-size: 6.5pt; line-height: 1.15; overflow: hidden; vertical-align: middle; } th { background-color: #1e3a8a !important; color: white !important; font-weight: bold; font-size: 6.5pt; border: 1pt solid #1e3a8a; } th.sub { background-color: #e5e7eb !important; color: #374151 !important; font-size: 6pt; } td.staff-cell { text-align: left; font-weight: bold; font-size: 7pt; padding: 2pt 3pt; } td.staff-cell .subj { font-size: 5.5pt; font-weight: normal; color: #374151; text-transform: uppercase; display: block; } td.hours-cell { font-weight: bold; color: #1e3a8a; background-color: #f0f4ff !important; } td.class-cell { text-align: left; color: #4f46e5; font-weight: bold; font-size: 6pt; } td.day-off { background-color: ${DAY_OFF_COLOR} !important; color: #991b1b !important; font-style: italic; font-weight: bold; font-size: 6pt; } td.lesson-active { background-color: #dbeafe !important; color: #1e3a8a !important; font-weight: bold; font-size: 7.5pt; line-height: 1.05; } td.lesson-active .room { display: block; font-size: 4.2pt; font-weight: normal; color: #4338ca; letter-spacing: -0.15pt; white-space: nowrap; } td.empty { background-color: #fafafa; } tr.dept-separator td { background-color: #1e3a8a !important; height: 3pt; padding: 0; } .page-break { page-break-before: always; } .day-sep { border-right: 2pt solid #1e3a8a !important; }`;
+    let css = `@page { size: A3 landscape; margin: 6mm; } * { box-sizing: border-box; } body { background-color: white; color: black; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 6mm; font-size: 7.5pt; } h1 { font-size: 14pt; font-weight: bold; margin: 0 0 4mm 0; color: #13233c; text-align: center; } h2 { font-size: 9pt; margin: 0 0 2mm 0; color: #13233c; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #13233c; padding-bottom: 1mm; } table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 3mm; } tr { page-break-inside: auto; } td, th { border: 0.5pt solid #64748b; padding: 1.5pt 2pt; text-align: center; font-size: 6.5pt; line-height: 1.15; overflow: hidden; vertical-align: middle; } th { background-color: #13233c !important; color: white !important; font-weight: bold; font-size: 6.5pt; border: 1pt solid #13233c; } th.sub { background-color: #e5e7eb !important; color: #374151 !important; font-size: 6pt; } td.staff-cell { text-align: left; font-weight: bold; font-size: 7pt; padding: 2pt 3pt; } td.staff-cell .subj { font-size: 5.5pt; font-weight: normal; color: #374151; text-transform: uppercase; display: block; } td.hours-cell { font-weight: bold; color: #13233c; background-color: #f2f7fa !important; } td.class-cell { text-align: left; color: #195275; font-weight: bold; font-size: 6pt; } td.day-off { background-color: ${DAY_OFF_COLOR} !important; color: #911a40 !important; font-style: italic; font-weight: bold; font-size: 6pt; } td.lesson-active { background-color: #e3eef5 !important; color: #13233c !important; font-weight: bold; font-size: 7.5pt; line-height: 1.05; } td.lesson-active .room { display: block; font-size: 4.2pt; font-weight: normal; color: #14425f; letter-spacing: -0.15pt; white-space: nowrap; } td.empty { background-color: #fafafa; } tr.dept-separator td { background-color: #13233c !important; height: 3pt; padding: 0; } .page-break { page-break-before: always; } .day-sep { border-right: 2pt solid #13233c !important; }`;
     let contentHtml = `<html><head><title>Orario - EduTime Pro</title><style>${css}</style></head><body>`;
     if (printType === 'master') {
       // Un tabellone solo, con le ore del mattino e quelle del pomeriggio
@@ -7282,7 +7282,7 @@ export default function App() {
           staff.subject
         )}</span></td><td class="hours-cell">${
           staffHoursPlanned[staff.id]
-        }h</td><td class="class-cell" style="color: #10b981;">${escapeXml(
+        }h</td><td class="class-cell" style="color: #6ea54b;">${escapeXml(
           staffClassSummary[staff.id]
         )}</td>`;
         DAYS_IN_USE.forEach((_, dIdx) => {
@@ -7370,7 +7370,7 @@ export default function App() {
                       allStaff.find((s) => s.id === l.teacherId)?.name
                     )}</span>${
                       isNamedRoom(l.room)
-                        ? `<br/><span style="font-size:9px;color:#4338ca;">📍 ${escapeXml(
+                        ? `<br/><span style="font-size:9px;color:#14425f;">📍 ${escapeXml(
                             l.room
                           )}</span>`
                         : ''
@@ -7385,7 +7385,7 @@ export default function App() {
       const deptColor = getDeptColor(staff?.subject);
       contentHtml = `<html><head><title>Orario ${
         staff?.name
-      }</title><style>@page { size: A4 portrait; margin: 15mm; } body { font-family: sans-serif; font-size: 12px; margin: 15mm; padding: 0; } table { width: 100%; border-collapse: collapse; page-break-inside: avoid; } th, td { border: 1px solid #ccc; padding: 8px; text-align: center; } th { background-color: #f0f0f0; } .dayoff { background-color: ${DAY_OFF_COLOR}; color: #991b1b; font-weight: bold; font-style: italic; } tr { page-break-inside: avoid; }</style></head><body><h2 style="text-align:center; background-color: ${deptColor}; padding: 10px; border-radius: 4px;">Orario: ${
+      }</title><style>@page { size: A4 portrait; margin: 15mm; } body { font-family: sans-serif; font-size: 12px; margin: 15mm; padding: 0; } table { width: 100%; border-collapse: collapse; page-break-inside: avoid; } th, td { border: 1px solid #ccc; padding: 8px; text-align: center; } th { background-color: #f0f0f0; } .dayoff { background-color: ${DAY_OFF_COLOR}; color: #911a40; font-weight: bold; font-style: italic; } tr { page-break-inside: avoid; }</style></head><body><h2 style="text-align:center; background-color: ${deptColor}; padding: 10px; border-radius: 4px;">Orario: ${
         staff?.name
       }</h2><h3 style="text-align:center; color: #666;">${
         staff?.subject
@@ -7415,12 +7415,12 @@ export default function App() {
                   slot.hour === dh.index
               );
               return `<td style="${
-                l ? 'background-color: #dbeafe; font-weight: bold;' : ''
+                l ? 'background-color: #e3eef5; font-weight: bold;' : ''
               }">${
                 l
                   ? `<b>Classe ${escapeXml(l.classId)}</b>${
                       isNamedRoom(l.room)
-                        ? `<br/><span style="font-size:9px;font-weight:normal;color:#4338ca;">📍 ${escapeXml(
+                        ? `<br/><span style="font-size:9px;font-weight:normal;color:#14425f;">📍 ${escapeXml(
                             l.room
                           )}</span>`
                         : ''
@@ -7457,7 +7457,7 @@ export default function App() {
                     slot.type === 'pomeriggio_musica')
               );
               if (!inAula.length) return `<td>-</td>`;
-              return `<td style="background-color:#eef2ff;">${inAula
+              return `<td style="background-color:#f2f7fa;">${inAula
                 .map(
                   (l: any) =>
                     `<span class="cls">${escapeXml(
@@ -7469,7 +7469,7 @@ export default function App() {
                       l.subject
                     )}</span>`
                 )
-                .join('<hr style="border:0;border-top:1px dashed #c7d2fe;margin:3px 0;"/>')}</td>`;
+                .join('<hr style="border:0;border-top:1px dashed #c7deed;margin:3px 0;"/>')}</td>`;
             }).join('')}</tr>`
         )
         .join('')}</tbody></table></body></html>`;
@@ -7536,11 +7536,11 @@ export default function App() {
     const daySubs = substitutions.filter((s2) => s2.date === substitutionsDate);
 
     const stili: Record<string, XlsxStyle> = {
-      titolo: { bold: true, size: 14, color: '#1E3A8A' },
+      titolo: { bold: true, size: 14, color: '#13233c' },
       intestazione: {
         bold: true,
         color: '#FFFFFF',
-        fill: '#1E3A8A',
+        fill: '#13233c',
         align: 'center',
         border: true,
       },
@@ -7549,8 +7549,8 @@ export default function App() {
       attenzione: {
         border: true,
         bold: true,
-        fill: '#FEF3C7',
-        color: '#92400E',
+        fill: '#f7e8e3',
+        color: '#7a3722',
       },
     };
 
@@ -7860,7 +7860,7 @@ export default function App() {
       (s) => s.date === substitutionsDate
     );
 
-    const css = `@page { size: A4 landscape; margin: 8mm; } * { box-sizing: border-box; } body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; color: #111827; font-size: 8pt; } h1 { text-align: center; font-size: 13pt; margin: 0 0 1mm 0; color: #1e3a8a; } h2 { text-align: center; font-size: 10pt; margin: 0 0 4mm 0; text-decoration: underline; } h3 { font-size: 8.5pt; text-transform: uppercase; background: #1e3a8a; color: white; margin: 4mm 0 0 0; padding: 1.5mm 2mm; } table { width: 100%; border-collapse: collapse; margin-bottom: 2mm; } th, td { border: 0.5pt solid #64748b; padding: 1.5pt 2pt; text-align: center; vertical-align: middle; font-size: 7.5pt; } th { background: #e5e7eb; font-weight: bold; } td.name-cell { text-align: left; font-weight: bold; padding-left: 2mm; } td.motivo-cell, td.note-cell { text-align: left; font-size: 7pt; } td.empty-row { font-style: italic; color: #6b7280; text-align: left; padding-left: 2mm; } span.room { display: block; font-size: 5.5pt; font-weight: normal; color: #4338ca; letter-spacing: -0.1pt; } .legend { font-size: 7pt; margin-top: 2mm; color: #374151; }`;
+    const css = `@page { size: A4 landscape; margin: 8mm; } * { box-sizing: border-box; } body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; color: #111827; font-size: 8pt; } h1 { text-align: center; font-size: 13pt; margin: 0 0 1mm 0; color: #13233c; } h2 { text-align: center; font-size: 10pt; margin: 0 0 4mm 0; text-decoration: underline; } h3 { font-size: 8.5pt; text-transform: uppercase; background: #13233c; color: white; margin: 4mm 0 0 0; padding: 1.5mm 2mm; } table { width: 100%; border-collapse: collapse; margin-bottom: 2mm; } th, td { border: 0.5pt solid #64748b; padding: 1.5pt 2pt; text-align: center; vertical-align: middle; font-size: 7.5pt; } th { background: #e5e7eb; font-weight: bold; } td.name-cell { text-align: left; font-weight: bold; padding-left: 2mm; } td.motivo-cell, td.note-cell { text-align: left; font-size: 7pt; } td.empty-row { font-style: italic; color: #6b7280; text-align: left; padding-left: 2mm; } span.room { display: block; font-size: 5.5pt; font-weight: normal; color: #14425f; letter-spacing: -0.1pt; } .legend { font-size: 7pt; margin-top: 2mm; color: #374151; }`;
 
     let html = `<html><head><title>Foglio Supplenze ${escapeXml(
       dateLabel
@@ -8152,7 +8152,7 @@ export default function App() {
           }`
         : 'nessuna supplenza retribuita registrata';
 
-    const css = `@page { size: A4 portrait; margin: 15mm; } body { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; font-size: 10pt; } h1 { font-size: 14pt; margin: 0 0 2mm 0; color: #1e3a8a; } p.sub { margin: 0 0 6mm 0; font-size: 9pt; color: #374151; } table { width: 100%; border-collapse: collapse; } th, td { border: 0.5pt solid #64748b; padding: 2mm; font-size: 9pt; } th { background: #e5e7eb; } td.num { text-align: center; font-weight: bold; } tr.totale td { background: #f1f5f9; font-weight: bold; } p.legend { margin-top: 6mm; font-size: 8pt; color: #374151; }`;
+    const css = `@page { size: A4 portrait; margin: 15mm; } body { font-family: 'Segoe UI', Arial, sans-serif; color: #111827; font-size: 10pt; } h1 { font-size: 14pt; margin: 0 0 2mm 0; color: #13233c; } p.sub { margin: 0 0 6mm 0; font-size: 9pt; color: #374151; } table { width: 100%; border-collapse: collapse; } th, td { border: 0.5pt solid #64748b; padding: 2mm; font-size: 9pt; } th { background: #e5e7eb; } td.num { text-align: center; font-weight: bold; } tr.totale td { background: #f1f5f9; font-weight: bold; } p.legend { margin-top: 6mm; font-size: 8pt; color: #374151; }`;
 
     let html = `<html><head><title>Riepilogo ore di disponibilità e supplenze</title><style>${css}</style></head><body>`;
     html += `<h1>Riepilogo ore di disponibilità e supplenze retribuite</h1>`;
@@ -8259,7 +8259,7 @@ export default function App() {
                     onClick={() =>
                       navigator.clipboard?.writeText(shareUrl(workspace.code))
                     }
-                    className="block mt-2 text-xs font-semibold text-indigo-700 hover:underline"
+                    className="block mt-2 text-xs font-semibold text-brand-700 hover:underline"
                   >
                     🔗 Copia il link di invito per i colleghi
                   </button>
@@ -8270,7 +8270,7 @@ export default function App() {
             <div className="flex flex-col gap-2">
               <button
                 onClick={handleBackupDownload}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-lg text-sm"
+                className="bg-salvia-600 hover:bg-salvia-700 text-white font-semibold py-2.5 px-4 rounded-lg text-sm"
               >
                 💾 Scarica backup (.json)
               </button>
@@ -8293,7 +8293,7 @@ export default function App() {
                 }}
               />
               {restoreError && (
-                <p className="text-xs text-rose-600">{restoreError}</p>
+                <p className="text-xs text-fucsia-600">{restoreError}</p>
               )}
               <a
                 href="/guida"
@@ -8305,7 +8305,7 @@ export default function App() {
               </a>
               <button
                 onClick={handleLeaveWorkspace}
-                className="text-sm text-slate-500 hover:text-rose-600 underline mt-2"
+                className="text-sm text-slate-500 hover:text-fucsia-600 underline mt-2"
               >
                 Esci e cambia scuola
               </button>
@@ -8313,7 +8313,7 @@ export default function App() {
           </div>
         </div>
       )}
-      <header className="bg-gradient-to-r from-blue-700 via-indigo-800 to-purple-950 text-white shadow-md p-4 print:hidden shrink-0 relative z-40">
+      <header className="bg-gradient-to-r from-brand-700 via-brand-800 to-brand-950 text-white shadow-md p-4 print:hidden shrink-0 relative z-40">
         <div
           className={`mx-auto flex flex-col md:flex-row justify-between items-center gap-4 transition-all duration-300 ${
             isFullWidth ? 'max-w-full px-4' : 'max-w-7xl'
@@ -8321,23 +8321,22 @@ export default function App() {
         >
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-white/10 rounded-xl">
+              {/* Marchio EduTime Pro: tre caselle d'orario e il cerchio del tempo. */}
               <svg
-                className="w-8 h-8 text-indigo-200"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+                className="w-8 h-8"
+                viewBox="0 0 48 48"
+                role="img"
+                aria-label="EduTime Pro"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
+                <rect x="0" y="0" width="21" height="21" rx="5" fill="#b1c5a4" />
+                <circle cx="37.5" cy="10.5" r="10.5" fill="#cbd817" />
+                <rect x="0" y="27" width="21" height="21" rx="5" fill="#f8f9fa" />
+                <rect x="27" y="27" width="21" height="21" rx="5" fill="#b1c5a4" />
               </svg>
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">EduTime Pro</h1>
-              <p className="text-xs text-indigo-200 flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <p className="text-xs text-brand-200 flex items-center gap-1.5 mt-0.5 flex-wrap">
                 <span className="font-semibold text-white/90">
                   {workspace.label}
                 </span>
@@ -8348,28 +8347,28 @@ export default function App() {
                   </span>
                 )}
                 {cloudStatus === 'sincronizzato' && (
-                  <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.5 rounded-sm">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />{' '}
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-salvia-500/20 text-salvia-300 font-bold px-1.5 py-0.5 rounded-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-salvia-400 animate-pulse" />{' '}
                     CLOUD SINCRONIZZATO
                   </span>
                 )}
                 {cloudStatus === 'salvataggio' && (
-                  <span className="inline-flex items-center gap-1 text-[10px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.5 rounded-sm">
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-bruciato-500/20 text-bruciato-300 font-bold px-1.5 py-0.5 rounded-sm">
                     💾 SALVATAGGIO...
                   </span>
                 )}
                 {cloudStatus === 'connessione' && (
-                  <span className="inline-flex items-center gap-1 text-[10px] bg-blue-500/20 text-blue-300 font-bold px-1.5 py-0.5 rounded-sm animate-pulse">
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-brand-500/20 text-brand-300 font-bold px-1.5 py-0.5 rounded-sm animate-pulse">
                     ⚡ CONNESSIONE...
                   </span>
                 )}
                 {cloudStatus === 'errore' && (
-                  <span className="inline-flex items-center gap-1 text-[10px] bg-rose-500/20 text-rose-300 font-bold px-1.5 py-0.5 rounded-sm">
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-fucsia-500/20 text-fucsia-300 font-bold px-1.5 py-0.5 rounded-sm">
                     ❌ NON SALVATO
                   </span>
                 )}
                 {readOnlyMode && (
-                  <span className="inline-flex items-center gap-1 text-[10px] bg-rose-500/30 text-rose-200 font-bold px-1.5 py-0.5 rounded-sm ml-2">
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-fucsia-500/30 text-fucsia-200 font-bold px-1.5 py-0.5 rounded-sm ml-2">
                     🔒 SOLA LETTURA
                   </span>
                 )}
@@ -8396,7 +8395,7 @@ export default function App() {
               onClick={() => setReadOnlyMode(!readOnlyMode)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
                 readOnlyMode
-                  ? 'bg-rose-500/20 text-rose-100 border-rose-400/50'
+                  ? 'bg-fucsia-500/20 text-fucsia-100 border-fucsia-400/50'
                   : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
               }`}
               title={
@@ -8416,10 +8415,10 @@ export default function App() {
             <button
               onClick={generateTimetable}
               disabled={readOnlyMode}
-              className={`bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center gap-2 transition-all duration-150 text-sm cursor-pointer ring-2 ring-emerald-400/50 ${
+              className={`bg-lime-400 hover:bg-lime-500 text-brand-900 font-bold py-2 px-4 rounded-lg shadow-md flex items-center gap-2 transition-all duration-150 text-sm cursor-pointer ring-2 ring-lime-300/60 ${
                 readOnlyMode
                   ? 'opacity-50 cursor-not-allowed'
-                  : 'hover:from-emerald-600 hover:to-teal-700'
+                  : 'hover:from-salvia-600 hover:to-salvia-700'
               }`}
             >
               <span className="text-base">✨</span>Auto-Genera Orario
@@ -8427,7 +8426,7 @@ export default function App() {
             <button
               onClick={handleAlignSostegno}
               disabled={readOnlyMode}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               🔄 Allinea Sostegno
             </button>
@@ -8435,13 +8434,13 @@ export default function App() {
               onClick={handleAlignCompresenze}
               disabled={readOnlyMode}
               title="Ricolloca le ore di compresenza sulle lezioni di adesso"
-              className="bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               👥 Allinea Compresenze
             </button>
             <button
               onClick={() => handlePrintBypass('master')}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors text-sm cursor-pointer"
+              className="bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors text-sm cursor-pointer"
             >
               <svg
                 className="w-4 h-4"
@@ -8460,7 +8459,7 @@ export default function App() {
             </button>
             <button
               onClick={handleExportExcel}
-              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors shadow-xs text-sm cursor-pointer"
+              className="bg-bruciato-600 hover:bg-bruciato-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors shadow-xs text-sm cursor-pointer"
             >
               <svg
                 className="w-4 h-4"
@@ -8486,7 +8485,7 @@ export default function App() {
         notava continuava a lavorare credendo che tutto fosse al sicuro.
       */}
       {cloudStatus === 'errore' && (
-        <div className="bg-rose-600 text-white px-4 py-2.5 shrink-0 print:hidden">
+        <div className="bg-fucsia-600 text-white px-4 py-2.5 shrink-0 print:hidden">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
             <p className="text-xs sm:text-sm font-semibold">
               ⚠️ Le ultime modifiche <u>non sono state salvate</u>.{' '}
@@ -8513,7 +8512,7 @@ export default function App() {
               onClick={() => setActiveTab('master-view')}
               className={`py-4 px-1 border-b-2 font-bold text-sm transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === 'master-view'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -8526,7 +8525,7 @@ export default function App() {
               }}
               className={`py-4 px-1 border-b-2 font-bold text-sm transition-all whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === 'dashboard'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -8539,7 +8538,7 @@ export default function App() {
               }}
               className={`py-4 px-1 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
                 activeTab === 'teachers'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-slate-500'
               }`}
             >
@@ -8549,7 +8548,7 @@ export default function App() {
               onClick={() => setActiveTab('config')}
               className={`py-4 px-1 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
                 activeTab === 'config'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-slate-500'
               }`}
             >
@@ -8559,13 +8558,13 @@ export default function App() {
               onClick={() => setActiveTab('validations')}
               className={`py-4 px-1 border-b-2 font-bold text-sm relative transition-all whitespace-nowrap ${
                 activeTab === 'validations'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-slate-500'
               }`}
             >
               ⚠️ Conflitti
               {validationResult.conflicts.length > 0 && (
-                <span className="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
+                <span className="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-fucsia-100 text-fucsia-800">
                   {validationResult.conflicts.length}
                 </span>
               )}
@@ -8574,13 +8573,13 @@ export default function App() {
               onClick={() => setActiveTab('sostituzioni')}
               className={`py-4 px-1 border-b-2 font-bold text-sm relative transition-all whitespace-nowrap ${
                 activeTab === 'sostituzioni'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-slate-500'
               }`}
             >
               🩹 Sostituzioni
               {absences.length > 0 && (
-                <span className="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                <span className="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-bruciato-100 text-bruciato-800">
                   {absences.length}
                 </span>
               )}
@@ -8589,7 +8588,7 @@ export default function App() {
               onClick={() => setActiveTab('assemblee')}
               className={`py-4 px-1 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
                 activeTab === 'assemblee'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-brand-600 text-brand-600'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -8616,7 +8615,7 @@ export default function App() {
                     placeholder="Cerca docente o materia..."
                     value={masterSearch}
                     onChange={(e) => setMasterSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-indigo-500 text-sm"
+                    className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl focus:ring-1 focus:ring-brand-500 text-sm"
                   />
                 </div>
                 <div className="inline-flex rounded-lg border border-slate-200 p-1 bg-slate-50">
@@ -8624,7 +8623,7 @@ export default function App() {
                     onClick={() => setMasterHourFilter('diurno')}
                     className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${
                       masterHourFilter === 'diurno'
-                        ? 'bg-white text-indigo-700 shadow-xs'
+                        ? 'bg-white text-brand-700 shadow-xs'
                         : 'text-slate-600'
                     }`}
                   >
@@ -8634,7 +8633,7 @@ export default function App() {
                     onClick={() => setMasterHourFilter('pomeridiano')}
                     className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${
                       masterHourFilter === 'pomeridiano'
-                        ? 'bg-white text-indigo-700 shadow-xs'
+                        ? 'bg-white text-brand-700 shadow-xs'
                         : 'text-slate-600'
                     }`}
                   >
@@ -8644,7 +8643,7 @@ export default function App() {
               </div>
               <div className="text-xs text-slate-500 text-right flex items-center gap-3">
                 <div>
-                  <p className="font-semibold text-indigo-600">
+                  <p className="font-semibold text-brand-600">
                     ✍️ Modifiche condivise
                   </p>
                   <p>Salvataggio su azione</p>
@@ -8675,7 +8674,7 @@ export default function App() {
                       <th className="p-3 h-12 w-80 min-w-[20rem] bg-slate-200 font-bold text-slate-800 border-r border-slate-300 sticky top-0 left-0 z-40 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
                         Docente / Materia
                       </th>
-                      <th className="p-3 h-12 w-16 bg-slate-200 font-bold text-center border-r-4 border-slate-300 text-indigo-800 sticky top-0 left-80 z-40 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
+                      <th className="p-3 h-12 w-16 bg-slate-200 font-bold text-center border-r-4 border-slate-300 text-brand-800 sticky top-0 left-80 z-40 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
                         Ore
                       </th>
                       {DAYS_IN_USE.map((day, idx) => {
@@ -8756,7 +8755,7 @@ export default function App() {
                                 ></td>
                               </tr>
                             )}
-                            <tr className="hover:bg-indigo-50/20 transition-colors">
+                            <tr className="hover:bg-brand-50/20 transition-colors">
                               <td
                                 className="p-2.5 w-80 border-r border-slate-300 sticky left-0 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]"
                                 style={{ backgroundColor: deptColor }}
@@ -8774,7 +8773,7 @@ export default function App() {
                                       )
                                     }
                                     disabled={readOnlyMode}
-                                    className="font-bold text-xs text-slate-800 bg-white/70 hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-indigo-500 rounded p-1 transition-all w-full uppercase disabled:opacity-60 disabled:cursor-not-allowed"
+                                    className="font-bold text-xs text-slate-800 bg-white/70 hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-brand-500 rounded p-1 transition-all w-full uppercase disabled:opacity-60 disabled:cursor-not-allowed"
                                     placeholder="Nome"
                                   />
                                   <div className="flex items-center gap-1.5">
@@ -8794,7 +8793,7 @@ export default function App() {
                                         )
                                       }
                                       disabled={readOnlyMode}
-                                      className="text-[10px] text-slate-700 font-bold bg-white/70 hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-indigo-500 rounded p-0.5 transition-all w-full uppercase disabled:opacity-60 disabled:cursor-not-allowed"
+                                      className="text-[10px] text-slate-700 font-bold bg-white/70 hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-brand-500 rounded p-0.5 transition-all w-full uppercase disabled:opacity-60 disabled:cursor-not-allowed"
                                       placeholder="Materia"
                                     />
                                     <button
@@ -8806,20 +8805,20 @@ export default function App() {
                                       }
                                       disabled={readOnlyMode}
                                       title="Rimuovi docente"
-                                      className="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-1 py-0.5 rounded font-bold transition-all shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+                                      className="text-xs text-fucsia-500 hover:text-fucsia-700 hover:bg-fucsia-50 px-1 py-0.5 rounded font-bold transition-all shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
                                     >
                                       🗑️
                                     </button>
                                   </div>
                                   <div
-                                    className="text-[9px] text-indigo-600 font-bold bg-indigo-50/80 rounded px-1.5 py-0.5 mt-0.5 truncate"
+                                    className="text-[9px] text-brand-600 font-bold bg-brand-50/80 rounded px-1.5 py-0.5 mt-0.5 truncate"
                                     title={classSummary}
                                   >
                                     Cls: {classSummary}
                                   </div>
                                   {staff.preferConsecutive && (
                                     <div
-                                      className="text-[9px] text-purple-700 font-bold bg-purple-100 rounded px-1.5 py-0.5 mt-0.5 truncate flex items-center gap-1"
+                                      className="text-[9px] text-brand-700 font-bold bg-brand-100 rounded px-1.5 py-0.5 mt-0.5 truncate flex items-center gap-1"
                                       title="Preferenza 2 ore consecutive attive"
                                     >
                                       <span>🔗</span> 2h Consecutive
@@ -8827,7 +8826,7 @@ export default function App() {
                                   )}
                                 </div>
                               </td>
-                              <td className="p-2 w-16 border-r-4 border-slate-300 text-center font-bold text-indigo-700 bg-indigo-50/10 sticky left-80 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
+                              <td className="p-2 w-16 border-r-4 border-slate-300 text-center font-bold text-brand-700 bg-brand-50/10 sticky left-80 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
                                 {hoursPlanned}h
                               </td>
                               {DAYS_IN_USE.map((day, dIdx) => {
@@ -8870,8 +8869,8 @@ export default function App() {
                                         <div
                                           className={`w-full text-center text-[10px] font-bold py-1 rounded select-none cursor-not-allowed ${
                                             isHourOff
-                                              ? 'text-amber-800'
-                                              : 'text-red-800'
+                                              ? 'text-bruciato-800'
+                                              : 'text-fucsia-800'
                                           }`}
                                         >
                                           {isHourOff ? 'N.D.' : 'LIBERO'}
@@ -8916,9 +8915,9 @@ export default function App() {
                                           }
                                           className={`w-full text-center text-xs font-bold rounded px-0.5 py-1 border truncate tracking-tight transition-all ${
                                             occupiedSlot
-                                              ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                                              ? 'bg-brand-600 text-white border-brand-700 shadow-xs'
                                               : isDisponibilita
-                                              ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                              ? 'bg-bruciato-100 text-bruciato-800 border-bruciato-300'
                                               : 'bg-white text-slate-400 border-slate-200'
                                           } ${
                                             readOnlyMode ? 'opacity-60' : ''
@@ -8960,7 +8959,7 @@ export default function App() {
                                           {staff.staffType === 'materia' && (
                                             <option
                                               value={DISPONIBILITA_VALUE}
-                                              className="bg-white text-amber-700"
+                                              className="bg-white text-bruciato-700"
                                             >
                                               D (disponibilità)
                                             </option>
@@ -8992,7 +8991,7 @@ export default function App() {
                                             } — clicca per cambiarla`}
                                             className={`mt-0.5 w-full text-[9px] leading-tight font-bold rounded px-0.5 py-0.5 border transition-all cursor-pointer truncate disabled:opacity-40 disabled:cursor-not-allowed ${
                                               isNamedRoom(occupiedSlot.room)
-                                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                                                ? 'bg-brand-50 border-brand-200 text-brand-700 hover:bg-brand-100'
                                                 : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'
                                             }`}
                                           >
@@ -9031,7 +9030,7 @@ export default function App() {
                             value={newTeacherName}
                             onChange={(e) => setNewTeacherName(e.target.value)}
                             disabled={readOnlyMode}
-                            className="text-xs border border-slate-300 rounded-lg p-2 uppercase bg-white focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                            className="text-xs border border-slate-300 rounded-lg p-2 uppercase bg-white focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                           />
                           <input
                             type="text"
@@ -9041,7 +9040,7 @@ export default function App() {
                               setNewTeacherSubject(e.target.value)
                             }
                             disabled={readOnlyMode}
-                            className="text-xs border border-slate-300 rounded-lg p-2 uppercase bg-white focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                            className="text-xs border border-slate-300 rounded-lg p-2 uppercase bg-white focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                           />
                           <div className="flex gap-1">
                             <select
@@ -9069,7 +9068,7 @@ export default function App() {
                           <button
                             type="submit"
                             disabled={readOnlyMode}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2 px-4 rounded-lg shadow-xs mt-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs py-2 px-4 rounded-lg shadow-xs mt-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Aggiungi Staff
                           </button>
@@ -9088,12 +9087,12 @@ export default function App() {
                 </table>
               </div>
             </div>
-            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-xs text-amber-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 shrink-0">
+            <div className="bg-bruciato-50 border border-bruciato-200 p-4 rounded-xl text-xs text-bruciato-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 shrink-0">
               <div>
                 💡 <strong>Salvataggio automatico:</strong> ogni modifica viene
                 salvata subito nello spazio di lavoro attivo.
               </div>
-              <span className="font-bold shrink-0 bg-amber-100 px-2 py-1 rounded">
+              <span className="font-bold shrink-0 bg-bruciato-100 px-2 py-1 rounded">
                 EduTime v7.2
               </span>
             </div>
@@ -9109,7 +9108,7 @@ export default function App() {
                     onClick={() => setViewType('class')}
                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
                       viewType === 'class'
-                        ? 'bg-white text-indigo-700 shadow-xs'
+                        ? 'bg-white text-brand-700 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -9119,7 +9118,7 @@ export default function App() {
                     onClick={() => setViewType('teacher')}
                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
                       viewType === 'teacher'
-                        ? 'bg-white text-indigo-700 shadow-xs'
+                        ? 'bg-white text-brand-700 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -9129,7 +9128,7 @@ export default function App() {
                     onClick={() => setViewType('sostegno')}
                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
                       viewType === 'sostegno'
-                        ? 'bg-white text-indigo-700 shadow-xs'
+                        ? 'bg-white text-brand-700 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -9139,7 +9138,7 @@ export default function App() {
                     onClick={() => setViewType('strumento')}
                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
                       viewType === 'strumento'
-                        ? 'bg-white text-indigo-700 shadow-xs'
+                        ? 'bg-white text-brand-700 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -9149,7 +9148,7 @@ export default function App() {
                     onClick={() => setViewType('department')}
                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
                       viewType === 'department'
-                        ? 'bg-white text-indigo-700 shadow-xs'
+                        ? 'bg-white text-brand-700 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -9159,7 +9158,7 @@ export default function App() {
                     onClick={() => setViewType('aula')}
                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
                       viewType === 'aula'
-                        ? 'bg-white text-indigo-700 shadow-xs'
+                        ? 'bg-white text-brand-700 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -9169,7 +9168,7 @@ export default function App() {
                     onClick={() => setViewType('equita')}
                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
                       viewType === 'equita'
-                        ? 'bg-white text-indigo-700 shadow-xs'
+                        ? 'bg-white text-brand-700 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -9184,7 +9183,7 @@ export default function App() {
                     <select
                       value={selectedClass}
                       onChange={(e) => setSelectedClass(e.target.value)}
-                      className="bg-white border border-slate-300 rounded-lg py-1.5 px-3 text-slate-700 font-semibold focus:ring-1 focus:ring-indigo-500"
+                      className="bg-white border border-slate-300 rounded-lg py-1.5 px-3 text-slate-700 font-semibold focus:ring-1 focus:ring-brand-500"
                     >
                       {classes.map((c) => (
                         <option key={c.id} value={c.id}>
@@ -9196,7 +9195,7 @@ export default function App() {
                       onClick={() =>
                         handlePrintBypass('single_class', selectedClass)
                       }
-                      className="ml-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 p-2 rounded-lg"
+                      className="ml-2 bg-brand-50 text-brand-600 hover:bg-brand-100 p-2 rounded-lg"
                     >
                       🖨️
                     </button>
@@ -9208,7 +9207,7 @@ export default function App() {
                     <select
                       value={selectedTeacherId}
                       onChange={(e) => setSelectedTeacherId(e.target.value)}
-                      className="bg-white border border-slate-300 rounded-lg py-1.5 px-3 text-slate-700 font-semibold focus:ring-1 focus:ring-indigo-500"
+                      className="bg-white border border-slate-300 rounded-lg py-1.5 px-3 text-slate-700 font-semibold focus:ring-1 focus:ring-brand-500"
                     >
                       {teachers.map((t) => (
                         <option key={t.id} value={t.id}>
@@ -9220,7 +9219,7 @@ export default function App() {
                       onClick={() =>
                         handlePrintBypass('single_teacher', selectedTeacherId)
                       }
-                      className="ml-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 p-2 rounded-lg"
+                      className="ml-2 bg-brand-50 text-brand-600 hover:bg-brand-100 p-2 rounded-lg"
                     >
                       🖨️
                     </button>
@@ -9232,7 +9231,7 @@ export default function App() {
                     <select
                       value={selectedSostegnoId}
                       onChange={(e) => setSelectedSostegnoId(e.target.value)}
-                      className="bg-white border border-slate-300 rounded-lg py-1.5 px-3 text-slate-700 font-semibold focus:ring-1 focus:ring-indigo-500"
+                      className="bg-white border border-slate-300 rounded-lg py-1.5 px-3 text-slate-700 font-semibold focus:ring-1 focus:ring-brand-500"
                     >
                       {sostegno.map((s) => (
                         <option key={s.id} value={s.id}>
@@ -9244,7 +9243,7 @@ export default function App() {
                       onClick={() =>
                         handlePrintBypass('single_teacher', selectedSostegnoId)
                       }
-                      className="ml-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 p-2 rounded-lg"
+                      className="ml-2 bg-brand-50 text-brand-600 hover:bg-brand-100 p-2 rounded-lg"
                     >
                       🖨️
                     </button>
@@ -9256,7 +9255,7 @@ export default function App() {
                     <select
                       value={selectedStrumentoId}
                       onChange={(e) => setSelectedStrumentoId(e.target.value)}
-                      className="bg-white border border-slate-300 rounded-lg py-1.5 px-3 text-slate-700 font-semibold focus:ring-1 focus:ring-indigo-500"
+                      className="bg-white border border-slate-300 rounded-lg py-1.5 px-3 text-slate-700 font-semibold focus:ring-1 focus:ring-brand-500"
                     >
                       {strumento.map((m) => (
                         <option key={m.id} value={m.id}>
@@ -9268,7 +9267,7 @@ export default function App() {
                       onClick={() =>
                         handlePrintBypass('single_teacher', selectedStrumentoId)
                       }
-                      className="ml-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 p-2 rounded-lg"
+                      className="ml-2 bg-brand-50 text-brand-600 hover:bg-brand-100 p-2 rounded-lg"
                     >
                       🖨️
                     </button>
@@ -9282,7 +9281,7 @@ export default function App() {
                     <select
                       value={selectedDepartment}
                       onChange={(e) => setSelectedDepartment(e.target.value)}
-                      className="bg-white border border-slate-300 rounded-lg py-1.5 px-3 text-slate-700 font-semibold focus:ring-1 focus:ring-indigo-500"
+                      className="bg-white border border-slate-300 rounded-lg py-1.5 px-3 text-slate-700 font-semibold focus:ring-1 focus:ring-brand-500"
                     >
                       {allDepartments.map((dep) => (
                         <option key={dep} value={dep}>
@@ -9298,7 +9297,7 @@ export default function App() {
                     <select
                       value={roomInView}
                       onChange={(e) => setSelectedRoom(e.target.value)}
-                      className="bg-white border border-slate-300 rounded-lg py-1.5 px-3 text-slate-700 font-semibold focus:ring-1 focus:ring-indigo-500"
+                      className="bg-white border border-slate-300 rounded-lg py-1.5 px-3 text-slate-700 font-semibold focus:ring-1 focus:ring-brand-500"
                     >
                       {namedRooms.map((r: any) => (
                         <option key={r.id || r.name} value={r.name}>
@@ -9309,7 +9308,7 @@ export default function App() {
                     <button
                       onClick={() => handlePrintBypass('single_room', roomInView)}
                       title="Stampa l'orario di questo laboratorio in A4"
-                      className="ml-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 p-2 rounded-lg"
+                      className="ml-2 bg-brand-50 text-brand-600 hover:bg-brand-100 p-2 rounded-lg"
                     >
                       🖨️
                     </button>
@@ -9319,7 +9318,7 @@ export default function App() {
                   <button
                     onClick={() => handlePrintBypass('equita')}
                     title="Stampa il prospetto in A4"
-                    className="ml-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 p-2 rounded-lg"
+                    className="ml-2 bg-brand-50 text-brand-600 hover:bg-brand-100 p-2 rounded-lg"
                   >
                     🖨️
                   </button>
@@ -9341,24 +9340,24 @@ export default function App() {
                   </p>
                   <button
                     onClick={() => setActiveTab('config')}
-                    className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm py-2 px-4 rounded-lg transition-all"
+                    className="mt-4 bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm py-2 px-4 rounded-lg transition-all"
                   >
                     Vai a Sezioni &amp; Regole
                   </button>
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                  <div className="bg-indigo-50 border-b border-indigo-100 px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="bg-brand-50 border-b border-brand-100 px-5 py-3 flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <h3 className="font-bold text-indigo-900">
+                      <h3 className="font-bold text-brand-900">
                         📍 {roomInView}
                       </h3>
-                      <p className="text-xs text-indigo-700/80">
+                      <p className="text-xs text-brand-700/80">
                         Chi c'è, con quale classe e per quale materia. È il
                         foglio da appendere alla porta.
                       </p>
                     </div>
-                    <span className="text-xs font-bold bg-white text-indigo-700 px-2 py-1 rounded-lg border border-indigo-200">
+                    <span className="text-xs font-bold bg-white text-brand-700 px-2 py-1 rounded-lg border border-brand-200">
                       {
                         timetable.filter((s: any) => s.room === roomInView)
                           .length
@@ -9390,7 +9389,7 @@ export default function App() {
                             className="hover:bg-slate-50/50 transition-colors"
                           >
                             <td className="p-4 font-medium text-slate-600 bg-slate-50/70 border-r border-slate-200 flex flex-col justify-center h-24">
-                              <span className="text-xs text-indigo-600 font-bold uppercase tracking-wider">
+                              <span className="text-xs text-brand-600 font-bold uppercase tracking-wider">
                                 {hObj.label}
                               </span>
                               <span className="text-[10px] text-slate-500 mt-1">
@@ -9423,14 +9422,14 @@ export default function App() {
                                         return (
                                           <div
                                             key={i}
-                                            className="border-l-4 border-indigo-500 rounded-sm px-2 py-1 text-left"
+                                            className="border-l-4 border-brand-500 rounded-sm px-2 py-1 text-left"
                                             style={{
                                               backgroundColor: getDeptColor(
                                                 l.subject
                                               ),
                                             }}
                                           >
-                                            <p className="font-bold text-indigo-800 text-sm leading-tight">
+                                            <p className="font-bold text-brand-800 text-sm leading-tight">
                                               {l.classId}
                                             </p>
                                             <p className="text-[11px] text-slate-700 truncate">
@@ -9465,11 +9464,11 @@ export default function App() {
               )
             ) : viewType === 'equita' ? (
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                <div className="bg-amber-50 border-b border-amber-100 px-5 py-3">
-                  <h3 className="font-bold text-amber-900">
+                <div className="bg-bruciato-50 border-b border-bruciato-100 px-5 py-3">
+                  <h3 className="font-bold text-bruciato-900">
                     ⚖️ Ore buco, entrate e uscite
                   </h3>
-                  <p className="text-xs text-amber-800/80 mt-1">
+                  <p className="text-xs text-bruciato-800/80 mt-1">
                     Quanti disagi tocca a ciascuno, per distribuirli con
                     equilibrio. In rosso chi sta sopra la media della scuola.
                     Clicca l'intestazione di una colonna per ordinare.
@@ -9502,7 +9501,7 @@ export default function App() {
                                   : 'text-center'
                               } ${
                                 equitaSort === col.key
-                                  ? 'text-indigo-700 bg-white'
+                                  ? 'text-brand-700 bg-white'
                                   : ''
                               }`}
                             >
@@ -9516,7 +9515,7 @@ export default function App() {
                         {equitaRowsOrdinate.map((r: any) => {
                           const sopra = (valore: number, media: number) =>
                             valore > Math.ceil(media)
-                              ? 'bg-rose-50 text-rose-700 font-bold'
+                              ? 'bg-fucsia-50 text-fucsia-700 font-bold'
                               : 'text-slate-600';
                           return (
                             <tr
@@ -9678,7 +9677,7 @@ export default function App() {
                             className="hover:bg-slate-50/50 transition-colors"
                           >
                             <td className="p-4 font-medium text-slate-600 bg-slate-50/70 border-r border-slate-200 flex flex-col justify-center h-24">
-                              <span className="text-xs text-indigo-600 font-bold uppercase tracking-wider">
+                              <span className="text-xs text-brand-600 font-bold uppercase tracking-wider">
                                 {hObj.label}
                               </span>
                               <span className="text-[10px] text-slate-500 mt-1">
@@ -9763,12 +9762,12 @@ export default function App() {
                                       className={`p-3 border-r border-slate-200 text-center relative ${
                                         readOnlyMode
                                           ? ''
-                                          : 'cursor-pointer hover:bg-emerald-50/60'
+                                          : 'cursor-pointer hover:bg-salvia-50/60'
                                       } transition-all h-24 align-middle`}
                                     >
-                                      <div className="border-l-4 border-emerald-400 pl-2 text-left h-full flex flex-col justify-between">
+                                      <div className="border-l-4 border-salvia-400 pl-2 text-left h-full flex flex-col justify-between">
                                         <div>
-                                          <p className="font-bold text-emerald-800 text-xs sm:text-sm truncate">
+                                          <p className="font-bold text-salvia-800 text-xs sm:text-sm truncate">
                                             {pmLesson.subject}
                                           </p>
                                           <p className="text-xs text-slate-500 truncate">
@@ -9782,7 +9781,7 @@ export default function App() {
                                           </p>
                                           {isNamedRoom(pmLesson.room) && (
                                             <p
-                                              className="text-[10px] text-emerald-700 font-semibold truncate"
+                                              className="text-[10px] text-salvia-700 font-semibold truncate"
                                               title={`Aula: ${pmLesson.room}`}
                                             >
                                               📍 {pmLesson.room}
@@ -9806,7 +9805,7 @@ export default function App() {
                                     className={`p-3 border-r border-slate-200 text-center relative ${
                                       readOnlyMode
                                         ? ''
-                                        : 'cursor-pointer hover:bg-indigo-50/60'
+                                        : 'cursor-pointer hover:bg-brand-50/60'
                                     } transition-all h-24 align-middle`}
                                     style={
                                       cellDeptColor
@@ -9855,7 +9854,7 @@ export default function App() {
                                             </p>
                                             {isNamedRoom(materia.room) && (
                                               <p
-                                                className="text-[10px] text-indigo-700 font-semibold truncate"
+                                                className="text-[10px] text-brand-700 font-semibold truncate"
                                                 title={`Aula: ${materia.room}`}
                                               >
                                                 📍 {materia.room}
@@ -9872,7 +9871,7 @@ export default function App() {
                                             </div>
                                           )}
                                           {sost && (
-                                            <div className="mt-1.5 text-[10px] bg-purple-100 text-purple-800 font-semibold px-1.5 py-0.5 rounded-sm inline-block self-start">
+                                            <div className="mt-1.5 text-[10px] bg-brand-100 text-brand-800 font-semibold px-1.5 py-0.5 rounded-sm inline-block self-start">
                                               🤝{' '}
                                               {
                                                 sostegno.find(
@@ -9896,7 +9895,7 @@ export default function App() {
                                                 cellNotes[noteKey] || ''
                                               );
                                             }}
-                                            className="absolute top-0 right-0 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 rounded-full w-5 h-5 flex items-center justify-center text-xs shadow-md transition-all"
+                                            className="absolute top-0 right-0 bg-lime-400 hover:bg-lime-500 text-lime-900 rounded-full w-5 h-5 flex items-center justify-center text-xs shadow-md transition-all"
                                             title={cellNotes[noteKey]}
                                           >
                                             📝
@@ -9914,7 +9913,7 @@ export default function App() {
                                               });
                                               setNoteText('');
                                             }}
-                                            className="absolute top-0 right-0 bg-slate-200 hover:bg-yellow-400 text-slate-600 hover:text-yellow-900 rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-all"
+                                            className="absolute top-0 right-0 bg-slate-200 hover:bg-lime-400 text-slate-600 hover:text-lime-900 rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-all"
                                             title="Aggiungi nota"
                                           >
                                             +
@@ -9922,7 +9921,7 @@ export default function App() {
                                         )}
                                       </div>
                                     ) : isRientroRow ? (
-                                      <span className="text-[11px] text-emerald-600 italic bg-emerald-50 px-2 py-1 rounded border border-emerald-100 block">
+                                      <span className="text-[11px] text-salvia-600 italic bg-salvia-50 px-2 py-1 rounded border border-salvia-100 block">
                                         Fine diurno
                                       </span>
                                     ) : (
@@ -9963,8 +9962,8 @@ export default function App() {
                                       <span
                                         className={`font-bold text-xs select-none ${
                                           isHourOff
-                                            ? 'text-amber-800'
-                                            : 'text-red-800'
+                                            ? 'text-bruciato-800'
+                                            : 'text-fucsia-800'
                                         }`}
                                       >
                                         {isHourOff
@@ -9991,8 +9990,8 @@ export default function App() {
                                     style={{ backgroundColor: deptColor }}
                                   >
                                     {slotOccupied ? (
-                                      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2 flex flex-col justify-center items-center h-full">
-                                        <span className="font-bold text-indigo-700 text-lg">
+                                      <div className="bg-brand-50 border border-brand-200 rounded-lg p-2 flex flex-col justify-center items-center h-full">
+                                        <span className="font-bold text-brand-700 text-lg">
                                           {slotOccupied.classId}
                                         </span>
                                         <span className="text-[10px] text-slate-500 uppercase tracking-wider">
@@ -10006,7 +10005,7 @@ export default function App() {
                                         )}
                                         {isNamedRoom(slotOccupied.room) && (
                                           <span
-                                            className="text-[10px] text-indigo-700 font-semibold truncate max-w-full"
+                                            className="text-[10px] text-brand-700 font-semibold truncate max-w-full"
                                             title={`Aula: ${slotOccupied.room}`}
                                           >
                                             📍 {slotOccupied.room}
@@ -10051,8 +10050,8 @@ export default function App() {
                                       <span
                                         className={`font-bold text-xs select-none ${
                                           isHourOff
-                                            ? 'text-amber-800'
-                                            : 'text-red-800'
+                                            ? 'text-bruciato-800'
+                                            : 'text-fucsia-800'
                                         }`}
                                       >
                                         {isHourOff
@@ -10074,8 +10073,8 @@ export default function App() {
                                     className="p-3 border-r border-slate-200 text-center h-24 align-middle bg-white"
                                   >
                                     {slotOccupied ? (
-                                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-2 flex flex-col justify-center items-center h-full">
-                                        <span className="font-bold text-purple-700 text-sm">
+                                      <div className="bg-brand-50 border border-brand-200 rounded-lg p-2 flex flex-col justify-center items-center h-full">
+                                        <span className="font-bold text-brand-700 text-sm">
                                           Classe {slotOccupied.classId}
                                         </span>
                                         <span className="text-[10px] text-slate-500 italic mt-0.5">
@@ -10120,8 +10119,8 @@ export default function App() {
                                       <span
                                         className={`font-bold text-xs select-none ${
                                           isHourOff
-                                            ? 'text-amber-800'
-                                            : 'text-red-800'
+                                            ? 'text-bruciato-800'
+                                            : 'text-fucsia-800'
                                         }`}
                                       >
                                         {isHourOff
@@ -10147,8 +10146,8 @@ export default function App() {
                                     style={{ backgroundColor: deptColor }}
                                   >
                                     {slotOccupied ? (
-                                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 flex flex-col justify-center items-center h-full">
-                                        <span className="font-bold text-emerald-700 text-lg">
+                                      <div className="bg-salvia-50 border border-salvia-200 rounded-lg p-2 flex flex-col justify-center items-center h-full">
+                                        <span className="font-bold text-salvia-700 text-lg">
                                           {slotOccupied.classId}
                                         </span>
                                         <span className="text-[10px] text-slate-500 uppercase tracking-wider">
@@ -10156,7 +10155,7 @@ export default function App() {
                                         </span>
                                         {isNamedRoom(slotOccupied.room) && (
                                           <span
-                                            className="text-[10px] text-indigo-700 font-semibold truncate max-w-full"
+                                            className="text-[10px] text-brand-700 font-semibold truncate max-w-full"
                                             title={`Aula: ${slotOccupied.room}`}
                                           >
                                             📍 {slotOccupied.room}
@@ -10176,10 +10175,10 @@ export default function App() {
                           </tr>
                         );
                       })}
-                      <tr className="bg-slate-100 border-t-2 border-indigo-200">
+                      <tr className="bg-slate-100 border-t-2 border-brand-200">
                         <td
                           colSpan={7}
-                          className="p-2 text-center text-xs font-bold text-indigo-800 tracking-wider"
+                          className="p-2 text-center text-xs font-bold text-brand-800 tracking-wider"
                         >
                           🎵 CORSO POMERIDIANO AD INDIRIZZO MUSICALE
                         </td>
@@ -10192,7 +10191,7 @@ export default function App() {
                             className="bg-slate-50/50 hover:bg-slate-50 transition-colors"
                           >
                             <td className="p-4 font-medium text-slate-600 bg-slate-50/70 border-r border-slate-200 flex flex-col justify-center h-20">
-                              <span className="text-[10px] text-purple-600 font-bold tracking-wider">
+                              <span className="text-[10px] text-brand-600 font-bold tracking-wider">
                                 {hObj.label}
                               </span>
                               <span className="text-[10px] text-slate-500 mt-0.5">
@@ -10234,12 +10233,12 @@ export default function App() {
                                           return (
                                             <div
                                               key={pmKey}
-                                              className="border-l-4 border-emerald-500 p-1 rounded-sm text-left"
+                                              className="border-l-4 border-salvia-500 p-1 rounded-sm text-left"
                                               style={{
                                                 backgroundColor: pmDeptColor,
                                               }}
                                             >
-                                              <p className="text-[10px] font-bold text-emerald-800 leading-tight">
+                                              <p className="text-[10px] font-bold text-salvia-800 leading-tight">
                                                 {pm.subject}
                                               </p>
                                               <p className="text-[9px] text-slate-500">
@@ -10291,8 +10290,8 @@ export default function App() {
                                       <span
                                         className={`font-bold text-xs select-none ${
                                           isHourOff
-                                            ? 'text-amber-800'
-                                            : 'text-red-800'
+                                            ? 'text-bruciato-800'
+                                            : 'text-fucsia-800'
                                         }`}
                                       >
                                         {isHourOff
@@ -10317,8 +10316,8 @@ export default function App() {
                                     style={{ backgroundColor: deptColor }}
                                   >
                                     {slotOccupied ? (
-                                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-1 h-full flex flex-col justify-center">
-                                        <p className="font-bold text-emerald-700 text-xs">
+                                      <div className="bg-salvia-50 border border-salvia-200 rounded-lg p-1 h-full flex flex-col justify-center">
+                                        <p className="font-bold text-salvia-700 text-xs">
                                           Classe {slotOccupied.classId}
                                         </p>
                                         <p
@@ -10432,7 +10431,7 @@ export default function App() {
                                 <div className="font-bold text-slate-800 text-xs truncate">
                                   {teacher.name}
                                 </div>
-                                <div className="text-[10px] text-indigo-600 font-bold">
+                                <div className="text-[10px] text-brand-600 font-bold">
                                   {totalHours} ore assegnate
                                 </div>
                               </td>
@@ -10462,8 +10461,8 @@ export default function App() {
                                         key={`${dIdx}_${dh.index}`}
                                         className={`p-2 text-[10px] italic font-bold text-center ${borderStyle} ${
                                           isHourOff
-                                            ? 'text-amber-800'
-                                            : 'text-red-800'
+                                            ? 'text-bruciato-800'
+                                            : 'text-fucsia-800'
                                         }`}
                                         style={{
                                           backgroundColor: isHourOff
@@ -10487,7 +10486,7 @@ export default function App() {
                                       key={`${dIdx}_${dh.index}`}
                                       className={`p-2 text-center text-xs font-bold ${borderStyle} ${
                                         occupied
-                                          ? 'bg-indigo-50 text-indigo-700'
+                                          ? 'bg-brand-50 text-brand-700'
                                           : 'text-slate-300'
                                       }`}
                                     >
@@ -10524,7 +10523,7 @@ export default function App() {
                     onClick={() => setCattedreSubTab('diurne')}
                     className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
                       cattedreSubTab === 'diurne'
-                        ? 'bg-indigo-600 text-white shadow-sm'
+                        ? 'bg-brand-600 text-white shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -10534,7 +10533,7 @@ export default function App() {
                     onClick={() => setCattedreSubTab('sostegno')}
                     className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
                       cattedreSubTab === 'sostegno'
-                        ? 'bg-indigo-600 text-white shadow-sm'
+                        ? 'bg-brand-600 text-white shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -10544,7 +10543,7 @@ export default function App() {
                     onClick={() => setCattedreSubTab('strumento')}
                     className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
                       cattedreSubTab === 'strumento'
-                        ? 'bg-indigo-600 text-white shadow-sm'
+                        ? 'bg-brand-600 text-white shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -10557,7 +10556,7 @@ export default function App() {
                     title="Colonne delle classi in ordine di anno: 1A 1B 1C, poi 2A 2B 2C"
                     className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
                       classOrderMode === 'anno'
-                        ? 'bg-indigo-600 text-white shadow-sm'
+                        ? 'bg-brand-600 text-white shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -10568,7 +10567,7 @@ export default function App() {
                     title="Colonne delle classi raggruppate per corso: 1A 2A 3A, poi 1B 2B 3B"
                     className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
                       classOrderMode === 'sezione'
-                        ? 'bg-indigo-600 text-white shadow-sm'
+                        ? 'bg-brand-600 text-white shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -10583,14 +10582,14 @@ export default function App() {
                   }
                   disabled={readOnlyMode}
                   title="Riordina l'elenco per materia e, a parità di materia, per nome"
-                  className="px-4 py-2 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 rounded-lg text-xs font-bold bg-brand-50 text-brand-700 border border-brand-200 hover:bg-brand-100 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   🔤 Ordina per materia
                 </button>
                 <button
                   onClick={() => setShowResetModal(true)}
                   disabled={readOnlyMode}
-                  className="px-4 py-2 rounded-lg text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 hover:text-rose-700 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 rounded-lg text-xs font-bold bg-fucsia-50 text-fucsia-600 border border-fucsia-200 hover:bg-fucsia-100 hover:text-fucsia-700 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   🗑️ Resetta Tutto
                 </button>
@@ -10619,16 +10618,16 @@ export default function App() {
                           Docente
                         </th>
                         <th
-                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700 sticky top-0 z-20"
+                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20"
                           title="Preferenza 2 ore consecutive"
                         >
                           2h
                         </th>
-                        <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700 sticky top-0 z-20">
+                        <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20">
                           Totale
                         </th>
                         <th
-                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-amber-700 sticky top-0 z-20"
+                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-bruciato-700 sticky top-0 z-20"
                           title="Disponibile per supplenze retribuite nell'ora buca"
                         >
                           🩹
@@ -10666,7 +10665,7 @@ export default function App() {
                                   ></td>
                                 </tr>
                               )}
-                              <tr className="hover:bg-indigo-50/20 transition-colors">
+                              <tr className="hover:bg-brand-50/20 transition-colors">
                                 <td
                                   className="p-2 w-64 border-r border-slate-300 sticky left-0 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]"
                                   style={{ backgroundColor: deptColor }}
@@ -10706,11 +10705,11 @@ export default function App() {
                                       )
                                     }
                                     disabled={readOnlyMode}
-                                    className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-5 h-5 text-brand-600 rounded focus:ring-brand-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Richiedi 2 ore consecutive"
                                   />
                                 </td>
-                                <td className="p-2 w-20 border-r border-slate-200 text-center font-bold text-indigo-700 bg-indigo-50/30">
+                                <td className="p-2 w-20 border-r border-slate-200 text-center font-bold text-brand-700 bg-brand-50/30">
                                   {totalHoursAssigned}h
                                 </td>
                                 <td className="p-2 w-16 border-r border-slate-200 text-center bg-white">
@@ -10723,7 +10722,7 @@ export default function App() {
                                       )
                                     }
                                     disabled={readOnlyMode}
-                                    className="w-5 h-5 text-amber-600 rounded focus:ring-amber-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-5 h-5 text-bruciato-600 rounded focus:ring-bruciato-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Disponibile per supplenze retribuite nell'ora buca"
                                   />
                                 </td>
@@ -10766,10 +10765,10 @@ export default function App() {
                                           )
                                         }
                                         disabled={readOnlyMode}
-                                        className="w-full text-center text-xs font-bold rounded p-1.5 border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all bg-transparent focus:bg-white text-slate-700 placeholder-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full text-center text-xs font-bold rounded p-1.5 border border-transparent hover:border-slate-300 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all bg-transparent focus:bg-white text-slate-700 placeholder-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
                                       />
                                       {materiaDiversa && (
-                                        <span className="block text-[8px] font-bold text-amber-700 text-center truncate leading-tight">
+                                        <span className="block text-[8px] font-bold text-bruciato-700 text-center truncate leading-tight">
                                           {materiaDiversa}
                                         </span>
                                       )}
@@ -10788,7 +10787,7 @@ export default function App() {
                                       setAssignSubject('');
                                     }}
                                     disabled={readOnlyMode}
-                                    className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold text-xs px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="bg-brand-100 hover:bg-brand-200 text-brand-700 font-bold text-xs px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     ➕
                                   </button>
@@ -10814,12 +10813,12 @@ export default function App() {
                           Docente Sostegno
                         </th>
                         <th
-                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700 sticky top-0 z-20"
+                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20"
                           title="Preferenza 2 ore consecutive"
                         >
                           2h
                         </th>
-                        <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700 sticky top-0 z-20">
+                        <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20">
                           Totale
                         </th>
                         {classes.map((c) => (
@@ -10843,7 +10842,7 @@ export default function App() {
                         return (
                           <tr
                             key={sos.id}
-                            className="hover:bg-indigo-50/20 transition-colors"
+                            className="hover:bg-brand-50/20 transition-colors"
                           >
                             <td
                               className="p-2 w-64 border-r border-slate-300 sticky left-0 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]"
@@ -10886,11 +10885,11 @@ export default function App() {
                                   )
                                 }
                                 disabled={readOnlyMode}
-                                className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-5 h-5 text-brand-600 rounded focus:ring-brand-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Richiedi 2 ore consecutive"
                               />
                             </td>
-                            <td className="p-2 w-20 border-r border-slate-200 text-center font-bold text-indigo-700 bg-indigo-50/30">
+                            <td className="p-2 w-20 border-r border-slate-200 text-center font-bold text-brand-700 bg-brand-50/30">
                               {totalHoursAssigned}h
                             </td>
                             {classes.map((cls) => {
@@ -10920,7 +10919,7 @@ export default function App() {
                                       )
                                     }
                                     disabled={readOnlyMode}
-                                    className="w-full text-center text-xs font-bold rounded p-1.5 border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all bg-transparent focus:bg-white text-slate-700 placeholder-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full text-center text-xs font-bold rounded p-1.5 border border-transparent hover:border-slate-300 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all bg-transparent focus:bg-white text-slate-700 placeholder-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
                                   />
                                 </td>
                               );
@@ -10936,7 +10935,7 @@ export default function App() {
                                   setAssignHours(1);
                                 }}
                                 disabled={readOnlyMode}
-                                className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold text-xs px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="bg-brand-100 hover:bg-brand-200 text-brand-700 font-bold text-xs px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 ➕
                               </button>
@@ -10960,12 +10959,12 @@ export default function App() {
                           Docente Strumento
                         </th>
                         <th
-                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700 sticky top-0 z-20"
+                          className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20"
                           title="Preferenza 2 ore consecutive"
                         >
                           2h
                         </th>
-                        <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-indigo-700 sticky top-0 z-20">
+                        <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20">
                           Totale
                         </th>
                         {classes.map((c) => (
@@ -11002,7 +11001,7 @@ export default function App() {
                                   ></td>
                                 </tr>
                               )}
-                              <tr className="hover:bg-indigo-50/20 transition-colors">
+                              <tr className="hover:bg-brand-50/20 transition-colors">
                                 <td
                                   className="p-2 w-64 border-r border-slate-300 sticky left-0 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]"
                                   style={{ backgroundColor: deptColor }}
@@ -11042,11 +11041,11 @@ export default function App() {
                                       )
                                     }
                                     disabled={readOnlyMode}
-                                    className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-5 h-5 text-brand-600 rounded focus:ring-brand-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Richiedi 2 ore consecutive"
                                   />
                                 </td>
-                                <td className="p-2 w-20 border-r border-slate-200 text-center font-bold text-indigo-700 bg-indigo-50/30">
+                                <td className="p-2 w-20 border-r border-slate-200 text-center font-bold text-brand-700 bg-brand-50/30">
                                   {totalHoursAssigned}h
                                 </td>
                                 {classes.map((cls) => {
@@ -11076,7 +11075,7 @@ export default function App() {
                                           )
                                         }
                                         disabled={readOnlyMode}
-                                        className="w-full text-center text-xs font-bold rounded p-1.5 border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all bg-transparent focus:bg-white text-slate-700 placeholder-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full text-center text-xs font-bold rounded p-1.5 border border-transparent hover:border-slate-300 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all bg-transparent focus:bg-white text-slate-700 placeholder-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
                                       />
                                     </td>
                                   );
@@ -11092,7 +11091,7 @@ export default function App() {
                                       setAssignHours(1);
                                     }}
                                     disabled={readOnlyMode}
-                                    className="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold text-xs px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="bg-brand-100 hover:bg-brand-200 text-brand-700 font-bold text-xs px-2 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     ➕
                                   </button>
@@ -11212,7 +11211,7 @@ export default function App() {
                             type="button"
                             onClick={() => handleRemoveCoTeaching(t.id, i)}
                             disabled={readOnlyMode}
-                            className="text-xs font-bold text-rose-600 hover:text-rose-700 disabled:opacity-50 cursor-pointer"
+                            className="text-xs font-bold text-fucsia-600 hover:text-fucsia-700 disabled:opacity-50 cursor-pointer"
                           >
                             Rimuovi
                           </button>
@@ -11227,8 +11226,8 @@ export default function App() {
         )}
         {activeTab === 'config' && (
           <div className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-indigo-200 border-l-4 border-l-indigo-600">
-              <h2 className="text-xl font-bold text-indigo-900 mb-2">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-200 border-l-4 border-l-brand-600">
+              <h2 className="text-xl font-bold text-brand-900 mb-2">
                 🧠 Regole di Auto-Generazione
               </h2>
               <ul className="text-sm text-slate-600 mb-6 list-disc pl-5">
@@ -11295,7 +11294,7 @@ export default function App() {
                           handleUpdateGenOptions('materie', e.target.checked)
                         }
                         disabled={readOnlyMode}
-                        className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
+                        className="w-5 h-5 rounded text-brand-600 focus:ring-brand-500 cursor-pointer disabled:opacity-50"
                       />
                       Genera Materie Curricolari
                     </label>
@@ -11307,7 +11306,7 @@ export default function App() {
                           handleUpdateGenOptions('sostegno', e.target.checked)
                         }
                         disabled={readOnlyMode}
-                        className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
+                        className="w-5 h-5 rounded text-brand-600 focus:ring-brand-500 cursor-pointer disabled:opacity-50"
                       />
                       Genera Sostegno
                     </label>
@@ -11319,7 +11318,7 @@ export default function App() {
                           handleUpdateGenOptions('compresenze', e.target.checked)
                         }
                         disabled={readOnlyMode}
-                        className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
+                        className="w-5 h-5 rounded text-brand-600 focus:ring-brand-500 cursor-pointer disabled:opacity-50"
                       />
                       Genera Compresenze
                     </label>
@@ -11331,7 +11330,7 @@ export default function App() {
                           handleUpdateGenOptions('strumento', e.target.checked)
                         }
                         disabled={readOnlyMode}
-                        className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
+                        className="w-5 h-5 rounded text-brand-600 focus:ring-brand-500 cursor-pointer disabled:opacity-50"
                       />
                       Genera Strumento
                     </label>
@@ -11355,7 +11354,7 @@ export default function App() {
                         )
                       }
                       disabled={readOnlyMode}
-                      className="text-sm bg-white border border-indigo-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700 cursor-pointer disabled:opacity-50"
+                      className="text-sm bg-white border border-brand-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-brand-500 font-bold text-brand-700 cursor-pointer disabled:opacity-50"
                     >
                       <option value={0}>0 ore</option>
                       <option value={1}>1 ora</option>
@@ -11380,7 +11379,7 @@ export default function App() {
                         )
                       }
                       disabled={readOnlyMode}
-                      className="text-sm bg-white border border-indigo-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700 cursor-pointer disabled:opacity-50"
+                      className="text-sm bg-white border border-brand-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-brand-500 font-bold text-brand-700 cursor-pointer disabled:opacity-50"
                     >
                       <option value={4}>4 ore</option>
                       <option value={5}>5 ore</option>
@@ -11405,7 +11404,7 @@ export default function App() {
                         )
                       }
                       disabled={readOnlyMode}
-                      className="text-sm bg-white border border-indigo-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700 cursor-pointer disabled:opacity-50"
+                      className="text-sm bg-white border border-brand-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-brand-500 font-bold text-brand-700 cursor-pointer disabled:opacity-50"
                     >
                       <option value={2}>2 ore</option>
                       <option value={3}>3 ore</option>
@@ -11433,7 +11432,7 @@ export default function App() {
                         )
                       }
                       disabled={readOnlyMode}
-                      className="text-sm bg-white border border-indigo-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700 cursor-pointer disabled:opacity-50"
+                      className="text-sm bg-white border border-brand-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-brand-500 font-bold text-brand-700 cursor-pointer disabled:opacity-50"
                     >
                       <option value={0}>Nessun minimo</option>
                       <option value={2}>2 ore</option>
@@ -11455,7 +11454,7 @@ export default function App() {
                         handleUpdateRules('autoDayOff', e.target.value === 'si')
                       }
                       disabled={readOnlyMode}
-                      className="text-sm bg-white border border-indigo-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700 cursor-pointer disabled:opacity-50"
+                      className="text-sm bg-white border border-brand-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-brand-500 font-bold text-brand-700 cursor-pointer disabled:opacity-50"
                     >
                       <option value="si">Assegnalo tu</option>
                       <option value="no">Nessuno</option>
@@ -11496,9 +11495,9 @@ export default function App() {
                               )
                             }
                             disabled={readOnlyMode}
-                            className={`text-xs border rounded py-1 px-1.5 focus:ring-1 focus:ring-indigo-500 ${
+                            className={`text-xs border rounded py-1 px-1.5 focus:ring-1 focus:ring-brand-500 ${
                               customGap !== undefined
-                                ? 'bg-white border-indigo-200 font-bold text-indigo-700'
+                                ? 'bg-white border-brand-200 font-bold text-brand-700'
                                 : 'bg-white/80 border-slate-200 text-slate-500'
                             } disabled:opacity-50`}
                           >
@@ -11613,9 +11612,9 @@ export default function App() {
                                     disabled={isDisabled}
                                     className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-bold transition-all border ${
                                       isOff
-                                        ? 'bg-red-600 border-red-700 text-white shadow-inner'
+                                        ? 'bg-fucsia-600 border-fucsia-700 text-white shadow-inner'
                                         : hasPartial
-                                        ? 'bg-amber-100 border-amber-400 text-amber-700'
+                                        ? 'bg-bruciato-100 border-bruciato-400 text-bruciato-700'
                                         : 'bg-white/80 border-slate-200 text-slate-400 hover:bg-white hover:border-slate-300'
                                     } ${
                                       isDisabled && !isOff
@@ -11640,8 +11639,8 @@ export default function App() {
                                 }
                                 className={`w-6 h-6 flex items-center justify-center rounded text-[10px] border transition-all ${
                                   isHoursOpen
-                                    ? 'bg-indigo-600 border-indigo-700 text-white'
-                                    : 'bg-white/80 border-slate-200 hover:bg-white hover:border-indigo-300'
+                                    ? 'bg-brand-600 border-brand-700 text-white'
+                                    : 'bg-white/80 border-slate-200 hover:bg-white hover:border-brand-300'
                                 }`}
                                 title="Blocca singole ore"
                               >
@@ -11666,7 +11665,7 @@ export default function App() {
                               title="Preferenza morbida: l'algoritmo ci prova, ma se serve piazza l'ora altrove"
                               className={`text-[9px] rounded border px-1 py-0.5 bg-white/90 ${
                                 hourPref
-                                  ? 'border-indigo-300 text-indigo-700 font-bold'
+                                  ? 'border-brand-300 text-brand-700 font-bold'
                                   : 'border-slate-200 text-slate-500'
                               } disabled:opacity-50`}
                             >
@@ -11726,10 +11725,10 @@ export default function App() {
                                                 title={`${dName} ${h.label} (${h.time})`}
                                                 className={`w-6 h-5 rounded border transition-all ${
                                                   dayIsOff
-                                                    ? 'bg-red-200 border-red-300 cursor-not-allowed'
+                                                    ? 'bg-fucsia-200 border-fucsia-300 cursor-not-allowed'
                                                     : isBlocked
-                                                    ? 'bg-amber-500 border-amber-600 text-white font-bold'
-                                                    : 'bg-white/80 border-slate-200 hover:border-amber-400'
+                                                    ? 'bg-bruciato-500 border-bruciato-600 text-white font-bold'
+                                                    : 'bg-white/80 border-slate-200 hover:border-bruciato-400'
                                                 }`}
                                               >
                                                 {dayIsOff
@@ -11756,8 +11755,8 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-amber-200 border-l-4 border-l-amber-500">
-              <h2 className="text-xl font-bold text-amber-900 mb-2">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-bruciato-200 border-l-4 border-l-bruciato-500">
+              <h2 className="text-xl font-bold text-bruciato-900 mb-2">
                 🚫 Materie da non affiancare
               </h2>
               <p className="text-sm text-slate-500 mb-6">
@@ -11767,7 +11766,7 @@ export default function App() {
                 l'alternativa è lasciare un'ora fuori dall'orario le
                 affianca lo stesso e lo segnala nei Conflitti.
               </p>
-              <div className="flex flex-wrap gap-2 mb-4 p-4 bg-amber-50 rounded-lg border border-amber-100">
+              <div className="flex flex-wrap gap-2 mb-4 p-4 bg-bruciato-50 rounded-lg border border-bruciato-100">
                 <select
                   value={newSepA}
                   onChange={(e) => setNewSepA(e.target.value)}
@@ -11800,7 +11799,7 @@ export default function App() {
                 <button
                   onClick={handleAddSubjectSeparation}
                   disabled={readOnlyMode || !newSepA || !newSepB}
-                  className="bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="bg-bruciato-600 hover:bg-bruciato-700 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Aggiungi
                 </button>
@@ -11815,13 +11814,13 @@ export default function App() {
                   (g: string[], idx: number) => (
                     <span
                       key={`${g.join('_')}_${idx}`}
-                      className="inline-flex items-center gap-2 bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-xs font-bold text-amber-800"
+                      className="inline-flex items-center gap-2 bg-white border border-bruciato-200 rounded-lg px-3 py-1.5 text-xs font-bold text-bruciato-800"
                     >
                       {g.join(' / ')}
                       <button
                         onClick={() => handleRemoveSubjectSeparation(idx)}
                         disabled={readOnlyMode}
-                        className="text-rose-400 hover:text-rose-600 disabled:opacity-40"
+                        className="text-fucsia-400 hover:text-fucsia-600 disabled:opacity-40"
                         title="Togli"
                       >
                         🗑️
@@ -11843,7 +11842,7 @@ export default function App() {
                     )
                   }
                   disabled={readOnlyMode}
-                  className="text-sm bg-white border border-amber-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-amber-500 font-bold text-amber-800 cursor-pointer disabled:opacity-50"
+                  className="text-sm bg-white border border-bruciato-300 rounded py-1.5 px-3 focus:ring-2 focus:ring-bruciato-500 font-bold text-bruciato-800 cursor-pointer disabled:opacity-50"
                 >
                   <option value="no">Come capita</option>
                   <option value="si">Distanziale</option>
@@ -11856,8 +11855,8 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-200 border-l-4 border-l-emerald-600">
-              <h2 className="text-xl font-bold text-emerald-900 mb-2">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-salvia-200 border-l-4 border-l-salvia-600">
+              <h2 className="text-xl font-bold text-salvia-900 mb-2">
                 🌍 Classi Miste (Lingue Straniere)
               </h2>
               <p className="text-sm text-slate-500 mb-6">
@@ -11865,7 +11864,7 @@ export default function App() {
                 L'algoritmo metterà le lezioni nelle due classi
                 contemporaneamente se lo stesso docente è assegnato ad entrambe.
               </p>
-              <div className="flex flex-wrap gap-2 mb-4 p-4 bg-emerald-50 rounded-lg border border-emerald-100">
+              <div className="flex flex-wrap gap-2 mb-4 p-4 bg-salvia-50 rounded-lg border border-salvia-100">
                 <select
                   value={newMixSubj}
                   onChange={(e) => setNewMixSubj(e.target.value)}
@@ -11905,7 +11904,7 @@ export default function App() {
                 <button
                   onClick={addMixedClass}
                   disabled={readOnlyMode}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-salvia-600 hover:bg-salvia-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ➕ Aggiungi Gruppo Misto
                 </button>
@@ -11922,7 +11921,7 @@ export default function App() {
                     <button
                       onClick={() => removeMixedClass(idx)}
                       disabled={readOnlyMode}
-                      className="text-rose-500 hover:text-rose-700 font-bold text-xs disabled:opacity-50"
+                      className="text-fucsia-500 hover:text-fucsia-700 font-bold text-xs disabled:opacity-50"
                     >
                       🗑️ Rimuovi
                     </button>
@@ -11944,7 +11943,7 @@ export default function App() {
                 Forza o monitora le ore in compresenza per classi diverse (es.
                 Ed. Fisica o progetti comuni).
               </p>
-              <div className="flex flex-wrap gap-2 mb-4 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+              <div className="flex flex-wrap gap-2 mb-4 p-4 bg-brand-50 rounded-lg border border-brand-100">
                 <select
                   value={newGroupC1}
                   onChange={(e) => setNewGroupC1(e.target.value)}
@@ -11987,7 +11986,7 @@ export default function App() {
                 <button
                   onClick={addGroupConstraint}
                   disabled={readOnlyMode}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ➕ Aggiungi Vincolo
                 </button>
@@ -12000,12 +11999,12 @@ export default function App() {
                   >
                     <span className="text-sm font-bold text-slate-700">
                       {gc.class1} + {gc.class2}{' '}
-                      <span className="text-indigo-600">({gc.subject})</span>
+                      <span className="text-brand-600">({gc.subject})</span>
                     </span>
                     <button
                       onClick={() => removeGroupConstraint(idx)}
                       disabled={readOnlyMode}
-                      className="text-rose-500 hover:text-rose-700 font-bold text-xs disabled:opacity-50"
+                      className="text-fucsia-500 hover:text-fucsia-700 font-bold text-xs disabled:opacity-50"
                     >
                       🗑️ Rimuovi
                     </button>
@@ -12040,14 +12039,14 @@ export default function App() {
                   {
                     model: 'modelloA',
                     nome: 'Modello A',
-                    box: 'bg-indigo-50 border-indigo-100',
-                    tag: 'bg-indigo-100 text-indigo-800',
+                    box: 'bg-brand-50 border-brand-100',
+                    tag: 'bg-brand-100 text-brand-800',
                   },
                   {
                     model: 'modelloB',
                     nome: 'Modello B',
-                    box: 'bg-amber-50 border-amber-100',
-                    tag: 'bg-amber-100 text-amber-800',
+                    box: 'bg-bruciato-50 border-bruciato-100',
+                    tag: 'bg-bruciato-100 text-bruciato-800',
                   },
                 ].map(({ model, nome, box, tag }) => {
                   const grid =
@@ -12086,7 +12085,7 @@ export default function App() {
                               )
                             }
                             disabled={readOnlyMode}
-                            className="w-20 border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                            className="w-20 border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                           />
                         </label>
                         <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
@@ -12104,7 +12103,7 @@ export default function App() {
                               )
                             }
                             disabled={readOnlyMode}
-                            className="w-20 border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                            className="w-20 border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                           />
                         </label>
                         <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
@@ -12122,7 +12121,7 @@ export default function App() {
                               )
                             }
                             disabled={readOnlyMode}
-                            className="w-20 border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                            className="w-20 border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                           />
                         </label>
                         <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 pb-1">
@@ -12137,7 +12136,7 @@ export default function App() {
                               )
                             }
                             disabled={readOnlyMode}
-                            className="w-4 h-4 accent-indigo-600 disabled:opacity-50"
+                            className="w-4 h-4 accent-brand-600 disabled:opacity-50"
                           />
                           Rientro pomeridiano
                         </label>
@@ -12178,7 +12177,7 @@ export default function App() {
                                 }
                                 disabled={readOnlyMode}
                                 title={giorno}
-                                className="w-14 border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                                className="w-14 border border-slate-300 rounded-lg px-2 py-1 text-sm font-bold text-slate-800 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                               />
                             </label>
                           ))}
@@ -12206,12 +12205,12 @@ export default function App() {
                         setNewSectionName(e.target.value.toUpperCase())
                       }
                       disabled={readOnlyMode}
-                      className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm w-48 uppercase focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                      className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm w-48 uppercase focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                     />
                     <button
                       type="submit"
                       disabled={readOnlyMode}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Aggiungi
                     </button>
@@ -12230,7 +12229,7 @@ export default function App() {
                           <button
                             onClick={() => handleDeleteSection(section)}
                             disabled={readOnlyMode}
-                            className="absolute top-3 right-3 text-rose-400 hover:text-rose-600 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            className="absolute top-3 right-3 text-fucsia-400 hover:text-fucsia-600 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                             title="Elimina"
                           >
                             🗑️
@@ -12252,7 +12251,7 @@ export default function App() {
                                   handleRenameSection(section, newName);
                               }}
                               disabled={readOnlyMode}
-                              className="text-xs text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="text-xs text-brand-500 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-0.5 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               ✏️ Rinomina
                             </button>
@@ -12267,7 +12266,7 @@ export default function App() {
                               )
                             }
                             disabled={readOnlyMode}
-                            className="text-sm bg-white border border-slate-300 rounded-lg py-1.5 px-2 font-medium w-full focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="text-sm bg-white border border-slate-300 rounded-lg py-1.5 px-2 font-medium w-full focus:ring-2 focus:ring-brand-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <option value="modelloA">
                               Modello A ({(modelGrids?.modelloA ||
@@ -12291,7 +12290,7 @@ export default function App() {
                             }
                             disabled={readOnlyMode || sedi.length === 0}
                             title="Sede della sezione (per il vincolo di spostamento multi-sede)"
-                            className="text-xs bg-white border border-slate-300 rounded-lg py-1 px-2 w-full focus:ring-1 focus:ring-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="text-xs bg-white border border-slate-300 rounded-lg py-1 px-2 w-full focus:ring-1 focus:ring-brand-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <option value="">📍 — Nessuna sede —</option>
                             {sedi.map((s) => (
@@ -12321,7 +12320,7 @@ export default function App() {
                                     );
                                   }}
                                   disabled={readOnlyMode}
-                                  className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer disabled:opacity-50"
+                                  className="rounded text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer disabled:opacity-50"
                                 />
                                 {yr}ª
                               </label>
@@ -12346,7 +12345,7 @@ export default function App() {
                               }
                               disabled={readOnlyMode}
                               list="monte-ore-tipici"
-                              className="w-16 text-center border border-slate-300 rounded p-1 font-normal focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                              className="w-16 text-center border border-slate-300 rounded p-1 font-normal focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                             />
                           </label>
                         </div>
@@ -12389,12 +12388,12 @@ export default function App() {
                   value={newSedeName}
                   onChange={(e) => setNewSedeName(e.target.value)}
                   disabled={readOnlyMode}
-                  className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                 />
                 <button
                   type="submit"
                   disabled={readOnlyMode}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Aggiungi
                 </button>
@@ -12418,7 +12417,7 @@ export default function App() {
                           handleRenameSede(s.id, newName);
                       }}
                       disabled={readOnlyMode}
-                      className="text-xs text-indigo-500 hover:text-indigo-700 cursor-pointer disabled:opacity-50"
+                      className="text-xs text-brand-500 hover:text-brand-700 cursor-pointer disabled:opacity-50"
                       title="Rinomina"
                     >
                       ✏️
@@ -12426,7 +12425,7 @@ export default function App() {
                     <button
                       onClick={() => handleDeleteSede(s.id)}
                       disabled={readOnlyMode}
-                      className="text-xs text-rose-400 hover:text-rose-600 cursor-pointer disabled:opacity-50"
+                      className="text-xs text-fucsia-400 hover:text-fucsia-600 cursor-pointer disabled:opacity-50"
                       title="Elimina"
                     >
                       🗑️
@@ -12462,7 +12461,7 @@ export default function App() {
                   value={newRoomName}
                   onChange={(e) => setNewRoomName(e.target.value)}
                   disabled={readOnlyMode}
-                  className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                 />
                 <input
                   type="text"
@@ -12470,12 +12469,12 @@ export default function App() {
                   value={newRoomSubjects}
                   onChange={(e) => setNewRoomSubjects(e.target.value)}
                   disabled={readOnlyMode}
-                  className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 uppercase focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 uppercase focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                 />
                 <button
                   type="submit"
                   disabled={readOnlyMode}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Aggiungi
                 </button>
@@ -12489,7 +12488,7 @@ export default function App() {
                     <button
                       onClick={() => handleDeleteRoom(r.id)}
                       disabled={readOnlyMode}
-                      className="absolute top-3 right-3 text-rose-400 hover:text-rose-600 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="absolute top-3 right-3 text-fucsia-400 hover:text-fucsia-600 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                       title="Elimina"
                     >
                       🗑️
@@ -12508,7 +12507,7 @@ export default function App() {
                             handleRenameRoom(r.id, newName);
                         }}
                         disabled={readOnlyMode}
-                        className="text-xs text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="text-xs text-brand-500 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-0.5 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         ✏️
                       </button>
@@ -12524,7 +12523,7 @@ export default function App() {
                       }
                       disabled={readOnlyMode}
                       placeholder="es. MUSICA"
-                      className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white uppercase focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                      className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white uppercase focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                     />
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">
                       Sigla per le stampe
@@ -12537,7 +12536,7 @@ export default function App() {
                       maxLength={6}
                       placeholder={roomShortLabel(r.name) || 'es. C.L.D.'}
                       title="Come compare nel quadro A3, dove il nome intero non entra. Massimo 6 caratteri: nelle colonne più strette ne entrano bene 3 o 4."
-                      className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white uppercase focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                      className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white uppercase focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                     />
                     <p className="text-[9px] text-slate-400 leading-tight">
                       Nel quadro generale e in A3 lo spazio è quello di un
@@ -12557,7 +12556,7 @@ export default function App() {
                       }
                       disabled={readOnlyMode}
                       title="Quante aule di questo tipo ha la scuola: due palestre, tre laboratori..."
-                      className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                      className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                     />
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1">
                       Sede
@@ -12568,7 +12567,7 @@ export default function App() {
                         handleUpdateRoomSede(r.id, e.target.value)
                       }
                       disabled={readOnlyMode || sedi.length === 0}
-                      className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                      className="text-xs border border-slate-300 rounded-lg p-1.5 bg-white focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                     >
                       <option value="">— Nessuna sede —</option>
                       {sedi.map((s) => (
@@ -12596,7 +12595,7 @@ export default function App() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <h3 className="text-base font-bold text-indigo-700 flex items-center gap-1.5">
+                    <h3 className="text-base font-bold text-brand-700 flex items-center gap-1.5">
                       <span>☀️ Ore Diurne</span>
                     </h3>
                     <div className="flex items-center gap-2">
@@ -12606,7 +12605,7 @@ export default function App() {
                           readOnlyMode || diurnalHours.length >= GRID_MAX_HOURS
                         }
                         title="Serve alla primaria a tempo pieno: aggiunge un'ora al mattino e sposta in avanti quelle pomeridiane"
-                        className="text-xs font-bold px-2.5 py-1 rounded-lg border bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="text-xs font-bold px-2.5 py-1 rounded-lg border bg-brand-50 border-brand-200 text-brand-700 hover:bg-brand-100 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         ➕ Aggiungi ora
                       </button>
@@ -12648,7 +12647,7 @@ export default function App() {
                           }
                           disabled={readOnlyMode}
                           placeholder="Etichetta"
-                          className="text-xs border border-slate-300 rounded p-1.5 bg-white w-28 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                          className="text-xs border border-slate-300 rounded p-1.5 bg-white w-28 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                         />
                         <input
                           type="text"
@@ -12663,7 +12662,7 @@ export default function App() {
                           }
                           disabled={readOnlyMode}
                           placeholder="Fascia"
-                          className="text-xs border border-slate-300 rounded p-1.5 bg-white flex-1 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                          className="text-xs border border-slate-300 rounded p-1.5 bg-white flex-1 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                         />
                         <select
                           value={dh.duration ?? HOUR_DEFAULT_MINUTES}
@@ -12677,7 +12676,7 @@ export default function App() {
                           }
                           disabled={readOnlyMode}
                           title="Durata della lezione. La mezz'ora conta 0,5 nel totale delle ore."
-                          className="text-xs border border-slate-300 rounded p-1.5 bg-white w-20 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 cursor-pointer"
+                          className="text-xs border border-slate-300 rounded p-1.5 bg-white w-20 focus:ring-1 focus:ring-brand-500 disabled:opacity-50 cursor-pointer"
                         >
                           {HOUR_DURATION_OPTIONS.map((m) => (
                             <option key={m} value={m}>
@@ -12696,7 +12695,7 @@ export default function App() {
                   </p>
                 </div>
                 <div className="space-y-4">
-                  <h3 className="text-base font-bold text-purple-700 flex items-center gap-1.5">
+                  <h3 className="text-base font-bold text-brand-700 flex items-center gap-1.5">
                     <span>🌙 Ore Pomeridiane</span>
                   </h3>
                   <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
@@ -12721,7 +12720,7 @@ export default function App() {
                           }
                           disabled={readOnlyMode}
                           placeholder="Etichetta"
-                          className="text-xs border border-slate-300 rounded p-1.5 bg-white w-28 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                          className="text-xs border border-slate-300 rounded p-1.5 bg-white w-28 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                         />
                         <input
                           type="text"
@@ -12736,7 +12735,7 @@ export default function App() {
                           }
                           disabled={readOnlyMode}
                           placeholder="Fascia"
-                          className="text-xs border border-slate-300 rounded p-1.5 bg-white flex-1 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                          className="text-xs border border-slate-300 rounded p-1.5 bg-white flex-1 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                         />
                         <select
                           value={ah.duration ?? HOUR_DEFAULT_MINUTES}
@@ -12750,7 +12749,7 @@ export default function App() {
                           }
                           disabled={readOnlyMode}
                           title="Durata della lezione. La mezz'ora conta 0,5 nel totale delle ore."
-                          className="text-xs border border-slate-300 rounded p-1.5 bg-white w-20 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 cursor-pointer"
+                          className="text-xs border border-slate-300 rounded p-1.5 bg-white w-20 focus:ring-1 focus:ring-brand-500 disabled:opacity-50 cursor-pointer"
                         >
                           {HOUR_DURATION_OPTIONS.map((m) => (
                             <option key={m} value={m}>
@@ -12782,11 +12781,11 @@ export default function App() {
                 </div>
               </div>
               {validationResult.conflicts.length === 0 ? (
-                <div className="p-8 text-center bg-emerald-50 border border-emerald-100 rounded-2xl">
-                  <h3 className="text-lg font-bold text-emerald-800 mb-1">
+                <div className="p-8 text-center bg-salvia-50 border border-salvia-100 rounded-2xl">
+                  <h3 className="text-lg font-bold text-salvia-800 mb-1">
                     ✅ Nessun conflitto rilevato!
                   </h3>
-                  <p className="text-sm text-emerald-600">
+                  <p className="text-sm text-salvia-600">
                     L'orario generato rispetta tutti i requisiti.
                   </p>
                 </div>
@@ -12797,8 +12796,8 @@ export default function App() {
                       key={index}
                       className={`p-4 rounded-xl border flex flex-col gap-3 ${
                         conf.type === 'error'
-                          ? 'bg-rose-50 border-rose-100 text-rose-800'
-                          : 'bg-amber-50 border-amber-100 text-amber-800'
+                          ? 'bg-fucsia-50 border-fucsia-100 text-fucsia-800'
+                          : 'bg-bruciato-50 border-bruciato-100 text-bruciato-800'
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -12841,14 +12840,14 @@ export default function App() {
                                   3000
                                 );
                               }}
-                              className="shrink-0 bg-white hover:bg-indigo-600 text-indigo-600 hover:text-white border border-indigo-200 hover:border-transparent font-bold text-xs py-1.5 px-3 rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer"
+                              className="shrink-0 bg-white hover:bg-brand-600 text-brand-600 hover:text-white border border-brand-200 hover:border-transparent font-bold text-xs py-1.5 px-3 rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer"
                             >
                               <span>👁️</span> Vai alla cella
                             </button>
                             <button
                               onClick={() => handleRemoveSlot(conf.slot)}
                               disabled={readOnlyMode}
-                              className="shrink-0 bg-white hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 hover:border-transparent font-bold text-xs py-1.5 px-3 rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="shrink-0 bg-white hover:bg-fucsia-600 text-fucsia-600 hover:text-white border border-fucsia-200 hover:border-transparent font-bold text-xs py-1.5 px-3 rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <span>🛠️</span> Rimuovi cella
                             </button>
@@ -12886,7 +12885,7 @@ export default function App() {
                       type="date"
                       value={substitutionsDate}
                       onChange={(e) => setSubstitutionsDate(e.target.value)}
-                      className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500"
+                      className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-brand-500"
                     />
                   </div>
                   <button
@@ -12898,7 +12897,7 @@ export default function App() {
                   </button>
                   <button
                     onClick={handleExportSostituzioniExcel}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                    className="bg-salvia-600 hover:bg-salvia-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
                     title="Scarica il foglio del giorno in Excel, per correggerlo a mano prima di stamparlo"
                   >
                     📊 Excel
@@ -13020,13 +13019,13 @@ export default function App() {
                   <button
                     type="submit"
                     disabled={readOnlyMode}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Segnala
                   </button>
                 </div>
                 {absenceFormError && (
-                  <p className="text-xs text-rose-600 font-semibold">
+                  <p className="text-xs text-fucsia-600 font-semibold">
                     {absenceFormError}
                   </p>
                 )}
@@ -13075,7 +13074,7 @@ export default function App() {
                           <button
                             onClick={() => handleDeleteAbsence(absence.id)}
                             disabled={readOnlyMode}
-                            className="shrink-0 text-rose-400 hover:text-rose-600 text-xs font-bold disabled:opacity-50"
+                            className="shrink-0 text-fucsia-400 hover:text-fucsia-600 text-xs font-bold disabled:opacity-50"
                           >
                             🗑️ Rimuovi
                           </button>
@@ -13146,12 +13145,12 @@ export default function App() {
                                   — Classe {s.classId} ({s.subject})
                                 </div>
                                 {s.coveredBySostegno ? (
-                                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded">
+                                  <span className="text-xs font-bold text-salvia-700 bg-salvia-50 px-2 py-1 rounded">
                                     ✅ Coperta da sostegno
                                   </span>
                                 ) : s.existingSub ? (
                                   <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded">
+                                    <span className="text-xs font-bold text-brand-700 bg-brand-50 px-2 py-1 rounded">
                                       {s.existingSub.method ===
                                       'docente_disponibile'
                                         ? `Sostituto: ${
@@ -13225,7 +13224,7 @@ export default function App() {
                                         )
                                       }
                                       disabled={readOnlyMode}
-                                      className="text-xs text-rose-500 hover:text-rose-700 disabled:opacity-50"
+                                      className="text-xs text-fucsia-500 hover:text-fucsia-700 disabled:opacity-50"
                                     >
                                       🗑️
                                     </button>
@@ -13262,7 +13261,7 @@ export default function App() {
                                           }
                                           className={`text-xs font-bold px-2 py-1 rounded-lg border cursor-pointer disabled:opacity-50 ${
                                             c.priority === 0
-                                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                              ? 'bg-salvia-50 border-salvia-200 text-salvia-700 hover:bg-salvia-100'
                                               : c.priority === 1
                                               ? 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100'
                                               : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -13282,7 +13281,7 @@ export default function App() {
                                         )
                                       }
                                       disabled={readOnlyMode}
-                                      className="text-xs font-bold px-2 py-1 rounded-lg border bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 cursor-pointer disabled:opacity-50"
+                                      className="text-xs font-bold px-2 py-1 rounded-lg border bg-bruciato-50 border-bruciato-200 text-bruciato-700 hover:bg-bruciato-100 cursor-pointer disabled:opacity-50"
                                     >
                                       Sorveglianza
                                     </button>
@@ -13297,7 +13296,7 @@ export default function App() {
                                         )
                                       }
                                       disabled={readOnlyMode}
-                                      className="text-xs font-bold px-2 py-1 rounded-lg border bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 cursor-pointer disabled:opacity-50"
+                                      className="text-xs font-bold px-2 py-1 rounded-lg border bg-bruciato-50 border-bruciato-200 text-bruciato-700 hover:bg-bruciato-100 cursor-pointer disabled:opacity-50"
                                     >
                                       Dividi alunni
                                     </button>
@@ -13314,7 +13313,7 @@ export default function App() {
                                       }
                                       disabled={readOnlyMode}
                                       title="Una collega della stessa classe anticipa la lezione che avrebbe più tardi"
-                                      className="text-xs font-bold px-2 py-1 rounded-lg border bg-violet-50 border-violet-200 text-violet-700 hover:bg-violet-100 cursor-pointer disabled:opacity-50"
+                                      className="text-xs font-bold px-2 py-1 rounded-lg border bg-brand-50 border-brand-200 text-brand-700 hover:bg-brand-100 cursor-pointer disabled:opacity-50"
                                     >
                                       ⏪ Anticipa lezione
                                     </button>
@@ -13416,8 +13415,8 @@ export default function App() {
                                         disabled={readOnlyMode}
                                         className={`text-left text-xs px-2.5 py-2 rounded-lg border cursor-pointer disabled:opacity-50 ${
                                           c.exitClean
-                                            ? 'bg-white border-emerald-200 hover:bg-emerald-50'
-                                            : 'bg-white border-amber-200 hover:bg-amber-50'
+                                            ? 'bg-white border-salvia-200 hover:bg-salvia-50'
+                                            : 'bg-white border-bruciato-200 hover:bg-bruciato-50'
                                         }`}
                                       >
                                         <span className="font-bold">
@@ -13429,7 +13428,7 @@ export default function App() {
                                           ? ` — 📍 ${c.room}`
                                           : ''}
                                         {c.roomBusy.length > 0 && (
-                                          <span className="block mt-0.5 font-semibold text-rose-700">
+                                          <span className="block mt-0.5 font-semibold text-fucsia-700">
                                             ⚠️ {c.room} in quest'ora è già di{' '}
                                             {c.roomBusy.join(', ')}: servirà
                                             un'altra aula.
@@ -13438,8 +13437,8 @@ export default function App() {
                                         <span
                                           className={`block mt-0.5 font-semibold ${
                                             c.exitClean
-                                              ? 'text-emerald-700'
-                                              : 'text-amber-700'
+                                              ? 'text-salvia-700'
+                                              : 'text-bruciato-700'
                                           }`}
                                         >
                                           {c.exitClean
@@ -13539,7 +13538,7 @@ export default function App() {
                         </div>
                         <div className="flex items-baseline justify-center gap-3 mt-1">
                           <span
-                            className="text-lg font-black text-amber-600"
+                            className="text-lg font-black text-bruciato-600"
                             title="Ore di disponibilità dichiarate a settimana"
                           >
                             {disponibilitaHoursByTeacher[tid] || 0}
@@ -13548,7 +13547,7 @@ export default function App() {
                             </span>
                           </span>
                           <span
-                            className="text-lg font-black text-indigo-600"
+                            className="text-lg font-black text-brand-600"
                             title="Ore di supplenza retribuita svolte"
                           >
                             {paidSubstitutionHoursByTeacher[tid] || 0}
@@ -13593,8 +13592,8 @@ export default function App() {
                         key={v.teacherId}
                         className={`p-3 rounded-lg border text-center ${
                           v.saldo > 0
-                            ? 'bg-amber-50 border-amber-200'
-                            : 'bg-emerald-50 border-emerald-200'
+                            ? 'bg-bruciato-50 border-bruciato-200'
+                            : 'bg-salvia-50 border-salvia-200'
                         }`}
                       >
                         <div className="text-xs font-bold text-slate-700">
@@ -13602,7 +13601,7 @@ export default function App() {
                         </div>
                         <div
                           className={`text-lg font-black ${
-                            v.saldo > 0 ? 'text-amber-700' : 'text-emerald-700'
+                            v.saldo > 0 ? 'text-bruciato-700' : 'text-salvia-700'
                           }`}
                           title="Ore ancora da recuperare"
                         >
@@ -13653,7 +13652,7 @@ export default function App() {
                               />
                               {r.oltreMeta && (
                                 <span
-                                  className="block text-[10px] font-bold text-rose-600 mt-0.5"
+                                  className="block text-[10px] font-bold text-fucsia-600 mt-0.5"
                                   title={`Quel giorno il docente era in servizio ${fmtOreRecupero(
                                     r.oreServizio
                                   )}`}
@@ -13668,8 +13667,8 @@ export default function App() {
                                 disabled={readOnlyMode}
                                 className={`px-2 py-1 rounded-lg border font-bold cursor-pointer disabled:opacity-50 ${
                                   r.recuperata
-                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                                    : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                                    ? 'bg-salvia-50 border-salvia-200 text-salvia-700 hover:bg-salvia-100'
+                                    : 'bg-bruciato-50 border-bruciato-200 text-bruciato-700 hover:bg-bruciato-100'
                                 }`}
                               >
                                 {r.recuperata
@@ -13763,7 +13762,7 @@ export default function App() {
                             <button
                               type="button"
                               onClick={handleRemoveCompresenza}
-                              className="text-[10px] font-bold text-rose-600 hover:text-rose-700 cursor-pointer"
+                              className="text-[10px] font-bold text-fucsia-600 hover:text-fucsia-700 cursor-pointer"
                             >
                               Togli
                             </button>
@@ -13829,7 +13828,7 @@ export default function App() {
                         className={`w-full flex items-center justify-between p-2 rounded-lg border text-left transition-all ${
                           isUnavailable
                             ? 'border-slate-200 opacity-60 cursor-not-allowed'
-                            : 'border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/40'
+                            : 'border-slate-200 hover:border-brand-500 hover:bg-brand-50/40'
                         }`}
                         style={{
                           backgroundColor: isUnavailable
@@ -13839,18 +13838,18 @@ export default function App() {
                       >
                         <span
                           className={`text-xs font-bold ${
-                            isUnavailable ? 'text-red-800' : 'text-slate-700'
+                            isUnavailable ? 'text-fucsia-800' : 'text-slate-700'
                           }`}
                         >
                           {t.name} ({t.subject})
                         </span>
                         {isUnavailable && (
-                          <span className="bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                          <span className="bg-fucsia-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
                             {isDayOff ? 'LIBERO' : 'ORA BLOCCATA'}
                           </span>
                         )}
                         {isBusy && !isUnavailable && (
-                          <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1 py-0.5 rounded">
+                          <span className="bg-bruciato-100 text-bruciato-800 text-[9px] font-bold px-1 py-0.5 rounded">
                             Occupato
                           </span>
                         )}
@@ -13886,12 +13885,12 @@ export default function App() {
                         className={`w-full flex items-center justify-between p-2 rounded-lg border text-left transition-all ${
                           isUnavailable
                             ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed'
-                            : 'border-slate-200 hover:border-purple-500 hover:bg-purple-50/40'
+                            : 'border-slate-200 hover:border-brand-500 hover:bg-brand-50/40'
                         }`}
                       >
                         <span
                           className={`text-xs font-bold ${
-                            isUnavailable ? 'text-slate-400' : 'text-purple-700'
+                            isUnavailable ? 'text-slate-400' : 'text-brand-700'
                           }`}
                         >
                           {s.name} (Sostegno)
@@ -13902,7 +13901,7 @@ export default function App() {
                           </span>
                         )}
                         {isBusy && !isUnavailable && (
-                          <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1 py-0.5 rounded">
+                          <span className="bg-bruciato-100 text-bruciato-800 text-[9px] font-bold px-1 py-0.5 rounded">
                             Occupato
                           </span>
                         )}
@@ -13921,7 +13920,7 @@ export default function App() {
                     setTempRoom(e.target.value);
                     setRoomTouched(true);
                   }}
-                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-500"
                 >
                   {rooms.map((r) => {
                     const occupanti = isNamedRoom(r.name)
@@ -13964,8 +13963,8 @@ export default function App() {
                     <p
                       className={`mt-2 text-[11px] font-semibold rounded-lg px-2.5 py-2 border ${
                         piena
-                          ? 'bg-rose-50 border-rose-200 text-rose-700'
-                          : 'bg-amber-50 border-amber-200 text-amber-800'
+                          ? 'bg-fucsia-50 border-fucsia-200 text-fucsia-700'
+                          : 'bg-bruciato-50 border-bruciato-200 text-bruciato-800'
                       }`}
                     >
                       {piena
@@ -14003,7 +14002,7 @@ export default function App() {
                             ? "Salva l'aula senza cambiare il docente"
                             : 'Prima assegna un docente a questa cella'
                         }
-                        className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="mt-2 w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         💾 Salva aula
                       </button>
@@ -14019,7 +14018,7 @@ export default function App() {
               <div className="pt-3 border-t border-slate-100 flex gap-2">
                 <button
                   onClick={() => handleAssignTeacher('cancella')}
-                  className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold py-2 px-4 rounded-lg text-xs border border-rose-200 transition-all cursor-pointer"
+                  className="flex-1 bg-fucsia-50 hover:bg-fucsia-100 text-fucsia-700 font-semibold py-2 px-4 rounded-lg text-xs border border-fucsia-200 transition-all cursor-pointer"
                 >
                   Rimuovi
                 </button>
@@ -14037,7 +14036,7 @@ export default function App() {
       {editingNoteCell && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full overflow-hidden">
-            <div className="bg-yellow-50 px-6 py-4 border-b border-yellow-100 flex justify-between items-center">
+            <div className="bg-lime-50 px-6 py-4 border-b border-lime-100 flex justify-between items-center">
               <div>
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
                   📝 Nota sulla Cella
@@ -14065,7 +14064,7 @@ export default function App() {
                 value={noteText}
                 onChange={(e) => setNoteText(e.target.value)}
                 placeholder="Scrivi qui la tua nota... (es: 'Lezione recupero', 'Uscita anticipata', 'Progetto speciale')"
-                className="w-full h-32 border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                className="w-full h-32 border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-lime-500 focus:border-lime-500"
                 autoFocus
               />
               <div className="flex gap-2">
@@ -14079,7 +14078,7 @@ export default function App() {
                 ] && (
                   <button
                     onClick={handleDeleteNote}
-                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold py-2 px-4 rounded-lg text-xs border border-rose-200 transition-all cursor-pointer"
+                    className="bg-fucsia-50 hover:bg-fucsia-100 text-fucsia-700 font-semibold py-2 px-4 rounded-lg text-xs border border-fucsia-200 transition-all cursor-pointer"
                   >
                     🗑️ Elimina Nota
                   </button>
@@ -14095,7 +14094,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={handleSaveNote}
-                  className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-all cursor-pointer flex-1"
+                  className="bg-lime-500 hover:bg-lime-600 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-all cursor-pointer flex-1"
                 >
                   💾 Salva Nota
                 </button>
@@ -14107,7 +14106,7 @@ export default function App() {
       {assignModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-sm w-full overflow-hidden">
-            <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center">
+            <div className="bg-brand-50 px-6 py-4 border-b border-brand-100 flex justify-between items-center">
               <div>
                 <h3 className="font-bold text-slate-800">
                   ➕ Aggiungi Assegnazione
@@ -14141,7 +14140,7 @@ export default function App() {
                     setAssignSubject(esistente?.subject || '');
                     if (esistente?.hours) setAssignHours(esistente.hours);
                   }}
-                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-500"
                 >
                   {classes.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -14162,7 +14161,7 @@ export default function App() {
                   onChange={(e) =>
                     setAssignHours(parseInt(e.target.value) || 1)
                   }
-                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-500"
                 />
               </div>
               {assignModal.staffType === 'materia' && (
@@ -14178,7 +14177,7 @@ export default function App() {
                       allStaff.find((s) => s.id === assignModal.staffId)
                         ?.subject || 'Materia del docente'
                     }
-                    className="w-full border border-slate-300 rounded-lg p-2 text-sm uppercase focus:ring-2 focus:ring-indigo-500"
+                    className="w-full border border-slate-300 rounded-lg p-2 text-sm uppercase focus:ring-2 focus:ring-brand-500"
                   />
                   <p className="mt-1.5 text-[11px] text-slate-500">
                     Lascia vuoto per la materia del docente. Compilalo quando
@@ -14196,7 +14195,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={handleSaveAssignmentModal}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-all cursor-pointer"
+                  className="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-all cursor-pointer"
                 >
                   💾 Salva
                 </button>
@@ -14209,7 +14208,7 @@ export default function App() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full overflow-hidden">
             <div className="p-6 text-center border-b border-slate-100">
-              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+              <div className="w-16 h-16 bg-bruciato-100 text-bruciato-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
                 ⚠️
               </div>
               <h3 className="text-xl font-bold text-slate-800 mb-2">
@@ -14222,7 +14221,7 @@ export default function App() {
                 <>
                   <button
                     onClick={conflictModal.onSwap}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     🔄 Scambia Lezioni
                   </button>
@@ -14237,7 +14236,7 @@ export default function App() {
               {conflictModal.hideSwap && !conflictModal.soloOk && (
                 <button
                   onClick={conflictModal.onConfirm}
-                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full bg-fucsia-600 hover:bg-fucsia-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   ⚠️ Procedi Comunque
                 </button>
@@ -14247,14 +14246,14 @@ export default function App() {
               {conflictModal.soloOk ? (
                 <button
                   onClick={() => setConflictModal(null)}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all cursor-pointer"
+                  className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all cursor-pointer"
                 >
                   Ok
                 </button>
               ) : (
                 <button
                   onClick={() => setConflictModal(null)}
-                  className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3 px-4 rounded-xl transition-all mt-2 cursor-pointer"
+                  className="w-full bg-fucsia-50 hover:bg-fucsia-100 text-fucsia-600 font-bold py-3 px-4 rounded-xl transition-all mt-2 cursor-pointer"
                 >
                   ❌ Annulla
                 </button>
@@ -14267,7 +14266,7 @@ export default function App() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-sm w-full overflow-hidden">
             <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+              <div className="w-16 h-16 bg-fucsia-100 text-fucsia-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
                 ⚠️
               </div>
               <h3 className="text-xl font-bold text-slate-800 mb-2">
@@ -14275,8 +14274,8 @@ export default function App() {
               </h3>
               <p className="text-sm text-slate-500 mb-6">
                 Cancellerà{' '}
-                <strong className="text-rose-600">tutti i carichi orari</strong>{' '}
-                e <strong className="text-rose-600">svuoterà l'orario</strong>.
+                <strong className="text-fucsia-600">tutti i carichi orari</strong>{' '}
+                e <strong className="text-fucsia-600">svuoterà l'orario</strong>.
               </p>
               <div className="flex gap-3">
                 <button
@@ -14287,7 +14286,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={handleResetAllAssignments}
-                  className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all cursor-pointer"
+                  className="flex-1 bg-fucsia-600 hover:bg-fucsia-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all cursor-pointer"
                 >
                   Sì, azzera
                 </button>
@@ -14300,7 +14299,7 @@ export default function App() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-sm w-full overflow-hidden">
             <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+              <div className="w-16 h-16 bg-bruciato-100 text-bruciato-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
                 🔒
               </div>
               <h3 className="text-xl font-bold text-slate-800 mb-2">
@@ -14308,7 +14307,7 @@ export default function App() {
               </h3>
               <p className="text-sm text-slate-500 mb-6">
                 Il browser ha bloccato la finestra di stampa.{' '}
-                <strong className="text-amber-600">Consenti i pop-up</strong> e
+                <strong className="text-bruciato-600">Consenti i pop-up</strong> e
                 riprova.
               </p>
               <button
@@ -14325,7 +14324,7 @@ export default function App() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-sm w-full overflow-hidden">
             <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+              <div className="w-16 h-16 bg-fucsia-100 text-fucsia-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
                 ⚠️
               </div>
               <h3 className="text-xl font-bold text-slate-800 mb-2">
@@ -14333,7 +14332,7 @@ export default function App() {
               </h3>
               <p className="text-sm text-slate-500 mb-6">
                 Rimuoverà{' '}
-                <strong className="text-rose-600">tutte le classi</strong> di
+                <strong className="text-fucsia-600">tutte le classi</strong> di
                 questa sezione. Irreversibile.
               </p>
               <div className="flex gap-3">
@@ -14348,7 +14347,7 @@ export default function App() {
                     executeDeleteSection(sectionActionModal.name);
                     setSectionActionModal(null);
                   }}
-                  className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all cursor-pointer"
+                  className="flex-1 bg-fucsia-600 hover:bg-fucsia-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all cursor-pointer"
                 >
                   Sì, elimina
                 </button>
@@ -14360,7 +14359,7 @@ export default function App() {
       {generationReport && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-2xl w-full overflow-hidden">
-            <div className="bg-emerald-50 px-6 py-4 border-b border-emerald-100 flex justify-between items-center">
+            <div className="bg-salvia-50 px-6 py-4 border-b border-salvia-100 flex justify-between items-center">
               <div>
                 <h3 className="font-bold text-slate-800 flex items-center gap-2">
                   ✨ Report Auto-Generazione
@@ -14377,26 +14376,26 @@ export default function App() {
               </button>
             </div>
             <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-              <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-lg">
-                <h4 className="font-bold text-indigo-900 mb-2">
+              <div className="bg-brand-50 border border-brand-200 p-4 rounded-lg">
+                <h4 className="font-bold text-brand-900 mb-2">
                   📚 Materie Curricolari
                 </h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-slate-600">Ore richieste:</span>
-                    <span className="ml-2 font-bold text-indigo-700">
+                    <span className="ml-2 font-bold text-brand-700">
                       {generationReport.materie.requested}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-600">Ore assegnate:</span>
-                    <span className="ml-2 font-bold text-emerald-700">
+                    <span className="ml-2 font-bold text-salvia-700">
                       {generationReport.materie.assigned}
                     </span>
                   </div>
                 </div>
                 {generationReport.materie.recovered > 0 && (
-                  <p className="text-xs text-emerald-700 mt-3">
+                  <p className="text-xs text-salvia-700 mt-3">
                     🔧 {generationReport.materie.recovered} ore recuperate dalla
                     seconda passata
                     {generationReport.materie.swaps > 0 &&
@@ -14405,7 +14404,7 @@ export default function App() {
                   </p>
                 )}
                 {generationReport.materie.consolidated > 0 && (
-                  <p className="text-xs text-emerald-700 mt-1">
+                  <p className="text-xs text-salvia-700 mt-1">
                     🧩 {generationReport.materie.consolidated} ore spostate per
                     chiudere le giornate sotto il minimo
                     {generationReport.materie.shortDaysLeft > 0 &&
@@ -14414,8 +14413,8 @@ export default function App() {
                   </p>
                 )}
                 {generationReport.materie.missing.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-indigo-200">
-                    <p className="text-xs text-rose-700 font-semibold mb-2">
+                  <div className="mt-3 pt-3 border-t border-brand-200">
+                    <p className="text-xs text-fucsia-700 font-semibold mb-2">
                       ⚠️ {generationReport.materie.missing.length} ore non
                       assegnate:
                     </p>
@@ -14456,14 +14455,14 @@ export default function App() {
                       </div>
                       <div>
                         <span className="text-slate-600">Ore assegnate:</span>
-                        <span className="ml-2 font-bold text-emerald-700">
+                        <span className="ml-2 font-bold text-salvia-700">
                           {generationReport.compresenze.assigned}
                         </span>
                       </div>
                     </div>
                     {generationReport.compresenze.missing.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-sky-200 space-y-1">
-                        <p className="text-xs text-rose-700 font-semibold">
+                        <p className="text-xs text-fucsia-700 font-semibold">
                           ⚠️ Ore di compresenza non piazzate:
                         </p>
                         {generationReport.compresenze.missing
@@ -14487,7 +14486,7 @@ export default function App() {
                     )}
                   </div>
                 )}
-              <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg text-sm text-amber-800">
+              <div className="bg-bruciato-50 border border-bruciato-200 p-4 rounded-lg text-sm text-bruciato-800">
                 <strong>💡 Suggerimento:</strong> Se alcune ore non sono state
                 assegnate, prova a:
                 <ul className="list-disc pl-5 mt-2 space-y-1">
@@ -14506,7 +14505,7 @@ export default function App() {
             <div className="bg-slate-50 px-6 py-4 border-t border-slate-200">
               <button
                 onClick={() => setGenerationReport(null)}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-all"
+                className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2 px-4 rounded-lg transition-all"
               >
                 Chiudi
               </button>

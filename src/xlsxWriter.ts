@@ -56,7 +56,7 @@ const esc = (s: string) =>
     // Excel rifiuta i caratteri di controllo dentro il testo delle celle.
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
 
-/** #1E3A8A → FF1E3A8A (ARGB, come vuole OOXML). */
+/** #195275 → FF195275 (ARGB, come vuole OOXML). */
 const argb = (hex?: string, fallback = 'FF000000') => {
   if (!hex) return fallback;
   const clean = hex.replace('#', '').trim();

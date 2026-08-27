@@ -101,27 +101,26 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col">
-      <header className="bg-gradient-to-r from-blue-700 via-indigo-800 to-purple-950 text-white px-6 py-8">
+      <header className="bg-gradient-to-r from-brand-700 via-brand-800 to-brand-950 text-white px-6 py-8">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center gap-4 justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-white/10 rounded-xl">
+              {/* Marchio EduTime Pro: tre caselle d'orario e il cerchio del tempo. */}
               <svg
-                className="w-8 h-8 text-indigo-200"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+                className="w-8 h-8"
+                viewBox="0 0 48 48"
+                role="img"
+                aria-label="EduTime Pro"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
+                <rect x="0" y="0" width="21" height="21" rx="5" fill="#b1c5a4" />
+                <circle cx="37.5" cy="10.5" r="10.5" fill="#cbd817" />
+                <rect x="0" y="27" width="21" height="21" rx="5" fill="#f8f9fa" />
+                <rect x="27" y="27" width="21" height="21" rx="5" fill="#b1c5a4" />
               </svg>
             </div>
             <div>
               <h1 className="text-3xl font-bold tracking-tight">EduTime Pro</h1>
-              <p className="text-sm text-indigo-200">
+              <p className="text-sm text-brand-200">
                 Costruisci l'orario scolastico della tua scuola
               </p>
             </div>
@@ -137,14 +136,14 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-10 flex flex-col gap-8">
         {invitedCode && (
-          <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-6 flex flex-col md:flex-row md:items-center gap-4 justify-between">
+          <div className="bg-brand-50 border border-brand-200 rounded-2xl p-6 flex flex-col md:flex-row md:items-center gap-4 justify-between">
             <div>
-              <p className="font-bold text-indigo-900">
+              <p className="font-bold text-brand-900">
                 Hai ricevuto un invito a un orario condiviso
               </p>
-              <p className="text-sm text-indigo-700">
+              <p className="text-sm text-brand-700">
                 Codice scuola:{' '}
-                <code className="font-mono bg-white px-2 py-0.5 rounded border border-indigo-200">
+                <code className="font-mono bg-white px-2 py-0.5 rounded border border-brand-200">
                   {invitedCode}
                 </code>
               </p>
@@ -157,7 +156,7 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
                   label: 'Scuola condivisa',
                 })
               }
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-5 rounded-lg"
+              className="bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 px-5 rounded-lg"
             >
               Apri l'orario condiviso →
             </button>
@@ -180,7 +179,7 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
             <div className="flex items-center gap-2">
               <span className="text-2xl">💻</span>
               <h3 className="text-lg font-bold">Solo su questo computer</h3>
-              <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">
+              <span className="text-[10px] font-bold bg-salvia-100 text-salvia-700 px-2 py-0.5 rounded">
                 CONSIGLIATO
               </span>
             </div>
@@ -200,7 +199,7 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
             </label>
             <button
               onClick={() => startLocal()}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-lg"
+              className="bg-salvia-600 hover:bg-salvia-700 text-white font-bold py-2.5 px-4 rounded-lg"
             >
               Inizia con i dati di esempio →
             </button>
@@ -218,7 +217,7 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
                 className="mt-2 w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700 file:font-semibold"
               />
               {importError && (
-                <p className="text-xs text-rose-600 mt-1">{importError}</p>
+                <p className="text-xs text-fucsia-600 mt-1">{importError}</p>
               )}
             </div>
           </section>
@@ -252,13 +251,13 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
                       .then(() => setCopied(true))
                       .catch(() => setCopied(false));
                   }}
-                  className="text-xs font-semibold text-indigo-700 hover:underline self-start"
+                  className="text-xs font-semibold text-brand-700 hover:underline self-start"
                 >
                   {copied ? '✅ Link copiato' : '🔗 Copia il link di invito'}
                 </button>
                 <button
                   onClick={enterCreatedCloud}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-lg"
+                  className="bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 px-4 rounded-lg"
                 >
                   Entra nell'orario condiviso →
                 </button>
@@ -275,7 +274,7 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
                   />
                 </label>
                 {cloudNameIsLink && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex flex-col gap-2 text-sm text-amber-900">
+                  <div className="bg-bruciato-50 border border-bruciato-200 rounded-lg p-3 flex flex-col gap-2 text-sm text-bruciato-900">
                     <p>
                       Questo sembra un <strong>link di invito</strong>, non il
                       nome di una scuola. Se te l'ha mandato un collega non
@@ -285,7 +284,7 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
                     {cloudNameCode ? (
                       <button
                         onClick={() => openSharedWorkspace(cloudNameCode)}
-                        className="self-start bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-4 rounded-lg"
+                        className="self-start bg-bruciato-600 hover:bg-bruciato-700 text-white font-bold py-2 px-4 rounded-lg"
                       >
                         Entra nell'orario di questo link →
                       </button>
@@ -301,7 +300,7 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
                 <button
                   onClick={createCloud}
                   disabled={cloudNameIsLink}
-                  className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-lg"
+                  className="bg-brand-600 hover:bg-brand-700 disabled:opacity-40 disabled:hover:bg-brand-600 text-white font-bold py-2.5 px-4 rounded-lg"
                 >
                   Crea un nuovo orario condiviso
                 </button>
@@ -334,13 +333,13 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
                 </p>
               )}
               {joinError && (
-                <p className="text-xs text-rose-600">{joinError}</p>
+                <p className="text-xs text-fucsia-600">{joinError}</p>
               )}
             </div>
           </section>
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+        <div className="bg-bruciato-50 border border-bruciato-200 rounded-xl p-4 text-sm text-bruciato-900">
           <strong>Nota sulla privacy.</strong> In modalità condivisa i dati
           (nomi dei docenti, classi, orari) vengono salvati su un database in
           cloud accessibile a chiunque conosca il codice scuola. Non inserire

@@ -72,13 +72,13 @@ export default function Guida() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
-      <header className="bg-gradient-to-r from-blue-700 via-indigo-800 to-purple-950 text-white">
+      <header className="bg-gradient-to-r from-brand-700 via-brand-800 to-brand-950 text-white">
         <div className="max-w-5xl mx-auto px-6 py-12">
-          <p className="text-xs font-bold tracking-widest text-indigo-300 uppercase">
+          <p className="text-xs font-bold tracking-widest text-brand-300 uppercase">
             Guida operativa · passo per passo
           </p>
           <h1 className="text-4xl font-bold mt-2">Guida a EduTime Pro</h1>
-          <p className="text-indigo-200 mt-3 max-w-2xl">
+          <p className="text-brand-200 mt-3 max-w-2xl">
             Manuale d'uso per la costruzione dell'orario scolastico: come
             muoversi fra le sei schede dell'app, assegnare le cattedre,
             generare l'orario e risolvere i conflitti.
@@ -101,7 +101,7 @@ export default function Guida() {
           </div>
           <a
             href="/"
-            className="inline-block mt-8 bg-white text-indigo-800 font-bold px-5 py-2.5 rounded-lg hover:bg-indigo-50"
+            className="inline-block mt-8 bg-white text-brand-800 font-bold px-5 py-2.5 rounded-lg hover:bg-brand-50"
           >
             ← Torna all'app
           </a>
@@ -118,7 +118,7 @@ export default function Guida() {
               <li key={c.id}>
                 <a
                   href={`#${c.id}`}
-                  className="text-slate-600 hover:text-indigo-700"
+                  className="text-slate-600 hover:text-brand-700"
                 >
                   <span className="font-mono text-xs text-slate-400 mr-2">
                     {c.num}
@@ -133,7 +133,7 @@ export default function Guida() {
         <div className="flex flex-col gap-14 min-w-0">
           {chapters.map((c) => (
             <section key={c.id} id={c.id} className="scroll-mt-6">
-              <p className="text-xs font-bold tracking-widest text-indigo-600 uppercase">
+              <p className="text-xs font-bold tracking-widest text-brand-600 uppercase">
                 Capitolo {c.num}
               </p>
               <h2 className="text-2xl font-bold text-slate-900 mt-1">
@@ -173,7 +173,7 @@ export default function Guida() {
                       key={s.title}
                       className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex gap-4"
                     >
-                      <span className="shrink-0 w-8 h-8 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center">
+                      <span className="shrink-0 w-8 h-8 rounded-full bg-brand-600 text-white font-bold flex items-center justify-center">
                         {i + 1}
                       </span>
                       <div>
@@ -188,7 +188,7 @@ export default function Guida() {
               )}
 
               {c.id === 'flusso' && (
-                <div className="mt-6 bg-indigo-50 border border-indigo-200 rounded-xl p-5 text-sm text-indigo-900">
+                <div className="mt-6 bg-brand-50 border border-brand-200 rounded-xl p-5 text-sm text-brand-900">
                   <strong>Iterazione.</strong> È normale ripetere i passi 7-9
                   più volte: dopo ogni rigenerazione i conflitti cambiano.
                   Affina finché la scheda Conflitti non mostra «✅ Nessun
@@ -197,7 +197,7 @@ export default function Guida() {
               )}
 
               {c.note && (
-                <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-5 text-sm text-amber-900">
+                <div className="mt-6 bg-bruciato-50 border border-bruciato-200 rounded-xl p-5 text-sm text-bruciato-900">
                   <strong>{c.note.title}.</strong>{' '}
                   <span className="block mt-1">{c.note.body}</span>
                 </div>
@@ -215,7 +215,7 @@ export default function Guida() {
             </p>
             <a
               href="/"
-              className="inline-block mt-5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-lg"
+              className="inline-block mt-5 bg-brand-600 hover:bg-brand-700 text-white font-bold px-5 py-2.5 rounded-lg"
             >
               Apri EduTime Pro →
             </a>

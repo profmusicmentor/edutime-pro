@@ -69,7 +69,7 @@ export default function Assistente({ inGuida = false }: Props) {
       <button
         type="button"
         onClick={() => setAperto(true)}
-        className="fixed bottom-5 right-5 z-50 print:hidden bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-4 py-3 rounded-full shadow-lg flex items-center gap-2 transition-all"
+        className="fixed bottom-5 right-5 z-50 print:hidden bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm px-4 py-3 rounded-full shadow-lg flex items-center gap-2 transition-all"
         aria-label="Apri l'assistente della guida"
       >
         <span aria-hidden="true">💬</span> Serve aiuto?
@@ -84,17 +84,17 @@ export default function Assistente({ inGuida = false }: Props) {
       aria-label="Assistente della guida"
       className="fixed bottom-5 right-5 left-5 sm:left-auto z-50 print:hidden w-auto sm:w-[400px] max-h-[75vh] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
     >
-      <div className="bg-gradient-to-r from-blue-700 via-indigo-800 to-purple-950 text-white px-4 py-3 flex items-start justify-between gap-3 shrink-0">
+      <div className="bg-gradient-to-r from-brand-700 via-brand-800 to-brand-950 text-white px-4 py-3 flex items-start justify-between gap-3 shrink-0">
         <div>
           <p className="font-bold text-sm">Assistente della guida</p>
-          <p className="text-[11px] text-indigo-200 mt-0.5">
+          <p className="text-[11px] text-brand-200 mt-0.5">
             Cerca fra i {NUMERO_CAPITOLI} capitoli · tutto nel tuo browser
           </p>
         </div>
         <button
           type="button"
           onClick={() => setAperto(false)}
-          className="text-indigo-200 hover:text-white text-lg leading-none shrink-0"
+          className="text-brand-200 hover:text-white text-lg leading-none shrink-0"
           aria-label="Chiudi l'assistente"
         >
           ✕
@@ -108,7 +108,7 @@ export default function Assistente({ inGuida = false }: Props) {
           value={domanda}
           onChange={(e) => setDomanda(e.target.value)}
           placeholder="Scrivi la tua domanda…"
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
       </div>
 
@@ -124,7 +124,7 @@ export default function Assistente({ inGuida = false }: Props) {
                   key={d}
                   type="button"
                   onClick={() => setDomanda(d)}
-                  className="text-xs bg-slate-100 hover:bg-indigo-50 hover:text-indigo-800 border border-slate-200 rounded-full px-3 py-1.5 text-left"
+                  className="text-xs bg-slate-100 hover:bg-brand-50 hover:text-brand-800 border border-slate-200 rounded-full px-3 py-1.5 text-left"
                 >
                   {d}
                 </button>
@@ -146,7 +146,7 @@ export default function Assistente({ inGuida = false }: Props) {
               href="/guida#introduzione"
               {...propsLink}
               onClick={(e) => vaiAlCapitolo(e, 'introduzione')}
-              className="inline-block mt-3 text-indigo-700 font-semibold underline"
+              className="inline-block mt-3 text-brand-700 font-semibold underline"
             >
               Apri la guida completa →
             </a>
@@ -176,7 +176,7 @@ export default function Assistente({ inGuida = false }: Props) {
                 href={`/guida#${r.voce.capitoloId}`}
                 {...propsLink}
                 onClick={(e) => vaiAlCapitolo(e, r.voce.capitoloId)}
-                className="inline-block mt-2 text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline"
+                className="inline-block mt-2 text-xs font-semibold text-brand-700 hover:text-brand-900 underline"
               >
                 Capitolo {r.voce.capitoloNum} · {r.voce.capitoloTitolo} →
               </a>

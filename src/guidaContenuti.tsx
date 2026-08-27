@@ -52,7 +52,7 @@ export const chapters: Chapter[] = [
           capitolo{' '}
           <a
             href="#primaria"
-            className="text-indigo-700 font-semibold underline"
+            className="text-brand-700 font-semibold underline"
           >
             12 · Se lavori alla scuola primaria
           </a>
@@ -1457,7 +1457,7 @@ export const chapters: Chapter[] = [
               href="https://www.facebook.com/profile.php?id=61556761432429"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-indigo-700 underline hover:text-indigo-900"
+              className="text-brand-700 underline hover:text-brand-900"
             >
               <B>Walter Vitale</B>
             </a>
@@ -1468,7 +1468,7 @@ export const chapters: Chapter[] = [
               href="https://biscottodigitale.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-indigo-700 underline hover:text-indigo-900"
+              className="text-brand-700 underline hover:text-brand-900"
             >
               biscottodigitale.com
             </a>
@@ -1477,7 +1477,7 @@ export const chapters: Chapter[] = [
               href="https://paypal.me/delfino0087"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-indigo-700 underline hover:text-indigo-900"
+              className="text-brand-700 underline hover:text-brand-900"
             >
               💛 puoi farlo qui
             </a>

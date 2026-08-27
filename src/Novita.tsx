@@ -93,7 +93,7 @@ export default function Novita({
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4 print:hidden">
       <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-lg w-full overflow-hidden flex flex-col max-h-[85vh]">
         <div className="p-6 border-b border-slate-100">
-          <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1 rounded-full uppercase">
+          <span className="bg-brand-100 text-brand-800 text-xs font-bold px-3 py-1 rounded-full uppercase">
             Novità
           </span>
           <h3 className="text-xl font-bold text-slate-800 mt-3">
@@ -119,7 +119,7 @@ export default function Novita({
                     key={i}
                     className="text-sm text-slate-600 leading-relaxed pl-5 relative"
                   >
-                    <span className="absolute left-0 top-0 text-indigo-500">
+                    <span className="absolute left-0 top-0 text-brand-500">
                       •
                     </span>
                     {voce}
@@ -133,7 +133,7 @@ export default function Novita({
           <button
             type="button"
             onClick={onChiudi}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all cursor-pointer"
+            className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-all cursor-pointer"
           >
             Ho capito
           </button>

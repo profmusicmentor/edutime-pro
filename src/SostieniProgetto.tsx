@@ -22,7 +22,7 @@ interface VoceProps {
 
 function Voce({ emoji, titolo, testo, azione, href, onClick }: VoceProps) {
   const classi =
-    'w-full flex items-center gap-3 text-left border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 rounded-xl px-4 py-3 transition-all cursor-pointer';
+    'w-full flex items-center gap-3 text-left border border-slate-200 hover:border-brand-300 hover:bg-brand-50/50 rounded-xl px-4 py-3 transition-all cursor-pointer';
 
   const contenuto = (
     <>
@@ -31,7 +31,7 @@ function Voce({ emoji, titolo, testo, azione, href, onClick }: VoceProps) {
         <span className="block font-semibold text-slate-800">{titolo}</span>
         <span className="block text-xs text-slate-500">{testo}</span>
       </span>
-      <span className="ml-auto shrink-0 text-xs font-semibold text-indigo-700 whitespace-nowrap">
+      <span className="ml-auto shrink-0 text-xs font-semibold text-brand-700 whitespace-nowrap">
         {azione}
       </span>
     </>
@@ -85,7 +85,7 @@ export default function SostieniProgetto() {
       {aperto && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 print:hidden">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full overflow-hidden text-left">
-            <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-start gap-4">
+            <div className="bg-brand-50 px-6 py-4 border-b border-brand-100 flex justify-between items-start gap-4">
               <div>
                 <h3 className="font-bold text-slate-800">
                   💛 Sostieni il progetto
@@ -142,7 +142,7 @@ export default function SostieniProgetto() {
               <button
                 type="button"
                 onClick={() => setAperto(false)}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-all cursor-pointer"
+                className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2 px-4 rounded-lg transition-all cursor-pointer"
               >
                 Chiudi
               </button>
