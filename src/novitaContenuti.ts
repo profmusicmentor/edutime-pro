@@ -20,7 +20,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-08-27';
+export const NOVITA_VERSIONE = '2026-08-27b';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -32,6 +32,14 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-08-27b',
+    data: '27 agosto 2026',
+    voci: [
+      'Il tetto di ore nella stessa classe ora resta dove lo metti. Chi lo abbassava a 2 se lo ritrovava a 3 alla riapertura dell\'app: il valore veniva perso quando i dati venivano ricaricati. Ora si salva insieme a tutte le altre regole. Grazie alla segnalazione arrivata dal pulsante dei feedback.',
+      'Materie da non affiancare, davvero divise. Dopo la generazione c\'è una passata in più che scioglie le coppie rimaste nello stesso giorno (arte e tecnologia, le due lingue): sposta un\'ora in un altro giorno o la scambia con un\'altra lezione della stessa classe, senza mai lasciare ore fuori dall\'orario e senza creare giornate sotto il minimo. Quello che resta appaiato ora si legge nei Conflitti, con classe e giorno, come avviso arancione e non come errore: la regola è una preferenza didattica, non un divieto.',
+    ],
+  },
   {
     versione: '2026-08-27',
     data: '27 agosto 2026',

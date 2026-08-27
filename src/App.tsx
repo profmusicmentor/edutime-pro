@@ -1567,6 +1567,43 @@ const canPlaceMateriaHard = (
  * casualità, perché qui serve una scelta ripetibile.
  */
 /**
+ * Le coppie di materie che la scuola non vuole nello stesso giorno, ripulite
+ * dalle righe incomplete.
+ */
+const separationGroupsFor = (rules: any): string[][] =>
+  (rules?.subjectSeparation || []).filter(
+    (g: any) => Array.isArray(g) && g.length >= 2
+  );
+
+/**
+ * Le materie separate che sono comunque finite nello stesso giorno nella
+ * stessa classe. Serve alla passata che prova a dividerle e ai Conflitti, che
+ * le mostrano come avviso: la regola è una preferenza didattica, non un
+ * vincolo, e un'ora appaiata è sempre meglio di un'ora fuori dall'orario.
+ */
+const separationViolations = (tt: any[], rules: any) => {
+  const gruppi = separationGroupsFor(rules);
+  if (gruppi.length === 0) return [];
+  const materiePerGiorno: Record<string, Set<string>> = {};
+  tt.forEach((s) => {
+    if (s.type !== 'materia') return;
+    const chiave = `${s.classId}|${s.day}`;
+    if (!materiePerGiorno[chiave]) materiePerGiorno[chiave] = new Set();
+    materiePerGiorno[chiave].add(s.subject);
+  });
+  const out: { classId: string; day: number; subjects: string[] }[] = [];
+  Object.entries(materiePerGiorno).forEach(([chiave, materie]) => {
+    const [classId, day] = chiave.split('|');
+    gruppi.forEach((g) => {
+      const insieme = g.filter((m) => materie.has(m));
+      if (insieme.length >= 2)
+        out.push({ classId, day: Number(day), subjects: insieme });
+    });
+  });
+  return out;
+};
+
+/**
  * Penalità didattiche chieste dalle scuole: due materie che non stanno bene
  * nello stesso giorno (le lingue straniere), e le ore della stessa materia
  * che è meglio non accostare in giorni consecutivi.
@@ -1579,7 +1616,7 @@ const didacticPenalty = (
   rules: any
 ) => {
   let penalty = 0;
-  const gruppi: string[][] = rules?.subjectSeparation || [];
+  const gruppi: string[][] = separationGroupsFor(rules);
   const mieiGruppi = gruppi.filter((g) => g.includes(subject));
   if (mieiGruppi.length > 0) {
     const scontro = tt.some(
@@ -1590,7 +1627,11 @@ const didacticPenalty = (
         s.subject !== subject &&
         mieiGruppi.some((g) => g.includes(s.subject))
     );
-    if (scontro) penalty += 400;
+    // Penalità volutamente contenuta: alzarla non divide di più le materie,
+    // fa solo prendere alla passata greedy strade peggiori, e le ore che non
+    // entrano più restano fuori dall'orario. A separare le coppie rimaste ci
+    // pensa separateSubjectPairs, che sposta ore già piazzate.
+    if (scontro) penalty += 60;
   }
   if (rules?.spreadSameSubject) {
     const inGiornoVicino = tt.some(
@@ -2091,6 +2132,218 @@ const consolidateShortDays = (tt: any[], ctx: any, budgetMs = 1500) => {
   return { moved, shortDaysLeft };
 };
 
+/**
+ * Quarta passata: divide le materie che la scuola non vuole nello stesso
+ * giorno (arte e tecnologia, le due lingue straniere). La passata greedy le
+ * allontana con una penalità, ma quando la settimana è piena qualcuna resta
+ * appaiata lo stesso, e alzare ancora la penalità farebbe solo restare delle
+ * ore fuori dall'orario: meglio piazzarle tutte e separarle qui.
+ *
+ * Non aggiunge e non toglie niente: sposta soltanto ore già in griglia, prima
+ * in una cella libera di un altro giorno e poi scambiandola con una lezione
+ * di un giorno diverso. Ogni mossa vale solo se regge i vincoli rigidi e se
+ * non crea una coppia nuova; celle col lucchetto e classi abbinate restano
+ * ferme, come nelle altre passate. Quello che non si riesce a dividere lo
+ * segnalano i Conflitti.
+ */
+const separateSubjectPairs = (tt: any[], ctx: any, budgetMs = 1500) => {
+  const gruppi = separationGroupsFor(ctx.rules);
+  if (gruppi.length === 0) return { separated: 0, left: 0 };
+
+  const deadline = Date.now() + budgetMs;
+  // Come nella consolidazione: qui conta il tetto della scuola, non la quota
+  // giornaliera, che serve a distribuire e non deve bloccare uno spostamento.
+  const relaxedCtx = { ...ctx, idealPerDay: null };
+  const maxGapFor = (teacherId: string) =>
+    ctx.rules.teacherMaxGapHours &&
+    ctx.rules.teacherMaxGapHours[teacherId] !== undefined
+      ? ctx.rules.teacherMaxGapHours[teacherId]
+      : ctx.rules.globalMaxGapHours || 1;
+
+  const asLesson = (slot: any) => ({
+    teacherId: slot.teacherId,
+    subject: slot.subject,
+    classId: slot.classId,
+    preferConsecutive: !!(ctx.teachers || []).find(
+      (t: any) => t.id === slot.teacherId
+    )?.preferConsecutive,
+  });
+
+  const spostabile = (slot: any) =>
+    !!slot &&
+    slot.type === 'materia' &&
+    !slot.locked &&
+    !isMixedLesson(slot, ctx.mixedClasses);
+
+  /** La materia troverebbe una sua "nemica" in quel giorno della classe? */
+  const appaiataIn = (classId: string, day: number, subject: string) => {
+    const mieiGruppi = gruppi.filter((g) => g.includes(subject));
+    if (mieiGruppi.length === 0) return false;
+    return tt.some(
+      (s) =>
+        s.type === 'materia' &&
+        s.classId === classId &&
+        s.day === day &&
+        s.subject !== subject &&
+        mieiGruppi.some((g) => g.includes(s.subject))
+    );
+  };
+
+  const minPerDay = minHoursPerDayFor(ctx.rules);
+  /**
+   * Togliere un'ora da un giorno non deve lasciare il docente a scuola per
+   * una mattina sotto il minimo: dividere due materie non vale una giornata
+   * da un'ora sola. Si chiama a lezione già tolta dalla griglia.
+   */
+  const giornoRegge = (teacherId: string, day: number) => {
+    if (minPerDay <= 1) return true;
+    const rimaste = tt.filter(
+      (s) => s.teacherId === teacherId && s.day === day
+    ).length;
+    return rimaste === 0 || rimaste >= minPerDay;
+  };
+
+  let separated = 0;
+
+  for (const violazione of separationViolations(tt, ctx.rules)) {
+    if (Date.now() > deadline) break;
+
+    const grid = ctx.getGrid(violazione.classId);
+    const celle: any[] = [];
+    for (let d = 0; d < grid.days; d++)
+      for (let h = 0; h < curricularSlots(grid); h++)
+        if (d !== violazione.day) celle.push({ day: d, hour: h });
+
+    // Le ore in ballo: quelle delle materie appaiate in quel giorno. Si prova
+    // a spostarne una qualsiasi, basta che la coppia si sciolga.
+    const candidate = tt.filter(
+      (s) =>
+        s.classId === violazione.classId &&
+        s.day === violazione.day &&
+        violazione.subjects.includes(s.subject) &&
+        spostabile(s)
+    );
+
+    let risolta = false;
+    for (const nostra of candidate) {
+      if (risolta || Date.now() > deadline) break;
+      const indice = tt.indexOf(nostra);
+      if (indice === -1) continue;
+      // La coppia può essersi già sciolta per una mossa precedente.
+      if (!appaiataIn(violazione.classId, violazione.day, nostra.subject))
+        break;
+
+      const lezione = asLesson(nostra);
+      tt.splice(indice, 1);
+
+      if (!giornoRegge(nostra.teacherId, violazione.day)) {
+        tt.splice(indice, 0, nostra);
+        continue;
+      }
+
+      // Prima strada: una cella libera in un altro giorno.
+      let migliore: any = null;
+      for (const cella of celle) {
+        if (appaiataIn(violazione.classId, cella.day, nostra.subject)) continue;
+        if (
+          !canPlaceMateriaHard(
+            tt,
+            lezione,
+            violazione.classId,
+            cella.day,
+            cella.hour,
+            relaxedCtx
+          )
+        )
+          continue;
+        const penalita = materiaPlacementPenalty(
+          tt,
+          lezione,
+          violazione.classId,
+          cella.day,
+          cella.hour,
+          maxGapFor(nostra.teacherId),
+          ctx.rules,
+          curricularSlots(grid)
+        );
+        if (!migliore || penalita < migliore.penalita)
+          migliore = { ...cella, penalita };
+      }
+      if (migliore) {
+        tt.push({ ...nostra, day: migliore.day, hour: migliore.hour });
+        separated++;
+        risolta = true;
+        break;
+      }
+
+      // Seconda strada: scambio con una lezione di un altro giorno della
+      // stessa classe. Le due ore si scambiano la cella e devono reggere
+      // entrambe i vincoli rigidi.
+      let scambiata = false;
+      for (const cella of celle) {
+        if (Date.now() > deadline) break;
+        if (appaiataIn(violazione.classId, cella.day, nostra.subject)) continue;
+
+        const vittimaIndice = tt.findIndex(
+          (s) =>
+            s.classId === violazione.classId &&
+            s.day === cella.day &&
+            s.hour === cella.hour &&
+            spostabile(s)
+        );
+        if (vittimaIndice === -1) continue;
+        const vittima = tt[vittimaIndice];
+        if (vittima.subject === nostra.subject) continue;
+
+        tt.splice(vittimaIndice, 1);
+
+        if (!giornoRegge(vittima.teacherId, cella.day)) {
+          tt.splice(vittimaIndice, 0, vittima);
+          continue;
+        }
+
+        const nostraOk =
+          !appaiataIn(violazione.classId, cella.day, nostra.subject) &&
+          canPlaceMateriaHard(
+            tt,
+            lezione,
+            violazione.classId,
+            cella.day,
+            cella.hour,
+            relaxedCtx
+          );
+        const vittimaOk =
+          nostraOk &&
+          !appaiataIn(violazione.classId, violazione.day, vittima.subject) &&
+          canPlaceMateriaHard(
+            tt,
+            asLesson(vittima),
+            violazione.classId,
+            violazione.day,
+            nostra.hour,
+            relaxedCtx
+          );
+
+        if (nostraOk && vittimaOk) {
+          tt.push({ ...nostra, day: cella.day, hour: cella.hour });
+          tt.push({ ...vittima, day: violazione.day, hour: nostra.hour });
+          separated++;
+          scambiata = true;
+          risolta = true;
+          break;
+        }
+
+        tt.splice(vittimaIndice, 0, vittima);
+      }
+
+      // Niente da fare per questa ora: torna esattamente dov'era.
+      if (!scambiata) tt.splice(indice, 0, nostra);
+    }
+  }
+
+  return { separated, left: separationViolations(tt, ctx.rules).length };
+};
+
 /** Frecce per spostare una riga docente su e giù nel suo elenco. */
 const StaffOrderButtons = ({
   index,
@@ -2557,6 +2810,11 @@ export default function App() {
               globalMaxGapHours: rules.globalMaxGapHours ?? 1,
               globalMaxHoursPerDay: rules.globalMaxHoursPerDay ?? 5,
               globalMinHoursPerDay: rules.globalMinHoursPerDay ?? 2,
+              // Senza questa riga il campo spariva a ogni ricarica e il tetto
+              // tornava al 3 di default: chi lo abbassava a 2 se lo ritrovava
+              // a 3 il giorno dopo.
+              globalMaxHoursPerClassPerDay:
+                rules.globalMaxHoursPerClassPerDay ?? 3,
               autoDayOff: rules.autoDayOff !== false,
               subjectSeparation: Array.isArray(rules.subjectSeparation)
                 ? rules.subjectSeparation.filter(
@@ -3505,6 +3763,21 @@ export default function App() {
       }
     });
 
+    // Materie che la scuola ha messo fra quelle da non affiancare e che sono
+    // finite lo stesso giorno: è un avviso, non un errore. La regola è una
+    // preferenza didattica e l'app preferisce appaiarle piuttosto che
+    // lasciare un'ora fuori dall'orario.
+    separationViolations(timetable, generationRules).forEach((v) => {
+      conflicts.push({
+        type: 'warning',
+        message: `Nella classe ${v.classId} ${v.subjects.join(
+          ' e '
+        )} capitano nello stesso giorno (${DAYS[v.day] || `giorno ${v.day + 1}`}).`,
+        suggestion:
+          'Sono materie che hai messo fra quelle da non affiancare: l\'orario non è riuscito a dividerle. Scambia a mano una delle due ore con una lezione di un altro giorno, oppure togli la coppia in "Sezioni & Regole" se non ti serve più.',
+      });
+    });
+
     classes.forEach((c) => {
       const hrs = classHourCounts[c.id] || 0;
       const expected = getSectionWeeklyHours(c.section);
@@ -3695,6 +3968,8 @@ export default function App() {
         swaps: 0,
         consolidated: 0,
         shortDaysLeft: 0,
+        separated: 0,
+        pairsLeft: 0,
         missing: [] as any[],
       },
       compresenze: {
@@ -4038,6 +4313,12 @@ export default function App() {
       const consolidation = consolidateShortDays(newTimetable, repairCtx);
       report.materie.consolidated = consolidation.moved;
       report.materie.shortDaysLeft = consolidation.shortDaysLeft;
+
+      // Quarta passata: scioglie le coppie di materie che la scuola non vuole
+      // nello stesso giorno, spostando ore già piazzate.
+      const separazione = separateSubjectPairs(newTimetable, repairCtx);
+      report.materie.separated = separazione.separated;
+      report.materie.pairsLeft = separazione.left;
     }
 
     // Compresenze: si piazzano dopo le materie, perche' si appoggiano alle
@@ -11761,10 +12042,13 @@ export default function App() {
               </h2>
               <p className="text-sm text-slate-500 mb-6">
                 Coppie di materie che nella stessa classe è meglio non far
-                capitare nello stesso giorno: le due lingue straniere, di
-                solito. Il generatore le allontana con decisione, ma se
-                l'alternativa è lasciare un'ora fuori dall'orario le
-                affianca lo stesso e lo segnala nei Conflitti.
+                capitare nello stesso giorno: le due lingue straniere, arte e
+                tecnologia. Il generatore le allontana mentre costruisce
+                l'orario e poi, in una passata dedicata, sposta le ore rimaste
+                appaiate. Resta però una preferenza, non un divieto: se
+                l'unica alternativa è lasciare un'ora fuori dall'orario o
+                creare una giornata da un'ora sola, le affianca lo stesso e lo
+                scrive nei Conflitti come avviso, con classe e giorno.
               </p>
               <div className="flex flex-wrap gap-2 mb-4 p-4 bg-bruciato-50 rounded-lg border border-bruciato-100">
                 <select
@@ -14409,6 +14693,16 @@ export default function App() {
                     chiudere le giornate sotto il minimo
                     {generationReport.materie.shortDaysLeft > 0 &&
                       ` (${generationReport.materie.shortDaysLeft} giornate non è stato possibile chiuderle)`}
+                    .
+                  </p>
+                )}
+                {(generationReport.materie.separated > 0 ||
+                  generationReport.materie.pairsLeft > 0) && (
+                  <p className="text-xs text-salvia-700 mt-1">
+                    🚫 {generationReport.materie.separated} ore spostate per
+                    dividere le materie da non affiancare
+                    {generationReport.materie.pairsLeft > 0 &&
+                      ` (${generationReport.materie.pairsLeft} coppie sono rimaste nello stesso giorno, le trovi nei Conflitti)`}
                     .
                   </p>
                 )}
