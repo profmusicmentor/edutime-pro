@@ -2554,7 +2554,7 @@ export default function App() {
     novitaAllAvvio()
   );
   const [generationReport, setGenerationReport] = useState<any>(null);
-  const [highlightedSlot, setHighlightedSlot] = useState<any>(null);
+  const [, setHighlightedSlot] = useState<any>(null);
   const [tempRoom, setTempRoom] = useState('Aula');
   /**
    * L'aula scelta a mano nel modale vince solo se l'utente ha davvero
@@ -4255,7 +4255,6 @@ export default function App() {
                   (m.c1 === cls.id || m.c2 === cls.id)
               );
               if (mix) {
-                const otherClassId = mix.c1 === cls.id ? mix.c2 : mix.c1;
                 const idxOther = pool.findIndex(
                   (p) =>
                     p.teacherId === lesson.teacherId &&
@@ -7626,7 +7625,7 @@ export default function App() {
               dh.label
             }<br/><span style="font-size: 8px; font-weight:normal;">${
               dh.time
-            }</span></td>${DAYS_IN_USE.map((day, dIdx) => {
+            }</span></td>${DAYS_IN_USE.map((_day, dIdx) => {
               if (dIdx >= classGrid.days) return '';
               const l = timetable.find(
                 (slot) =>
@@ -7682,7 +7681,7 @@ export default function App() {
               dh.label
             }<br/><span style="font-size: 8px; font-weight:normal;">${
               dh.time
-            }</span></td>${DAYS_IN_USE.map((day, dIdx) => {
+            }</span></td>${DAYS_IN_USE.map((_day, dIdx) => {
               const isDayOff = (
                 generationRules.teacherDaysOff[staff?.id] || []
               ).includes(dIdx);
@@ -9110,7 +9109,7 @@ export default function App() {
                               <td className="p-2 w-16 border-r-4 border-slate-300 text-center font-bold text-brand-700 bg-brand-50/10 sticky left-80 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
                                 {hoursPlanned}h
                               </td>
-                              {DAYS_IN_USE.map((day, dIdx) => {
+                              {DAYS_IN_USE.map((_day, dIdx) => {
                                 const activeHours =
                                   masterHourFilter === 'diurno'
                                     ? diurnalHours
@@ -9965,7 +9964,7 @@ export default function App() {
                                 {hObj.time}
                               </span>
                             </td>
-                            {DAYS_IN_USE.map((day, dIdx) => {
+                            {DAYS_IN_USE.map((_day, dIdx) => {
                               if (
                                 viewType === 'class' &&
                                 dIdx >= getClassGrid(selectedClass).days
@@ -10479,7 +10478,7 @@ export default function App() {
                                 {hObj.time}
                               </span>
                             </td>
-                            {DAYS_IN_USE.map((day, dIdx) => {
+                            {DAYS_IN_USE.map((_day, dIdx) => {
                               if (dIdx === 5) return null;
                               if (viewType === 'class') {
                                 const pmLessons = timetable.filter(
@@ -10716,7 +10715,7 @@ export default function App() {
                                   {totalHours} ore assegnate
                                 </div>
                               </td>
-                              {DAYS_IN_USE.map((day, dIdx) => {
+                              {DAYS_IN_USE.map((_day, dIdx) => {
                                 const isDayOff = (
                                   generationRules.teacherDaysOff[teacher.id] ||
                                   []

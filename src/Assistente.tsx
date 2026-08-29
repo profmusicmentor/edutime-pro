@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { cerca, DOMANDE_SUGGERITE, NUMERO_CAPITOLI } from './guidaIndice';
 import Feedback from './Feedback';
 
@@ -45,7 +45,7 @@ export default function Assistente({ inGuida = false }: Props) {
    * giusta in una nuova scheda.
    */
   const vaiAlCapitolo = (
-    e: React.MouseEvent<HTMLAnchorElement>,
+    e: MouseEvent<HTMLAnchorElement>,
     capitoloId: string
   ) => {
     if (!inGuida) return;
