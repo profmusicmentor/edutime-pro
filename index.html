@@ -6,6 +6,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#13233c" />
 
+    <!--
+      Modalita' notte, prima che la pagina si disegni.
+      Se la classe `dark` la mettesse React, per una frazione di secondo si
+      vedrebbe la pagina bianca e poi il buio: un lampo fastidioso a ogni
+      apertura. Qui si legge la scelta salvata (o, se non c'e', quella del
+      sistema) e si scrive subito la classe su <html>. La stessa logica sta in
+      src/tema.ts per il pulsante nella testata: se cambia una, cambia l'altra.
+    -->
+    <script>
+      (function () {
+        try {
+          var salvato = localStorage.getItem('eduTime_tema');
+          var scuro =
+            salvato === 'scuro' ||
+            (salvato !== 'chiaro' &&
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (scuro) {
+            document.documentElement.classList.add('dark');
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#0b1220');
+          }
+        } catch (e) {
+          /* Niente localStorage: si resta in chiaro. */
+        }
+      })();
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

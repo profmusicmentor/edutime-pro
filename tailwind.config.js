@@ -8,6 +8,10 @@
 // tonalita' intermedie. Se un valore cambia sul sito, cambialo anche qui.
 
 export default {
+  // La modalità notte si accende con la classe `dark` su <html>. Le regole
+  // vere stanno in src/index.css; qui si dichiara solo il meccanismo, per chi
+  // in futuro volesse usare le varianti `dark:` di Tailwind.
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {

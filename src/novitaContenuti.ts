@@ -20,7 +20,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-08-27b';
+export const NOVITA_VERSIONE = '2026-08-29';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -32,6 +32,13 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-08-29',
+    data: '29 agosto 2026',
+    voci: [
+      'Modalità notte. In alto a destra, accanto a «Espandi», c\'è il pulsante 🌙 Notte: tutta l\'app passa su fondo scuro, griglie dell\'orario comprese. Serve a chi sistema le sostituzioni la sera o lavora in una stanza poco illuminata. La scelta resta impostata anche alla prossima apertura, e chi tiene già il computer in modalità scura trova l\'app scura da sola, senza toccare niente. La stampa A3, i PDF e i fogli Excel restano su carta bianca in ogni caso.',
+    ],
+  },
   {
     versione: '2026-08-27b',
     data: '27 agosto 2026',
@@ -72,23 +79,6 @@ export const NOVITA: VoceNovita[] = [
     data: '24 agosto 2026',
     voci: [
       'Indisponibilità anche al pomeriggio: nel riquadro Indisponibilità, il tasto con l\'orologio apriva una griglia con le sole ore del mattino. Chi ha impostato ore pomeridiane non riusciva a bloccarle e non poteva dire, per esempio, che un docente non c\'è mai all\'ultima ora del pomeriggio. Ora la griglia mostra le stesse ore dell\'orario, mattino e pomeriggio.',
-    ],
-  },
-  {
-    versione: '2026-08-22b',
-    data: '22 agosto 2026',
-    voci: [
-      'Le intestazioni restano ferme: nell\'Orario Generale e nel Registro Cattedre la riga con i giorni, le ore e le classi non scorre più via quando si scende in fondo all\'elenco dei docenti. Sul tablet funzionava già, sul computer no: il riquadro della tabella si allungava fino a contenere tutte le righe e non scorreva al suo interno. Ora scorre davvero e l\'intestazione tiene.',
-      'Classi in ordine di corso: nel Registro Cattedre, in alto, si sceglie come mettere in fila le colonne delle classi. "1A 1B 1C" è l\'ordine di sempre, "1A 2A 3A" le raggruppa per corso. La scelta vale in tutta l\'app e resta impostata anche alla prossima apertura.',
-      'La giornata sott\'occhio in Sostituzioni: appena si segnala l\'assenza di un collega compare la sua giornata ora per ora, con classi e laboratori. E sotto ogni proposta di anticipo si vede anche la giornata della collega che si sposterebbe, così si capisce subito se lo spostamento le lascia un buco.',
-      'Le ore "D" nel quadro generale: nell\'Orario Generale, al posto della classe, si può scegliere "D (disponibilità)" per segnare le ore messe a disposizione a inizio anno. La casella diventa gialla con la D, le ore si contano da sole in Sostituzioni e con "🖨️ Prospetto per la segreteria" si stampa il foglio con le ore dichiarate e quelle di supplenza davvero svolte, docente per docente.',
-    ],
-  },
-  {
-    versione: '2026-08-22',
-    data: '22 agosto 2026',
-    voci: [
-      'Preferenza oraria per docente: in Sezioni & Regole, nel riquadro "Indisponibilità", accanto a ogni docente c\'è il menu "Preferisce", con le prime ore o le ultime. È un desiderio, non un vincolo: l\'algoritmo prova a far cominciare lì la giornata di quel docente, ma se l\'orario non regge in altro modo piazza l\'ora dove può invece di lasciarla fuori. Per un vincolo vero restano le ore bloccate con ⏰.',
     ],
   },
 ];

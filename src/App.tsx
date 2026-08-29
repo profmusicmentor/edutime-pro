@@ -16,6 +16,8 @@ import type {
   PersonaExtra,
 } from './Assemblee';
 import type { ModoNovita } from './Novita';
+import { applicaTema, temaIniziale } from './tema';
+import type { Tema } from './tema';
 import {
   buildXlsx,
   type XlsxCell,
@@ -72,6 +74,35 @@ const getDeptColor = (subject: string) =>
 const DAY_OFF_COLOR = '#fbe4eb';
 /** Cella di un'ora bloccata: arancio, per distinguerla dal giorno libero. */
 const HOUR_OFF_COLOR = '#f7e8e3';
+
+/**
+ * Gli stessi colori, rifatti per la modalità notte.
+ *
+ * Le caselle dell'orario prendono il colore dal dipartimento con uno stile
+ * scritto direttamente sull'elemento, e uno stile così non lo può ridipingere
+ * il foglio di `index.css`: se restassero questi rosa e azzurri pastello, su
+ * fondo scuro resterebbero macchie accecanti. Qui ogni tinta ha la sua
+ * versione cupa, con la stessa dominante, così le materie continuano a
+ * distinguersi a colpo d'occhio.
+ *
+ * Le costanti chiare qui sopra NON vanno toccate: le usano la stampa A3, i PDF
+ * e i fogli Excel, che escono su carta bianca qualunque tema si stia usando.
+ */
+const DEPARTMENT_COLORS_NOTTE: Record<string, string> = {
+  '#e3eef5': '#1c3346',
+  '#e8eee5': '#23301f',
+  '#f7e8e3': '#3a281f',
+  '#fce7f3': '#3a1f2c',
+  '#e9d5ff': '#2b2140',
+  '#fae8ff': '#331f38',
+  '#ccfbf1': '#10322c',
+  '#dcfce7': '#16321f',
+  '#fef9c3': '#33301a',
+  '#fed7aa': '#3a2a17',
+  '#f1f5f9': '#202c42',
+  [DAY_OFF_COLOR]: '#3a1a24',
+};
+
 
 /**
  * Anni di corso che una sezione può contenere. Arriva fino al quinto per la
@@ -2585,6 +2616,36 @@ export default function App() {
   const [newMixSubj, setNewMixSubj] = useState('SPAGNOLO');
   const [newMixC1, setNewMixC1] = useState('');
   const [newMixC2, setNewMixC2] = useState('');
+
+  // Chiara o notte. Il valore di partenza lo ha gia' scritto su <html> lo
+  // script in index.html: qui si legge lo stesso criterio, cosi' il pulsante
+  // parte dall'icona giusta senza far lampeggiare la pagina.
+  const [tema, setTema] = useState<Tema>(() => temaIniziale());
+
+  useEffect(() => {
+    applicaTema(tema);
+  }, [tema]);
+
+  /*
+   * I colori delle caselle vanno decisi qui, guardando `tema`, e non leggendo
+   * la classe `dark` su <html>: quella classe la scrive `applicaTema` DOPO che
+   * la pagina si è ridisegnata, quindi chi la interrogasse durante il disegno
+   * si ritroverebbe sempre il tema di un giro prima, con i colori chiari di
+   * notte e quelli scuri di giorno.
+   */
+  const scuro = tema === 'scuro';
+
+  /** Il colore di una casella dell'orario, nel tema in uso. */
+  const coloreMateria = (subject?: string) => {
+    const chiaro = getDeptColor(subject as string);
+    return scuro ? DEPARTMENT_COLORS_NOTTE[chiaro] || '#202c42' : chiaro;
+  };
+
+  /** Il colore del giorno libero, nel tema in uso. */
+  const coloreGiornoLibero = () => (scuro ? '#3a1a24' : DAY_OFF_COLOR);
+
+  /** Il colore dell'ora bloccata, nel tema in uso. */
+  const coloreOraBloccata = () => (scuro ? '#3a281f' : HOUR_OFF_COLOR);
 
   useEffect(() => {
     const saved = localStorage.getItem('eduTime_readOnlyMode');
@@ -8687,6 +8748,18 @@ export default function App() {
               {readOnlyMode ? '🔒 Sola Lettura' : '🔓 Modifica'}
             </button>
             <button
+              onClick={() => setTema(tema === 'scuro' ? 'chiaro' : 'scuro')}
+              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 active:bg-white/35 rounded-lg text-xs font-semibold text-white border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              title={
+                tema === 'scuro'
+                  ? 'Torna ai colori chiari'
+                  : 'Passa alla modalità notte'
+              }
+              aria-pressed={tema === 'scuro'}
+            >
+              <span>{tema === 'scuro' ? '☀️ Chiara' : '🌙 Notte'}</span>
+            </button>
+            <button
               onClick={() => setIsFullWidth(!isFullWidth)}
               className="px-3 py-1.5 bg-white/10 hover:bg-white/20 active:bg-white/35 rounded-lg text-xs font-semibold text-white border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer"
             >
@@ -9015,7 +9088,7 @@ export default function App() {
                         const classSummary =
                           staffClassSummary[staff.id] || 'Nessun carico';
                         const hoursPlanned = staffHoursPlanned[staff.id] || 0;
-                        const deptColor = getDeptColor(staff.subject);
+                        const deptColor = coloreMateria(staff.subject);
                         const isNewDept =
                           staff.subject !== prevSubject && idx > 0;
                         prevSubject = staff.subject;
@@ -9140,8 +9213,8 @@ export default function App() {
                                         className={`p-1 align-middle ${borderClass}`}
                                         style={{
                                           backgroundColor: isHourOff
-                                            ? HOUR_OFF_COLOR
-                                            : DAY_OFF_COLOR,
+                                            ? coloreOraBloccata()
+                                            : coloreGiornoLibero(),
                                           backgroundImage:
                                             'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(153, 27, 27, 0.1) 8px, rgba(153, 27, 27, 0.1) 16px)',
                                         }}
@@ -9704,7 +9777,7 @@ export default function App() {
                                             key={i}
                                             className="border-l-4 border-brand-500 rounded-sm px-2 py-1 text-left"
                                             style={{
-                                              backgroundColor: getDeptColor(
+                                              backgroundColor: coloreMateria(
                                                 l.subject
                                               ),
                                             }}
@@ -9999,7 +10072,7 @@ export default function App() {
                                   : null;
                                 const hasNote = noteKey && cellNotes[noteKey];
                                 const cellDeptColor = materia
-                                  ? getDeptColor(materia.subject)
+                                  ? coloreMateria(materia.subject)
                                   : null;
                                 // Giorno corto: le ore che quel giorno la
                                 // classe non fa restano fuori dall'orario,
@@ -10233,8 +10306,8 @@ export default function App() {
                                       className="p-3 border-r border-slate-200 text-center h-24 align-middle"
                                       style={{
                                         backgroundColor: isHourOff
-                                          ? HOUR_OFF_COLOR
-                                          : DAY_OFF_COLOR,
+                                          ? coloreOraBloccata()
+                                          : coloreGiornoLibero(),
                                         backgroundImage:
                                           'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(153, 27, 27, 0.1) 10px, rgba(153, 27, 27, 0.1) 20px)',
                                       }}
@@ -10261,7 +10334,7 @@ export default function App() {
                                       slot.type === 'compresenza')
                                 );
                                 const deptColor = slotOccupied
-                                  ? getDeptColor(slotOccupied.subject)
+                                  ? coloreMateria(slotOccupied.subject)
                                   : '#fff';
                                 return (
                                   <td
@@ -10321,8 +10394,8 @@ export default function App() {
                                       className="p-3 border-r border-slate-200 text-center h-24 align-middle"
                                       style={{
                                         backgroundColor: isHourOff
-                                          ? HOUR_OFF_COLOR
-                                          : DAY_OFF_COLOR,
+                                          ? coloreOraBloccata()
+                                          : coloreGiornoLibero(),
                                         backgroundImage:
                                           'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(153, 27, 27, 0.1) 10px, rgba(153, 27, 27, 0.1) 20px)',
                                       }}
@@ -10390,8 +10463,8 @@ export default function App() {
                                       className="p-3 border-r border-slate-200 text-center h-24 align-middle"
                                       style={{
                                         backgroundColor: isHourOff
-                                          ? HOUR_OFF_COLOR
-                                          : DAY_OFF_COLOR,
+                                          ? coloreOraBloccata()
+                                          : coloreGiornoLibero(),
                                         backgroundImage:
                                           'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(153, 27, 27, 0.1) 10px, rgba(153, 27, 27, 0.1) 20px)',
                                       }}
@@ -10417,7 +10490,7 @@ export default function App() {
                                     slot.type === 'pomeriggio_musica'
                                 );
                                 const deptColor = slotOccupied
-                                  ? getDeptColor(slotOccupied.subject)
+                                  ? coloreMateria(slotOccupied.subject)
                                   : '#fafafa';
                                 return (
                                   <td
@@ -10507,7 +10580,7 @@ export default function App() {
                                     {pmLessons.length > 0 ? (
                                       <div className="flex flex-col gap-1">
                                         {pmLessons.map((pm, pmKey) => {
-                                          const pmDeptColor = getDeptColor(
+                                          const pmDeptColor = coloreMateria(
                                             pm.subject
                                           );
                                           return (
@@ -10561,8 +10634,8 @@ export default function App() {
                                       className="p-2 border-r border-slate-200 h-20 text-center align-middle"
                                       style={{
                                         backgroundColor: isHourOff
-                                          ? HOUR_OFF_COLOR
-                                          : DAY_OFF_COLOR,
+                                          ? coloreOraBloccata()
+                                          : coloreGiornoLibero(),
                                         backgroundImage:
                                           'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(153, 27, 27, 0.1) 10px, rgba(153, 27, 27, 0.1) 20px)',
                                       }}
@@ -10587,7 +10660,7 @@ export default function App() {
                                     slot.hour === hIdx
                                 );
                                 const deptColor = slotOccupied
-                                  ? getDeptColor(slotOccupied.subject)
+                                  ? coloreMateria(slotOccupied.subject)
                                   : '#fff';
                                 return (
                                   <td
@@ -10637,7 +10710,7 @@ export default function App() {
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                 <div
                   className="p-4 border-b border-slate-200"
-                  style={{ backgroundColor: getDeptColor(selectedDepartment) }}
+                  style={{ backgroundColor: coloreMateria(selectedDepartment) }}
                 >
                   <h3 className="font-bold text-slate-700 text-sm uppercase">
                     👥 Dipartimento di {selectedDepartment}
@@ -10698,7 +10771,7 @@ export default function App() {
                               (sum: number, a: any) => sum + a.hours,
                               0
                             ) || 0;
-                          const deptColor = getDeptColor(teacher.subject);
+                          const deptColor = coloreMateria(teacher.subject);
                           return (
                             <tr
                               key={teacher.id}
@@ -10746,8 +10819,8 @@ export default function App() {
                                         }`}
                                         style={{
                                           backgroundColor: isHourOff
-                                            ? HOUR_OFF_COLOR
-                                            : DAY_OFF_COLOR,
+                                            ? coloreOraBloccata()
+                                            : coloreGiornoLibero(),
                                           backgroundImage:
                                             'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(153,27,27,0.08) 10px, rgba(153,27,27,0.08) 20px)',
                                         }}
@@ -10931,7 +11004,7 @@ export default function App() {
                             (sum: number, a: any) => sum + a.hours,
                             0
                           );
-                          const deptColor = getDeptColor(teacher.subject);
+                          const deptColor = coloreMateria(teacher.subject);
                           const isNewDept =
                             teacher.subject !== prevSubject && idx > 0;
                           prevSubject = teacher.subject;
@@ -11127,7 +11200,7 @@ export default function App() {
                             <td
                               className="p-2 w-64 border-r border-slate-300 sticky left-0 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]"
                               style={{
-                                backgroundColor: getDeptColor('SOSTEGNO'),
+                                backgroundColor: coloreMateria('SOSTEGNO'),
                               }}
                             >
                               <div className="flex items-center gap-2">
@@ -11267,7 +11340,7 @@ export default function App() {
                             (sum: number, a: any) => sum + a.hours,
                             0
                           );
-                          const deptColor = getDeptColor(str.subject);
+                          const deptColor = coloreMateria(str.subject);
                           const isNewDept =
                             str.subject !== prevSubject && idx > 0;
                           prevSubject = str.subject;
@@ -11755,7 +11828,7 @@ export default function App() {
                     {allStaff.map((staff) => {
                       const customGap =
                         generationRules.teacherMaxGapHours?.[staff.id];
-                      const deptColor = getDeptColor(staff.subject);
+                      const deptColor = coloreMateria(staff.subject);
                       return (
                         <div
                           key={staff.id}
@@ -11817,7 +11890,7 @@ export default function App() {
                         (generationRules.teacherHourPreference || {})[
                           staff.id
                         ] || '';
-                      const deptColor = getDeptColor(staff.subject);
+                      const deptColor = coloreMateria(staff.subject);
                       const plannedHours = staffHoursPlanned[staff.id] || 0;
                       const maxDays = getMaxDaysOffForHours(plannedHours);
                       const isLimitReached = daysOffArr.length >= maxDays;
@@ -14098,7 +14171,7 @@ export default function App() {
                       editingCell.day,
                       editingCell.hour
                     );
-                    const deptColor = getDeptColor(t.subject);
+                    const deptColor = coloreMateria(t.subject);
                     return (
                       <button
                         key={t.id}
@@ -14115,7 +14188,7 @@ export default function App() {
                         }`}
                         style={{
                           backgroundColor: isUnavailable
-                            ? DAY_OFF_COLOR
+                            ? coloreGiornoLibero()
                             : deptColor,
                         }}
                       >
