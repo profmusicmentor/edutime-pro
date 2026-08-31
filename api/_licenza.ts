@@ -118,13 +118,16 @@ export async function verificaLicenza(grezza: unknown): Promise<EsitoLicenza> {
 
   let esito: EsitoLicenza;
   try {
+    // La License API di LemonSqueezy vuole i dati come form, non JSON, e
+    // pretende l'header Accept. Con un corpo JSON il campo license_key non
+    // viene letto e ogni chiave risulterebbe non valida.
     const risposta = await fetch(ENDPOINT, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
         Accept: 'application/json',
       },
-      body: JSON.stringify({ license_key: chiave }),
+      body: new URLSearchParams({ license_key: chiave }).toString(),
     });
     esito = valuta((await risposta.json()) as RispostaLemon);
   } catch {
