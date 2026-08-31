@@ -21,13 +21,11 @@ export interface Workspace {
 }
 
 /**
- * Elenco dei campi che le regole di sicurezza Firestore accettano nel
- * documento di una scuola. Va tenuto uguale a quello in `firestore.rules`:
- * se l'app manda un campo che le regole non prevedono, Firestore rifiuta
- * l'intero salvataggio con «Missing or insufficient permissions» e la scuola
- * si ritrova con il badge ❌ ERRORE e nessun dato salvato.
+ * Campi presenti nelle regole di sicurezza pubblicate da tempo sulla console
+ * Firebase. Sono la "base sicura": un salvataggio limitato a questi campi
+ * passa anche se le regole in console non sono state ancora aggiornate.
  */
-export const CLOUD_FIELDS = [
+export const CLOUD_FIELDS_STABILI = [
   'timetable',
   'teachers',
   'sostegno',
@@ -52,10 +50,35 @@ export const CLOUD_FIELDS = [
   'lastUpdatedBy',
 ] as const;
 
+/**
+ * Campi aggiunti di recente al documento. Vengono accettati solo dopo che le
+ * regole aggiornate sono state pubblicate a mano dalla console Firebase.
+ * Quando sono in console da un po' e tutte le scuole salvano senza avvisi,
+ * si spostano in `CLOUD_FIELDS_STABILI`.
+ */
+export const CLOUD_FIELDS_RECENTI = ['consigli', 'consigliConfig'] as const;
+
+/**
+ * Elenco completo dei campi che le regole di sicurezza Firestore accettano nel
+ * documento di una scuola. Va tenuto uguale a quello in `firestore.rules`:
+ * se l'app manda un campo che le regole non prevedono, Firestore rifiuta
+ * l'intero salvataggio con «Missing or insufficient permissions» e la scuola
+ * si ritrova con il badge ❌ ERRORE e nessun dato salvato.
+ *
+ * Da questo elenco passa davvero il payload (vedi `pickCloudFields`): un campo
+ * nuovo che nessuno ha aggiunto qui viene scartato prima della scrittura,
+ * invece di far fallire tutto il salvataggio della scuola.
+ */
+export const CLOUD_FIELDS = [
+  ...CLOUD_FIELDS_STABILI,
+  ...CLOUD_FIELDS_RECENTI,
+] as const;
+
 export type CloudStatus =
   | 'connessione'
   | 'sincronizzato'
   | 'salvataggio'
+  | 'parziale'
   | 'errore'
   | 'locale';
 
@@ -222,6 +245,27 @@ export const stripUndefined = (value: any): any => {
   return value;
 };
 
+/**
+ * Tiene del documento solo i campi elencati.
+ *
+ * È la difesa vera contro il guaio descritto sopra: le regole Firestore usano
+ * `hasOnly`, quindi basta un campo di troppo perché venga rifiutata l'intera
+ * scrittura, non solo quel campo. Filtrando qui, una scheda nuova che si
+ * dimentica di aggiornare l'elenco perde la sincronizzazione dei suoi dati ma
+ * non blocca il salvataggio dell'orario di tutta la scuola.
+ */
+export const pickCloudFields = (
+  data: any,
+  fields: readonly string[]
+): any => {
+  if (!data || typeof data !== 'object') return data;
+  const out: any = {};
+  fields.forEach((k) => {
+    if (k in data) out[k] = data[k];
+  });
+  return out;
+};
+
 let cloudPromise: Promise<any> | null = null;
 
 /** Carica Firebase una sola volta e solo quando serve davvero. */
@@ -339,12 +383,30 @@ export const persistWorkspace = async (
   }
 
   onStatus('salvataggio');
+  const payload = pickCloudFields(clean, CLOUD_FIELDS);
   try {
     const { db, storeMod } = await getCloud();
-    await storeMod.setDoc(storeMod.doc(db, CLOUD_COLLECTION, ws.code), clean, {
-      merge: true,
-    });
-    onStatus('sincronizzato');
+    const ref = storeMod.doc(db, CLOUD_COLLECTION, ws.code);
+    try {
+      await storeMod.setDoc(ref, payload, { merge: true });
+      onStatus('sincronizzato');
+      return;
+    } catch (err: any) {
+      // Regole non ancora aggiornate in console: invece di lasciare la scuola
+      // senza salvataggio, si riprova con i soli campi che le regole vecchie
+      // accettano di sicuro. Così l'orario si salva comunque e si perde solo
+      // la sincronizzazione delle schede più nuove, con un avviso esplicito.
+      if (!String(err?.code || '').includes('permission-denied')) throw err;
+      const ridotto = pickCloudFields(clean, CLOUD_FIELDS_STABILI);
+      await storeMod.setDoc(ref, ridotto, { merge: true });
+      onStatus(
+        'parziale',
+        'Le regole di sicurezza del progetto Firebase non sono aggiornate: ' +
+          'orario e sostituzioni sono stati salvati, i dati delle schede più ' +
+          'recenti restano solo su questo computer. Segnalalo con il pulsante ' +
+          'dei suggerimenti.'
+      );
+    }
   } catch (err: any) {
     onStatus('errore', describeCloudError(err, 'scrittura'));
   }

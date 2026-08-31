@@ -2981,7 +2981,7 @@ export default function App() {
         setIsInitialLoad(false);
         seedWorkspace(workspace, initial);
       },
-      onStatus: handleCloudStatus,
+      onStatus: handleReadStatus,
     });
     return () => unsubscribe();
   }, [workspace]);
@@ -3011,10 +3011,30 @@ export default function App() {
   /** Tiene insieme il badge di stato e il motivo dell'eventuale errore. */
   const handleCloudStatus = (status: CloudStatus, detail?: string) => {
     setCloudStatus(status);
-    setCloudError(
-      status === 'errore'
-        ? detail || 'Le ultime modifiche non sono state salvate.'
-        : ''
+    if (status === 'errore') {
+      setCloudError(detail || 'Le ultime modifiche non sono state salvate.');
+    } else if (status === 'parziale') {
+      setCloudError(detail || 'Una parte dei dati non è stata salvata.');
+    } else {
+      setCloudError('');
+    }
+  };
+
+  /**
+   * Stato che arriva dall'ascolto dei dati, non da un salvataggio.
+   *
+   * Ogni modifica fa arrivare uno snapshot da Firestore, e prima il suo
+   * "sincronizzato" cancellava subito l'avviso di un salvataggio appena
+   * fallito: chi usava l'app vedeva i dati tornare indietro senza nessuna
+   * striscia rossa. Ora solo un salvataggio riuscito toglie l'avviso.
+   */
+  const handleReadStatus = (status: CloudStatus, detail?: string) => {
+    if (status === 'errore') {
+      handleCloudStatus(status, detail);
+      return;
+    }
+    setCloudStatus((prev) =>
+      prev === 'errore' || prev === 'parziale' ? prev : status
     );
   };
 
@@ -8767,6 +8787,11 @@ export default function App() {
                     ⚡ CONNESSIONE...
                   </span>
                 )}
+                {cloudStatus === 'parziale' && (
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-bruciato-500/25 text-bruciato-200 font-bold px-1.5 py-0.5 rounded-sm">
+                    ⚠️ SALVATO IN PARTE
+                  </span>
+                )}
                 {cloudStatus === 'errore' && (
                   <span className="inline-flex items-center gap-1 text-[10px] bg-fucsia-500/20 text-fucsia-300 font-bold px-1.5 py-0.5 rounded-sm">
                     ❌ NON SALVATO
@@ -8901,6 +8926,23 @@ export default function App() {
         la pagina, perché il badge piccolo nell'angolo non bastava: chi non lo
         notava continuava a lavorare credendo che tutto fosse al sicuro.
       */}
+      {cloudStatus === 'parziale' && (
+        <div className="bg-bruciato-600 text-white px-4 py-2.5 shrink-0 print:hidden">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+            <p className="text-xs sm:text-sm font-semibold">
+              ⚠️ Una parte dei dati <u>non è finita sul cloud</u>.{' '}
+              <span className="font-normal">{cloudError}</span>
+            </p>
+            <button
+              onClick={handleBackupDownload}
+              className="shrink-0 bg-white/15 hover:bg-white/25 border border-white/30 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
+              title="Scarica sul computer una copia di tutto il lavoro, così non si perde niente"
+            >
+              💾 Scarica subito un backup
+            </button>
+          </div>
+        </div>
+      )}
       {cloudStatus === 'errore' && (
         <div className="bg-fucsia-600 text-white px-4 py-2.5 shrink-0 print:hidden">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center gap-2 justify-between">

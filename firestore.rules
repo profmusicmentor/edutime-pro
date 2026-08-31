@@ -51,6 +51,8 @@ service cloud.firestore {
              'assemblee',
              'personaleExtra',
              'assembleeConfig',
+             'consigli',
+             'consigliConfig',
              'lastUpdatedAt',
              'lastUpdatedBy'
            ]);

@@ -20,7 +20,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-08-31b';
+export const NOVITA_VERSIONE = '2026-08-31c';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -32,6 +32,13 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-08-31c',
+    data: '31 agosto 2026',
+    voci: [
+      'Salvataggio cloud riparato. Da stamattina, con l\'arrivo della scheda «Consigli di classe», il database rifiutava l\'intero salvataggio delle scuole in modalità cloud: il lavoro sembrava fatto ma alla riapertura si tornava indietro di giorni, e per giunta senza nessun avviso in rosso. Ora l\'app manda al cloud solo i dati previsti, così una scheda nuova non può più bloccare il salvataggio di tutto il resto; se qualcosa viene comunque rifiutato, l\'orario viene salvato lo stesso e compare una striscia arancione che lo dice; e l\'avviso di salvataggio fallito non sparisce più da solo dopo un istante, ma resta finché un salvataggio non riesce davvero. Grazie a chi lo ha segnalato dal pulsante dei feedback.',
+    ],
+  },
   {
     versione: '2026-08-31b',
     data: '31 agosto 2026',
