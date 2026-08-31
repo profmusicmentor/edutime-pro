@@ -20,7 +20,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-08-29';
+export const NOVITA_VERSIONE = '2026-08-31';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -32,6 +32,13 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-08-31',
+    data: '31 agosto 2026',
+    voci: [
+      'Consigli di classe: c\'è una scheda nuova in alto, «Consigli di classe». Si scelgono le classi e, per ognuna, l\'elenco dei docenti si riempie da solo dalle cattedre (poi si corregge a mano). Si impostano giorno, ora di inizio, durata e quante sale sono disponibili: l\'app monta il calendario mettendo più consigli in contemporanea, uno per sala, senza mai mettere lo stesso docente in due riunioni nello stesso orario. Le sale possono stare in sedi diverse. I docenti che stanno in tante classi (religione, motoria, sostegno itinerante) si possono segnare come «jolly»: non bloccano il parallelo e l\'app segnala che per loro i turni vanno concordati a parte. C\'è anche un interruttore per lasciare la pausa pranzo a chi ha fatto l\'ultima ora del mattino, tenendolo fuori dal primo consiglio del pomeriggio (funziona se l\'orario è già stato generato). Il calendario si scarica in Excel, con anche il prospetto degli impegni per docente. Nato da una richiesta arrivata via mail.',
+    ],
+  },
   {
     versione: '2026-08-29',
     data: '29 agosto 2026',
@@ -72,13 +79,6 @@ export const NOVITA: VoceNovita[] = [
     voci: [
       'Assemblee sindacali: c\'è una scheda nuova in alto, «Assemblee». Si registra l\'assemblea con data e orario, si spuntano le persone che aderiscono e le ore si contano da sole, prese dall\'orario di quel giorno. L\'app avvisa in rosso quando qualcuno supera il tetto di ore dell\'anno o il numero di assemblee nello stesso mese: i due limiti si impostano in alto e partono da 10 ore e 2 assemblee. Il prospetto si scarica in Excel per la segreteria. Per chi non è nell\'orario dell\'app (infanzia, primaria, personale ATA) c\'è la scheda «Personale fuori orario», dove si scrive una fascia di servizio per ogni giorno: da lì in poi il conteggio è automatico anche per loro.',
       'Screenshot nelle segnalazioni: nel modulo «Segnala un bug o un suggerimento» ora si può allegare un\'immagine, scegliendo il file oppure incollandola con Ctrl+V (Cmd+V sul Mac). Prima si poteva solo descrivere il problema a parole.',
-    ],
-  },
-  {
-    versione: '2026-08-24',
-    data: '24 agosto 2026',
-    voci: [
-      'Indisponibilità anche al pomeriggio: nel riquadro Indisponibilità, il tasto con l\'orologio apriva una griglia con le sole ore del mattino. Chi ha impostato ore pomeridiane non riusciva a bloccarle e non poteva dire, per esempio, che un docente non c\'è mai all\'ultima ora del pomeriggio. Ora la griglia mostra le stesse ore dell\'orario, mattino e pomeriggio.',
     ],
   },
 ];

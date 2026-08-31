@@ -15,6 +15,12 @@ import type {
   AssembleeConfig,
   PersonaExtra,
 } from './Assemblee';
+import ConsigliClasse, {
+  DEFAULT_CONSIGLI_CONFIG,
+  normalizeConsigli,
+  normalizeConsigliConfig,
+} from './ConsigliClasse';
+import type { ConsiglioClasse, ConsigliConfig } from './ConsigliClasse';
 import type { ModoNovita } from './Novita';
 import { applicaTema, temaIniziale } from './tema';
 import type { Tema } from './tema';
@@ -2489,6 +2495,11 @@ export default function App() {
   const [assembleeConfig, setAssembleeConfig] = useState<AssembleeConfig>(
     DEFAULT_ASSEMBLEE_CONFIG
   );
+  /** Consigli di classe: elenco e impostazioni del calendario riunioni. */
+  const [consigli, setConsigli] = useState<ConsiglioClasse[]>([]);
+  const [consigliConfig, setConsigliConfig] = useState<ConsigliConfig>(
+    DEFAULT_CONSIGLI_CONFIG
+  );
   /** Ora per cui è aperto l'elenco di chi può anticipare la lezione. */
   const [anticipoPanel, setAnticipoPanel] = useState<any>(null);
   const [substitutionsDate, setSubstitutionsDate] = useState<string>(() =>
@@ -2810,6 +2821,8 @@ export default function App() {
     assemblee: [],
     personaleExtra: [],
     assembleeConfig: DEFAULT_ASSEMBLEE_CONFIG,
+    consigli: [],
+    consigliConfig: DEFAULT_CONSIGLI_CONFIG,
     lastUpdatedAt: new Date().toISOString(),
   });
 
@@ -2913,6 +2926,10 @@ export default function App() {
           setAssemblee(normalizeAssemblee(data.assemblee));
           setPersonaleExtra(normalizePersonaleExtra(data.personaleExtra));
           setAssembleeConfig(normalizeAssembleeConfig(data.assembleeConfig));
+          // I documenti salvati prima dei consigli di classe non hanno questi
+          // campi: la scheda parte vuota, con le impostazioni di default.
+          setConsigli(normalizeConsigli(data.consigli));
+          setConsigliConfig(normalizeConsigliConfig(data.consigliConfig));
   };
 
   /** Riapre l'ultimo spazio di lavoro usato (o quello del link di invito). */
@@ -3020,7 +3037,9 @@ export default function App() {
     newSubstitutions?: any[],
     newAssemblee?: Assemblea[],
     newPersonaleExtra?: PersonaExtra[],
-    newAssembleeConfig?: AssembleeConfig
+    newAssembleeConfig?: AssembleeConfig,
+    newConsigli?: ConsiglioClasse[],
+    newConsigliConfig?: ConsigliConfig
   ) => {
     if (!workspace || isInitialLoad) return;
     await persistWorkspace(
@@ -3055,6 +3074,9 @@ export default function App() {
           newAssembleeConfig !== undefined
             ? newAssembleeConfig
             : assembleeConfig,
+        consigli: newConsigli !== undefined ? newConsigli : consigli,
+        consigliConfig:
+          newConsigliConfig !== undefined ? newConsigliConfig : consigliConfig,
         lastUpdatedAt: new Date().toISOString(),
       },
       handleCloudStatus
@@ -3084,6 +3106,8 @@ export default function App() {
       assemblee,
       personaleExtra,
       assembleeConfig,
+      consigli,
+      consigliConfig,
       lastUpdatedAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -6539,6 +6563,46 @@ export default function App() {
   };
 
   /**
+   * Salva i consigli di classe. Come per le assemblee, in modalità locale il
+   * documento si riscrive per intero: si rimanda tutto lo stato corrente e si
+   * cambiano solo i campi passati.
+   */
+  const handleConsigliChange = (next: {
+    consigli?: ConsiglioClasse[];
+    config?: ConsigliConfig;
+  }) => {
+    const nuoviConsigli =
+      next.consigli !== undefined ? next.consigli : consigli;
+    const nuovaConsigliConfig =
+      next.config !== undefined ? next.config : consigliConfig;
+    if (next.consigli !== undefined) setConsigli(nuoviConsigli);
+    if (next.config !== undefined) setConsigliConfig(nuovaConsigliConfig);
+    pushDataToCloud(
+      timetable,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses,
+      rooms,
+      sedi,
+      absences,
+      substitutions,
+      assemblee,
+      personaleExtra,
+      assembleeConfig,
+      nuoviConsigli,
+      nuovaConsigliConfig
+    );
+  };
+
+  /**
    * Chi è già occupato in quell'ora: le lezioni dell'orario, ma anche le
    * supplenze e gli anticipi già decisi per quella data. Senza la seconda
    * metà lo stesso docente poteva essere proposto due volte nella stessa
@@ -8946,6 +9010,16 @@ export default function App() {
               }`}
             >
               🗳️ Assemblee
+            </button>
+            <button
+              onClick={() => setActiveTab('consigli')}
+              className={`py-4 px-1 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
+                activeTab === 'consigli'
+                  ? 'border-brand-600 text-brand-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              🧑‍🏫 Consigli di classe
             </button>
           </nav>
         </div>
@@ -14061,6 +14135,20 @@ export default function App() {
             hoursMap={mergedHoursMap}
             days={DAYS}
             onChange={handleAssembleeChange}
+          />
+        )}
+
+        {activeTab === 'consigli' && (
+          <ConsigliClasse
+            classi={classes}
+            staff={allStaff}
+            sedi={sedi}
+            timetable={timetable}
+            diurnalHours={diurnalHours}
+            giorni={DAYS}
+            consigli={consigli}
+            config={consigliConfig}
+            onChange={handleConsigliChange}
           />
         )}
       </main>
