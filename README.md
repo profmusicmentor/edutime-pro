@@ -42,10 +42,10 @@ In basso a destra, sia nell'app sia nella pagina `/guida`, c'è il pulsante
 e si ottengono i due-quattro pezzi di guida più pertinenti, con il link al
 capitolo completo.
 
-Non c'è nessun modello linguistico e nessuna chiamata di rete: la domanda non
-lascia il browser. I contenuti stanno in `src/guidaContenuti.tsx` (condivisi
-con la pagina della guida), l'indice e il punteggio in `src/guidaIndice.ts`,
-il pannello in `src/Assistente.tsx`.
+La ricerca non usa nessun modello linguistico e non fa nessuna chiamata di
+rete: la domanda non lascia il browser. I contenuti stanno in
+`src/guidaContenuti.tsx` (condivisi con la pagina della guida), l'indice e il
+punteggio in `src/guidaIndice.ts`, il pannello in `src/Assistente.tsx`.
 
 La ricerca appiattisce il JSX della guida in testo, pesa titoli e tag più del
 corpo, corregge il peso con la rarità della parola nella guida, tollera la
@@ -56,6 +56,71 @@ tabella di sinonimi con cui i docenti pongono le domande (*maestra* →
 **Aggiungere contenuti**: basta aggiungere capitoli o card in
 `src/guidaContenuti.tsx`, l'indice si ricostruisce da solo. Se una funzione
 dell'app non è documentata nella guida, l'assistente non può rispondere.
+
+### Risposta scritta da un modello linguistico (facoltativa)
+
+Sopra i risultati può comparire il pulsante **✨ Fatti scrivere una risposta**:
+manda la domanda e i capitoli già trovati a `/api/assistente`, che li gira a un
+modello linguistico e restituisce una risposta discorsiva. Il pulsante compare
+solo se l'endpoint è configurato; senza chiave sul server il pannello resta
+quello di prima, tutto locale. La ricerca nei capitoli è sempre gratuita e
+senza limiti; la risposta scritta è un servizio in abbonamento (vedi sotto).
+
+La chiamata passa da una funzione serverless e non dal browser per tre motivi:
+la chiave resta lato server (nel bundle sarebbe leggibile da chiunque), il
+numero di domande al giorno si può contare davvero, e i nomi propri si tolgono
+dalla domanda prima che esca. Verso il modello vanno solo la domanda ripulita e
+il testo della guida, che è pubblico: l'orario della scuola, le classi e i
+docenti non passano mai di lì.
+
+Il freno di spesa è il conteggio in `api/_limite.ts`, non gli avvisi di budget
+del fornitore, che mandano una mail e non fermano niente. Il conteggio usa
+Vercel KV (o Upstash) se le variabili ci sono; altrimenti resta nella memoria
+della funzione, che regge un utente insistente ma non un attacco vero.
+
+Il motore si cambia da variabile d'ambiente, senza toccare il codice:
+
+| Variabile | Cosa fa | Predefinito |
+| --- | --- | --- |
+| `ASSISTENTE_MOTORE` | `gemini`, `openai` o `anthropic` | `gemini` |
+| `ASSISTENTE_MODELLO` | id del modello | quello del motore |
+| `GEMINI_API_KEY` | chiave, se il motore è `gemini` | nessuno |
+| `OPENAI_API_KEY` | chiave, se il motore è `openai` | nessuno |
+| `OPENAI_BASE_URL` | per Groq, OpenRouter, DeepSeek, Mistral… | OpenAI |
+| `ANTHROPIC_API_KEY` | chiave, se il motore è `anthropic` | nessuno |
+| `ASSISTENTE_LIMITE_GIORNO` | domande al giorno per persona | `40` |
+| `ASSISTENTE_LIMITE_IP` | domande al giorno per indirizzo | 10 volte il precedente |
+| `ASSISTENTE_LIMITE_GLOBALE` | domande al giorno per tutta l'app | `3000` |
+| `ASSISTENTE_MAX_TOKEN` | lunghezza massima della risposta | `500` |
+| `ASSISTENTE_GEMINI_THINKING` | `auto` o un numero | `0` |
+| `ASSISTENTE_RICHIEDE_LICENZA` | `1` pretende una chiave di abbonamento valida | assente (assistente libero) |
+| `LEMONSQUEEZY_STORE_ID` | se c'è, la chiave deve essere di questo negozio | nessuno |
+| `LEMONSQUEEZY_PRODUCT_ID` | se c'è, la chiave deve essere di questo prodotto | nessuno |
+
+Il motore `openai` non parla solo con OpenAI: quasi tutti i fornitori espongono
+lo stesso formato `/chat/completions`, quindi basta puntare `OPENAI_BASE_URL`
+al loro indirizzo e mettere la loro chiave. Il modello in uso si controlla con
+`GET /api/assistente`, che risponde con motore e modello senza mostrare nessuna
+chiave.
+
+Due avvertenze sul livello gratuito dei fornitori: le quote sono basse (con più
+utenti in contemporanea arrivano subito gli errori) e i contenuti possono
+essere usati per addestrare i modelli. Con dati di una scuola dentro, va usato
+un piano a pagamento.
+
+### Abbonamento
+
+La risposta scritta è un servizio in abbonamento annuale. Con
+`ASSISTENTE_RICHIEDE_LICENZA=1` l'endpoint pretende una chiave di licenza
+LemonSqueezy valida prima di ogni risposta: la convalida `api/_licenza.ts`
+chiamando l'endpoint pubblico `/v1/licenses/validate` (nessuna chiave API del
+negozio), con una cache in memoria e, se LemonSqueezy non risponde, si lascia
+passare chi poco prima era in regola. Quando l'abbonamento non viene rinnovato
+LemonSqueezy segna la chiave come scaduta e la convalida comincia a rifiutarla
+da sola. Senza la variabile, o con un valore diverso da `1`, l'assistente
+risponde a tutti: serve a provare la qualità dei modelli prima di montare il
+pagamento. La chiave si incolla una volta sola nel pannello e resta nel
+browser (`localStorage`). I tetti di `api/_limite.ts` valgono comunque.
 
 ## Sviluppo
 
@@ -106,6 +171,9 @@ quel documento: il codice è l'unica barriera.
   cloud (Firebase caricato con import dinamico).
 - `src/WorkspaceGate.tsx` — schermata iniziale di scelta.
 - `src/Guida.tsx` — guida all'uso servita su `/guida`.
+- `api/assistente.ts` — endpoint della risposta scritta dal modello, con i
+  moduli di appoggio `_motori.ts` (un adattatore per fornitore), `_limite.ts`
+  (il conteggio delle domande) e `_anonimizza.ts` (i nomi tolti dalla domanda).
 
 ## Licenza
 

@@ -1,0 +1,9 @@
+# L'assistente IA è un servizio in abbonamento nella stessa app, non un prodotto separato
+
+La risposta scritta dal modello linguistico (il «livello 2» dell'assistente della guida) costa token a ogni domanda, quindi passa a un abbonamento annuale che ne copra il costo. La scelta è tenerla **dentro l'unica app**, accesa da una chiave di licenza, invece di pubblicare due prodotti distinti (uno gratuito senza IA, uno a pagamento con IA).
+
+Il motivo è la manutenzione. `src/App.tsx` è un file solo di oltre 8000 righe e il generatore d'orario riceve correzioni di continuo, spesso dietro segnalazione. Con due app ogni correzione andrebbe portata a mano su due copie; con una app sola si scrive una volta. La ricerca locale nei capitoli resta comunque gratuita, senza limiti e offline: l'abbonamento riguarda solo la risposta discorsiva, che è un di più.
+
+Il diritto si verifica con le **chiavi di licenza di LemonSqueezy** (già intermediario di pagamento del sito, merchant of record). Il cliente incolla la chiave nel pannello dell'assistente; il browser la salva in `localStorage` e la manda a `/api/assistente`, che la convalida con l'endpoint pubblico `/v1/licenses/validate` prima di spendere token (`api/_licenza.ts`). Quando l'abbonamento annuale non viene rinnovato LemonSqueezy segna la chiave come scaduta e la convalida comincia a rifiutarla da sola. L'alternativa scartata era interrogare l'API delle sottoscrizioni con la chiave segreta del negozio e l'email dell'utente: più dati in giro e più codice, per lo stesso risultato.
+
+La variabile `ASSISTENTE_RICHIEDE_LICENZA` governa il passaggio: assente o diversa da `1` l'assistente resta libero (serve a provare la qualità dei modelli senza montare prima il pagamento), a `1` pretende la chiave. In entrambi i casi restano attivi i tetti di domande al giorno per persona, per indirizzo e per l'app intera (`api/_limite.ts`), che sono l'unico freno di spesa reale.

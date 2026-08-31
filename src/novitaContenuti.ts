@@ -20,7 +20,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-08-31';
+export const NOVITA_VERSIONE = '2026-08-31b';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -32,6 +32,13 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-08-31b',
+    data: '31 agosto 2026',
+    voci: [
+      'Assistente della guida: il pannello «💬 Serve aiuto?» ora può anche scrivere una risposta a parole sue, non solo elencare i capitoli. La ricerca nei capitoli resta com\'è: gratis, senza limiti e dentro il tuo browser. La risposta scritta invece è un servizio in abbonamento: si attiva una volta sola incollando nel pannello la chiave che ricevi al momento dell\'acquisto. Quando è attiva, sopra i capitoli trovati compare il pulsante «✨ Fatti scrivere una risposta» e il testo viene messo insieme leggendo quegli stessi capitoli. La domanda passa da un servizio esterno solo quando premi quel pulsante; nomi di persone, indirizzi email e numeri di telefono vengono tolti prima dell\'invio, e l\'orario della tua scuola non esce mai.',
+    ],
+  },
   {
     versione: '2026-08-31',
     data: '31 agosto 2026',

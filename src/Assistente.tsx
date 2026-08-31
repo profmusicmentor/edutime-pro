@@ -1,13 +1,33 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { cerca, DOMANDE_SUGGERITE, NUMERO_CAPITOLI } from './guidaIndice';
 import Feedback from './Feedback';
+import {
+  chiediAllIA,
+  statoIA,
+  leggiLicenza,
+  salvaLicenza,
+  ErroreLicenza,
+  type StatoIA,
+} from './assistenteIA';
+
+/**
+ * Dove si compra l'abbonamento all'assistente IA. Da sostituire con il link di
+ * checkout LemonSqueezy del prodotto «EduTime Pro - Assistente IA».
+ */
+const LINK_ABBONAMENTO = 'https://biscottodigitale.com/app/edutime-pro/';
 
 /**
  * Assistente della guida: pannello di aiuto che risponde a domande in
  * italiano pescando dai capitoli della guida.
  *
- * Funziona interamente nel browser, senza modelli linguistici né chiamate di
- * rete: la domanda dell'utente non lascia mai il dispositivo.
+ * La ricerca funziona interamente nel browser, senza modelli linguistici né
+ * chiamate di rete: la domanda non lascia il dispositivo.
+ *
+ * Sopra i risultati c'è un di più facoltativo: il pulsante «Fatti scrivere una
+ * risposta» manda la domanda e i capitoli trovati a /api/assistente, che li
+ * gira a un modello linguistico. Parte solo se lo si preme, e compare solo
+ * se l'endpoint è configurato: senza chiave sul server il pannello resta
+ * quello di prima, tutto locale.
  */
 
 interface Props {
@@ -25,6 +45,72 @@ export default function Assistente({ inGuida = false }: Props) {
 
   const risultati = useMemo(() => cerca(domanda), [domanda]);
   const haDomanda = domanda.trim().length > 0;
+
+  const [ia, setIa] = useState<StatoIA | null>(null);
+  const [risposta, setRisposta] = useState('');
+  const [inAttesa, setInAttesa] = useState(false);
+  const [erroreIa, setErroreIa] = useState('');
+  const [rimaste, setRimaste] = useState<number | null>(null);
+
+  // La chiave di abbonamento vive su questo browser. Il campo per incollarla
+  // compare da solo quando il server la chiede e non ce n'è una, oppure
+  // quando l'utente vuole cambiarla, oppure quando il server l'ha rifiutata.
+  const [licenza, setLicenza] = useState(() => leggiLicenza());
+  const [bozzaLicenza, setBozzaLicenza] = useState('');
+  const [campoLicenzaAperto, setCampoLicenzaAperto] = useState(false);
+
+  const iaAttiva = Boolean(ia?.disponibile);
+  const serveLicenza = Boolean(ia?.richiedeLicenza);
+  const haLicenza = licenza.length > 0;
+  const mostraCampoLicenza =
+    serveLicenza && (campoLicenzaAperto || !haLicenza);
+
+  const attivaLicenza = () => {
+    const pulita = bozzaLicenza.trim();
+    if (!pulita) return;
+    salvaLicenza(pulita);
+    setLicenza(pulita);
+    setBozzaLicenza('');
+    setCampoLicenzaAperto(false);
+    setErroreIa('');
+  };
+
+  // Si chiede al server se l'assistente IA è acceso solo quando qualcuno
+  // apre davvero il pannello, e una volta sola per visita.
+  useEffect(() => {
+    if (!aperto || ia) return;
+    let vivo = true;
+    statoIA().then((stato) => {
+      if (vivo) setIa(stato);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [aperto, ia]);
+
+  // Cambiata la domanda, la vecchia risposta non c'entra più niente.
+  useEffect(() => {
+    setRisposta('');
+    setErroreIa('');
+  }, [domanda]);
+
+  const chiediRisposta = async () => {
+    if (inAttesa) return;
+    setInAttesa(true);
+    setErroreIa('');
+    setRisposta('');
+    try {
+      const esito = await chiediAllIA(domanda.trim(), risultati);
+      setRisposta(esito.risposta);
+      setRimaste(esito.rimaste);
+    } catch (e) {
+      setErroreIa(e instanceof Error ? e.message : 'Errore imprevisto.');
+      // Chiave rifiutata o assente: riapri il campo così si può correggere.
+      if (e instanceof ErroreLicenza) setCampoLicenzaAperto(true);
+    } finally {
+      setInAttesa(false);
+    }
+  };
 
   useEffect(() => {
     if (aperto) inputRef.current?.focus();
@@ -88,7 +174,10 @@ export default function Assistente({ inGuida = false }: Props) {
         <div>
           <p className="font-bold text-sm">Assistente della guida</p>
           <p className="text-[11px] text-brand-200 mt-0.5">
-            Cerca fra i {NUMERO_CAPITOLI} capitoli · tutto nel tuo browser
+            Cerca fra i {NUMERO_CAPITOLI} capitoli ·{' '}
+            {iaAttiva
+              ? 'la ricerca resta nel tuo browser'
+              : 'tutto nel tuo browser'}
           </p>
         </div>
         <button
@@ -113,6 +202,119 @@ export default function Assistente({ inGuida = false }: Props) {
       </div>
 
       <div className="overflow-y-auto p-3 flex flex-col gap-3">
+        {haDomanda && iaAttiva && (
+          <div className="border border-brand-200 bg-brand-50 rounded-xl p-3">
+            {!risposta && !inAttesa && mostraCampoLicenza && (
+              <>
+                <p className="text-sm font-bold text-brand-800">
+                  ✨ La risposta scritta è per gli abbonati
+                </p>
+                <p className="text-[11px] text-slate-600 mt-1 leading-snug">
+                  La ricerca nei capitoli qui sotto resta gratis e senza limiti.
+                  In più, con l'abbonamento annuale, l'assistente ti mette
+                  insieme una risposta a parole sue leggendo quei capitoli.
+                </p>
+                <input
+                  type="text"
+                  value={bozzaLicenza}
+                  onChange={(e) => setBozzaLicenza(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') attivaLicenza();
+                  }}
+                  placeholder="Incolla qui la chiave di abbonamento"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mt-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={attivaLicenza}
+                    className="flex-1 text-sm font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg px-3 py-2 disabled:opacity-50"
+                    disabled={!bozzaLicenza.trim()}
+                  >
+                    Attiva
+                  </button>
+                  <a
+                    href={LINK_ABBONAMENTO}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 text-sm font-bold text-brand-700 bg-white border border-brand-300 hover:bg-brand-100 rounded-lg px-3 py-2 text-center"
+                  >
+                    Abbonati
+                  </a>
+                </div>
+                {campoLicenzaAperto && haLicenza && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCampoLicenzaAperto(false);
+                      setBozzaLicenza('');
+                    }}
+                    className="text-[11px] text-slate-500 underline mt-2"
+                  >
+                    Annulla
+                  </button>
+                )}
+              </>
+            )}
+
+            {!risposta && !inAttesa && !mostraCampoLicenza && (
+              <>
+                <button
+                  type="button"
+                  onClick={chiediRisposta}
+                  className="w-full text-sm font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg px-3 py-2"
+                >
+                  ✨ Fatti scrivere una risposta
+                </button>
+                <p className="text-[10px] text-slate-500 mt-2 leading-snug">
+                  La domanda e i capitoli qui sotto vengono inviati a un modello
+                  linguistico esterno, che compone la risposta. Nomi di persone,
+                  email e numeri di telefono vengono tolti prima dell'invio.
+                  L'orario della tua scuola non parte mai.
+                </p>
+                {serveLicenza && haLicenza && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBozzaLicenza(licenza);
+                      setCampoLicenzaAperto(true);
+                    }}
+                    className="text-[10px] text-slate-400 underline mt-1.5"
+                  >
+                    Abbonamento attivo · cambia chiave
+                  </button>
+                )}
+              </>
+            )}
+
+            {inAttesa && (
+              <p className="text-sm text-brand-800 font-semibold">
+                Sto leggendo la guida…
+              </p>
+            )}
+
+            {risposta && (
+              <>
+                <p className="text-[10px] uppercase font-bold text-brand-700">
+                  Risposta scritta dall'assistente
+                </p>
+                <p className="text-sm text-slate-800 mt-1.5 leading-relaxed whitespace-pre-wrap">
+                  {risposta}
+                </p>
+                <p className="text-[10px] text-slate-500 mt-2 leading-snug">
+                  Scritta da un modello linguistico a partire dai capitoli qui
+                  sotto: se qualcosa non torna, sono quelli che fanno fede.
+                  {rimaste !== null && ` Ti restano ${rimaste} domande oggi.`}
+                </p>
+              </>
+            )}
+
+            {erroreIa && (
+              <p className="text-sm text-fucsia-600 mt-2">{erroreIa}</p>
+            )}
+          </div>
+        )}
+
         {!haDomanda && (
           <>
             <p className="text-xs text-slate-500">
@@ -185,7 +387,11 @@ export default function Assistente({ inGuida = false }: Props) {
       </div>
 
       <div className="text-[10px] text-slate-400 px-3 py-2 border-t border-slate-200 shrink-0">
-        <p>Risposte prese dalla guida dell'app. Nessun dato inviato in rete.</p>
+        <p>
+          {iaAttiva
+            ? "Tutto viene dalla guida dell'app. La ricerca resta nel tuo browser; solo il pulsante ✨ manda la domanda in rete."
+            : "Risposte prese dalla guida dell'app. Nessun dato inviato in rete."}
+        </p>
         <p className="text-slate-500 mt-0.5">
           Non hai trovato quello che cerchi? <Feedback />
         </p>
