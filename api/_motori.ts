@@ -35,11 +35,19 @@ const NOME_CHIAVE: Record<NomeMotore, string> = {
   anthropic: 'ANTHROPIC_API_KEY',
 };
 
+export interface Messaggio {
+  ruolo: 'user' | 'assistant';
+  testo: string;
+}
+
 export interface Domanda {
-  /** Istruzioni fisse: chi è l'assistente e cosa può dire. */
+  /** Istruzioni fisse più i pezzi di guida: chi è l'assistente, cosa può dire. */
   sistema: string;
-  /** Pezzi di guida più domanda della persona. */
-  utente: string;
+  /**
+   * Lo scambio finora, dal più vecchio al più recente. L'ultimo è sempre una
+   * riga `user`: la domanda a cui il modello deve rispondere adesso.
+   */
+  messaggi: Messaggio[];
   /** Tetto duro sulla lunghezza della risposta: è anche un tetto di spesa. */
   maxToken: number;
 }
@@ -126,6 +134,11 @@ async function chiediGemini(cfg: Configurazione, d: Domanda): Promise<string> {
     generationConfig.thinkingConfig = { thinkingBudget: budget };
   }
 
+  const contents = d.messaggi.map((m) => ({
+    role: m.ruolo === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.testo }],
+  }));
+
   const invia = (config: Record<string, unknown>) =>
     fetch(url, {
       method: 'POST',
@@ -135,7 +148,7 @@ async function chiediGemini(cfg: Configurazione, d: Domanda): Promise<string> {
       },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: d.sistema }] },
-        contents: [{ role: 'user', parts: [{ text: d.utente }] }],
+        contents,
         generationConfig: config,
       }),
     });
@@ -202,7 +215,7 @@ async function chiediOpenAi(cfg: Configurazione, d: Domanda): Promise<string> {
     model: cfg.modello,
     messages: [
       { role: 'system', content: d.sistema },
-      { role: 'user', content: d.utente },
+      ...d.messaggi.map((m) => ({ role: m.ruolo, content: m.testo })),
     ],
     max_tokens: d.maxToken,
     temperature: 0.2,
@@ -281,7 +294,7 @@ async function chiediAnthropic(
       max_tokens: d.maxToken,
       temperature: 0.2,
       system: d.sistema,
-      messages: [{ role: 'user', content: d.utente }],
+      messages: d.messaggi.map((m) => ({ role: m.ruolo, content: m.testo })),
     }),
   });
 

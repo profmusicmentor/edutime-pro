@@ -36,7 +36,7 @@ export const NOVITA: VoceNovita[] = [
     versione: '2026-08-31b',
     data: '31 agosto 2026',
     voci: [
-      'Assistente della guida: il pannello «💬 Serve aiuto?» ora può anche scrivere una risposta a parole sue, non solo elencare i capitoli. La ricerca nei capitoli resta com\'è: gratis, senza limiti e dentro il tuo browser. La risposta scritta invece è un servizio in abbonamento: si attiva una volta sola incollando nel pannello la chiave che ricevi al momento dell\'acquisto. Quando è attiva, sopra i capitoli trovati compare il pulsante «✨ Fatti scrivere una risposta» e il testo viene messo insieme leggendo quegli stessi capitoli. La domanda passa da un servizio esterno solo quando premi quel pulsante; nomi di persone, indirizzi email e numeri di telefono vengono tolti prima dell\'invio, e l\'orario della tua scuola non esce mai.',
+      'Assistente della guida: il pannello «💬 Serve aiuto?» ora può reggere una conversazione. La ricerca nei capitoli resta com\'è: gratis, senza limiti e dentro il tuo browser. In più, con l\'abbonamento annuale, puoi fare domande a parole tue e farti rispondere: scrivi, leggi la risposta, incalza con un\'altra domanda, fino a cinque per conversazione. Sotto ogni risposta trovi i capitoli da cui è stata presa. L\'abbonamento si attiva una volta sola incollando nel pannello la chiave che ricevi al momento dell\'acquisto. La conversazione non viene salvata da nessuna parte: se vuoi tenerla, il pulsante «Scarica» te la mette in un file sul tuo computer. Verso il servizio esterno partono solo le tue domande, ripulite da nomi, email e numeri, e i capitoli della guida: l\'orario della tua scuola non esce mai.',
     ],
   },
   {

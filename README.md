@@ -57,21 +57,23 @@ tabella di sinonimi con cui i docenti pongono le domande (*maestra* →
 `src/guidaContenuti.tsx`, l'indice si ricostruisce da solo. Se una funzione
 dell'app non è documentata nella guida, l'assistente non può rispondere.
 
-### Risposta scritta da un modello linguistico (facoltativa)
+### Conversazione con un modello linguistico (facoltativa)
 
-Sopra i risultati può comparire il pulsante **✨ Fatti scrivere una risposta**:
-manda la domanda e i capitoli già trovati a `/api/assistente`, che li gira a un
-modello linguistico e restituisce una risposta discorsiva. Il pulsante compare
-solo se l'endpoint è configurato; senza chiave sul server il pannello resta
-quello di prima, tutto locale. La ricerca nei capitoli è sempre gratuita e
-senza limiti; la risposta scritta è un servizio in abbonamento (vedi sotto).
+Quando l'endpoint è configurato, e per gli abbonati, il pannello diventa una
+chat: la persona scrive una domanda a parole sue, il modello risponde leggendo
+i capitoli della guida, si può incalzare fino a `ASSISTENTE_MAX_TURNI` volte
+per conversazione. Sotto ogni risposta ci sono i capitoli da cui è stata presa.
+La conversazione vive solo nella pagina: non è salvata né in `localStorage` né
+altrove, e il pulsante «Scarica» la esporta in un file Markdown. Senza endpoint
+configurato resta la sola ricerca locale. La ricerca nei capitoli è sempre
+gratuita e senza limiti; la chat è un servizio in abbonamento (vedi sotto).
 
 La chiamata passa da una funzione serverless e non dal browser per tre motivi:
 la chiave resta lato server (nel bundle sarebbe leggibile da chiunque), il
 numero di domande al giorno si può contare davvero, e i nomi propri si tolgono
-dalla domanda prima che esca. Verso il modello vanno solo la domanda ripulita e
-il testo della guida, che è pubblico: l'orario della scuola, le classi e i
-docenti non passano mai di lì.
+da ogni riga scritta dalla persona prima che esca. Verso il modello vanno solo
+lo scambio ripulito e il testo della guida, che è pubblico: l'orario della
+scuola, le classi e i docenti non passano mai di lì.
 
 Il freno di spesa è il conteggio in `api/_limite.ts`, non gli avvisi di budget
 del fornitore, che mandano una mail e non fermano niente. Il conteggio usa
@@ -88,7 +90,8 @@ Il motore si cambia da variabile d'ambiente, senza toccare il codice:
 | `OPENAI_API_KEY` | chiave, se il motore è `openai` | nessuno |
 | `OPENAI_BASE_URL` | per Groq, OpenRouter, DeepSeek, Mistral… | OpenAI |
 | `ANTHROPIC_API_KEY` | chiave, se il motore è `anthropic` | nessuno |
-| `ASSISTENTE_LIMITE_GIORNO` | domande al giorno per persona | `40` |
+| `ASSISTENTE_MAX_TURNI` | domande per conversazione | `5` |
+| `ASSISTENTE_LIMITE_GIORNO` | domande al giorno per persona | `50` |
 | `ASSISTENTE_LIMITE_IP` | domande al giorno per indirizzo | 10 volte il precedente |
 | `ASSISTENTE_LIMITE_GLOBALE` | domande al giorno per tutta l'app | `3000` |
 | `ASSISTENTE_MAX_TOKEN` | lunghezza massima della risposta | `500` |
@@ -110,17 +113,20 @@ un piano a pagamento.
 
 ### Abbonamento
 
-La risposta scritta è un servizio in abbonamento annuale. Con
+La chat è un servizio in abbonamento annuale. Con
 `ASSISTENTE_RICHIEDE_LICENZA=1` l'endpoint pretende una chiave di licenza
 LemonSqueezy valida prima di ogni risposta: la convalida `api/_licenza.ts`
-chiamando l'endpoint pubblico `/v1/licenses/validate` (nessuna chiave API del
-negozio), con una cache in memoria e, se LemonSqueezy non risponde, si lascia
-passare chi poco prima era in regola. Quando l'abbonamento non viene rinnovato
-LemonSqueezy segna la chiave come scaduta e la convalida comincia a rifiutarla
-da sola. Senza la variabile, o con un valore diverso da `1`, l'assistente
-risponde a tutti: serve a provare la qualità dei modelli prima di montare il
-pagamento. La chiave si incolla una volta sola nel pannello e resta nel
-browser (`localStorage`). I tetti di `api/_limite.ts` valgono comunque.
+mandando una richiesta `x-www-form-urlencoded` all'endpoint pubblico
+`/v1/licenses/validate` (nessuna chiave API del negozio), con una cache in
+memoria e, se LemonSqueezy non risponde, si lascia passare chi poco prima era
+in regola. Quando l'abbonamento non viene rinnovato LemonSqueezy segna la
+chiave come scaduta e la convalida comincia a rifiutarla da sola. Senza la
+variabile, o con un valore diverso da `1`, l'assistente risponde a tutti:
+serve a provare la qualità dei modelli prima di montare il pagamento. La
+chiave si incolla una volta sola nel pannello e resta nel browser
+(`localStorage`). I tetti di `api/_limite.ts` valgono comunque: con la chat una
+conversazione piena pesa `ASSISTENTE_MAX_TURNI` chiamate, e il predefinito di
+50 domande al giorno per persona equivale a una decina di conversazioni.
 
 ## Sviluppo
 

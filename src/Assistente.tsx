@@ -1,33 +1,30 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { cerca, DOMANDE_SUGGERITE, NUMERO_CAPITOLI } from './guidaIndice';
 import Feedback from './Feedback';
+import AssistenteChat from './AssistenteChat';
 import {
-  chiediAllIA,
   statoIA,
   leggiLicenza,
   salvaLicenza,
-  ErroreLicenza,
+  MAX_TURNI,
   type StatoIA,
 } from './assistenteIA';
 
 /**
  * Dove si compra l'abbonamento all'assistente IA. Da sostituire con il link di
- * checkout LemonSqueezy del prodotto «EduTime Pro - Assistente IA».
+ * checkout LemonSqueezy del prodotto «EduTime Pro · Assistente IA».
  */
 const LINK_ABBONAMENTO = 'https://biscottodigitale.com/app/edutime-pro/';
 
 /**
- * Assistente della guida: pannello di aiuto che risponde a domande in
- * italiano pescando dai capitoli della guida.
+ * Assistente della guida: pannello di aiuto in basso a destra.
  *
- * La ricerca funziona interamente nel browser, senza modelli linguistici né
- * chiamate di rete: la domanda non lascia il dispositivo.
+ * Base gratuita per tutti: una ricerca fra i capitoli della guida che gira
+ * interamente nel browser, senza modelli linguistici né rete.
  *
- * Sopra i risultati c'è un di più facoltativo: il pulsante «Fatti scrivere una
- * risposta» manda la domanda e i capitoli trovati a /api/assistente, che li
- * gira a un modello linguistico. Parte solo se lo si preme, e compare solo
- * se l'endpoint è configurato: senza chiave sul server il pannello resta
- * quello di prima, tutto locale.
+ * Per gli abbonati (o quando ASSISTENTE_RICHIEDE_LICENZA è spento) il pannello
+ * diventa una conversazione con un modello linguistico: vedi `AssistenteChat`.
+ * Senza endpoint configurato sul server, resta la sola ricerca.
  */
 
 interface Props {
@@ -47,23 +44,21 @@ export default function Assistente({ inGuida = false }: Props) {
   const haDomanda = domanda.trim().length > 0;
 
   const [ia, setIa] = useState<StatoIA | null>(null);
-  const [risposta, setRisposta] = useState('');
-  const [inAttesa, setInAttesa] = useState(false);
-  const [erroreIa, setErroreIa] = useState('');
-  const [rimaste, setRimaste] = useState<number | null>(null);
 
   // La chiave di abbonamento vive su questo browser. Il campo per incollarla
-  // compare da solo quando il server la chiede e non ce n'è una, oppure
-  // quando l'utente vuole cambiarla, oppure quando il server l'ha rifiutata.
+  // compare quando il server la chiede e non ce n'è una, quando l'utente vuole
+  // cambiarla, o quando il server l'ha rifiutata a metà conversazione.
   const [licenza, setLicenza] = useState(() => leggiLicenza());
   const [bozzaLicenza, setBozzaLicenza] = useState('');
   const [campoLicenzaAperto, setCampoLicenzaAperto] = useState(false);
+  const [avvisoLicenza, setAvvisoLicenza] = useState('');
 
   const iaAttiva = Boolean(ia?.disponibile);
   const serveLicenza = Boolean(ia?.richiedeLicenza);
   const haLicenza = licenza.length > 0;
   const mostraCampoLicenza =
     serveLicenza && (campoLicenzaAperto || !haLicenza);
+  const modalitaChat = iaAttiva && !mostraCampoLicenza;
 
   const attivaLicenza = () => {
     const pulita = bozzaLicenza.trim();
@@ -72,11 +67,16 @@ export default function Assistente({ inGuida = false }: Props) {
     setLicenza(pulita);
     setBozzaLicenza('');
     setCampoLicenzaAperto(false);
-    setErroreIa('');
+    setAvvisoLicenza('');
   };
 
-  // Si chiede al server se l'assistente IA è acceso solo quando qualcuno
-  // apre davvero il pannello, e una volta sola per visita.
+  const apriCampoLicenza = () => {
+    setBozzaLicenza(licenza);
+    setCampoLicenzaAperto(true);
+  };
+
+  // Si chiede al server se l'assistente IA è acceso solo quando qualcuno apre
+  // davvero il pannello, e una volta sola per visita.
   useEffect(() => {
     if (!aperto || ia) return;
     let vivo = true;
@@ -88,33 +88,9 @@ export default function Assistente({ inGuida = false }: Props) {
     };
   }, [aperto, ia]);
 
-  // Cambiata la domanda, la vecchia risposta non c'entra più niente.
   useEffect(() => {
-    setRisposta('');
-    setErroreIa('');
-  }, [domanda]);
-
-  const chiediRisposta = async () => {
-    if (inAttesa) return;
-    setInAttesa(true);
-    setErroreIa('');
-    setRisposta('');
-    try {
-      const esito = await chiediAllIA(domanda.trim(), risultati);
-      setRisposta(esito.risposta);
-      setRimaste(esito.rimaste);
-    } catch (e) {
-      setErroreIa(e instanceof Error ? e.message : 'Errore imprevisto.');
-      // Chiave rifiutata o assente: riapri il campo così si può correggere.
-      if (e instanceof ErroreLicenza) setCampoLicenzaAperto(true);
-    } finally {
-      setInAttesa(false);
-    }
-  };
-
-  useEffect(() => {
-    if (aperto) inputRef.current?.focus();
-  }, [aperto]);
+    if (aperto && !modalitaChat) inputRef.current?.focus();
+  }, [aperto, modalitaChat]);
 
   useEffect(() => {
     if (!aperto) return;
@@ -168,16 +144,15 @@ export default function Assistente({ inGuida = false }: Props) {
       role="dialog"
       aria-modal="false"
       aria-label="Assistente della guida"
-      className="fixed bottom-5 right-5 left-5 sm:left-auto z-50 print:hidden w-auto sm:w-[400px] max-h-[75vh] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+      className="fixed bottom-5 right-5 left-5 sm:left-auto z-50 print:hidden w-auto sm:w-[400px] h-[75vh] max-h-[560px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
     >
       <div className="bg-gradient-to-r from-brand-700 via-brand-800 to-brand-950 text-white px-4 py-3 flex items-start justify-between gap-3 shrink-0">
         <div>
           <p className="font-bold text-sm">Assistente della guida</p>
           <p className="text-[11px] text-brand-200 mt-0.5">
-            Cerca fra i {NUMERO_CAPITOLI} capitoli ·{' '}
-            {iaAttiva
-              ? 'la ricerca resta nel tuo browser'
-              : 'tutto nel tuo browser'}
+            {modalitaChat
+              ? `Conversa sull'uso dell'app · ${NUMERO_CAPITOLI} capitoli`
+              : `Cerca fra i ${NUMERO_CAPITOLI} capitoli · tutto nel tuo browser`}
           </p>
         </div>
         <button
@@ -190,30 +165,42 @@ export default function Assistente({ inGuida = false }: Props) {
         </button>
       </div>
 
-      <div className="p-3 border-b border-slate-200 shrink-0">
-        <input
-          ref={inputRef}
-          type="search"
-          value={domanda}
-          onChange={(e) => setDomanda(e.target.value)}
-          placeholder="Scrivi la tua domanda…"
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+      {modalitaChat ? (
+        <AssistenteChat
+          inGuida={inGuida}
+          onLicenzaRifiutata={(messaggio) => {
+            setAvvisoLicenza(messaggio);
+            apriCampoLicenza();
+          }}
         />
-      </div>
+      ) : (
+        <>
+          <div className="p-3 border-b border-slate-200 shrink-0">
+            <input
+              ref={inputRef}
+              type="search"
+              value={domanda}
+              onChange={(e) => setDomanda(e.target.value)}
+              placeholder="Scrivi la tua domanda…"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
 
-      <div className="overflow-y-auto p-3 flex flex-col gap-3">
-        {haDomanda && iaAttiva && (
-          <div className="border border-brand-200 bg-brand-50 rounded-xl p-3">
-            {!risposta && !inAttesa && mostraCampoLicenza && (
-              <>
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-3">
+            {iaAttiva && mostraCampoLicenza && (
+              <div className="border border-brand-200 bg-brand-50 rounded-xl p-3">
                 <p className="text-sm font-bold text-brand-800">
-                  ✨ La risposta scritta è per gli abbonati
+                  ✨ La chat con l'assistente è per gli abbonati
                 </p>
                 <p className="text-[11px] text-slate-600 mt-1 leading-snug">
                   La ricerca nei capitoli qui sotto resta gratis e senza limiti.
-                  In più, con l'abbonamento annuale, l'assistente ti mette
-                  insieme una risposta a parole sue leggendo quei capitoli.
+                  Con l'abbonamento annuale puoi anche fare domande a parole tue
+                  e ricevere una risposta scritta, in una conversazione fino a{' '}
+                  {MAX_TURNI} domande.
                 </p>
+                {avvisoLicenza && (
+                  <p className="text-xs text-fucsia-600 mt-2">{avvisoLicenza}</p>
+                )}
                 <input
                   type="text"
                   value={bozzaLicenza}
@@ -254,147 +241,104 @@ export default function Assistente({ inGuida = false }: Props) {
                     Annulla
                   </button>
                 )}
-              </>
-            )}
-
-            {!risposta && !inAttesa && !mostraCampoLicenza && (
-              <>
-                <button
-                  type="button"
-                  onClick={chiediRisposta}
-                  className="w-full text-sm font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg px-3 py-2"
-                >
-                  ✨ Fatti scrivere una risposta
-                </button>
-                <p className="text-[10px] text-slate-500 mt-2 leading-snug">
-                  La domanda e i capitoli qui sotto vengono inviati a un modello
-                  linguistico esterno, che compone la risposta. Nomi di persone,
-                  email e numeri di telefono vengono tolti prima dell'invio.
-                  L'orario della tua scuola non parte mai.
-                </p>
-                {serveLicenza && haLicenza && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBozzaLicenza(licenza);
-                      setCampoLicenzaAperto(true);
-                    }}
-                    className="text-[10px] text-slate-400 underline mt-1.5"
-                  >
-                    Abbonamento attivo · cambia chiave
-                  </button>
-                )}
-              </>
-            )}
-
-            {inAttesa && (
-              <p className="text-sm text-brand-800 font-semibold">
-                Sto leggendo la guida…
-              </p>
-            )}
-
-            {risposta && (
-              <>
-                <p className="text-[10px] uppercase font-bold text-brand-700">
-                  Risposta scritta dall'assistente
-                </p>
-                <p className="text-sm text-slate-800 mt-1.5 leading-relaxed whitespace-pre-wrap">
-                  {risposta}
-                </p>
-                <p className="text-[10px] text-slate-500 mt-2 leading-snug">
-                  Scritta da un modello linguistico a partire dai capitoli qui
-                  sotto: se qualcosa non torna, sono quelli che fanno fede.
-                  {rimaste !== null && ` Ti restano ${rimaste} domande oggi.`}
-                </p>
-              </>
-            )}
-
-            {erroreIa && (
-              <p className="text-sm text-fucsia-600 mt-2">{erroreIa}</p>
-            )}
-          </div>
-        )}
-
-        {!haDomanda && (
-          <>
-            <p className="text-xs text-slate-500">
-              Domande frequenti — oppure scrivi la tua con parole tue:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {DOMANDE_SUGGERITE.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDomanda(d)}
-                  className="text-xs bg-slate-100 hover:bg-brand-50 hover:text-brand-800 border border-slate-200 rounded-full px-3 py-1.5 text-left"
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        {haDomanda && risultati.length === 0 && (
-          <div className="text-sm text-slate-600">
-            <p className="font-semibold text-slate-800">
-              Non ho trovato niente su questo.
-            </p>
-            <p className="mt-2">
-              Prova con parole diverse (per esempio «cattedre», «conflitti»,
-              «stampa», «backup») oppure sfoglia la guida completa.
-            </p>
-            <a
-              href="/guida#introduzione"
-              {...propsLink}
-              onClick={(e) => vaiAlCapitolo(e, 'introduzione')}
-              className="inline-block mt-3 text-brand-700 font-semibold underline"
-            >
-              Apri la guida completa →
-            </a>
-          </div>
-        )}
-
-        {haDomanda &&
-          risultati.map((r) => (
-            <div
-              key={r.voce.id}
-              className="border border-slate-200 rounded-xl p-3 bg-slate-50"
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <h3 className="font-bold text-slate-900 text-sm">
-                  {r.voce.titolo}
-                </h3>
-                {r.voce.tag && (
-                  <span className="text-[10px] uppercase font-bold text-slate-400 shrink-0">
-                    {r.voce.tag}
-                  </span>
-                )}
               </div>
-              <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
-                {r.estratto}
-              </p>
-              <a
-                href={`/guida#${r.voce.capitoloId}`}
-                {...propsLink}
-                onClick={(e) => vaiAlCapitolo(e, r.voce.capitoloId)}
-                className="inline-block mt-2 text-xs font-semibold text-brand-700 hover:text-brand-900 underline"
-              >
-                Capitolo {r.voce.capitoloNum} · {r.voce.capitoloTitolo} →
-              </a>
-            </div>
-          ))}
-      </div>
+            )}
+
+            {!haDomanda && (
+              <>
+                <p className="text-xs text-slate-500">
+                  Domande frequenti — oppure scrivi la tua con parole tue:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {DOMANDE_SUGGERITE.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setDomanda(d)}
+                      className="text-xs bg-slate-100 hover:bg-brand-50 hover:text-brand-800 border border-slate-200 rounded-full px-3 py-1.5 text-left"
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {haDomanda && risultati.length === 0 && (
+              <div className="text-sm text-slate-600">
+                <p className="font-semibold text-slate-800">
+                  Non ho trovato niente su questo.
+                </p>
+                <p className="mt-2">
+                  Prova con parole diverse (per esempio «cattedre», «conflitti»,
+                  «stampa», «backup») oppure sfoglia la guida completa.
+                </p>
+                <a
+                  href="/guida#introduzione"
+                  {...propsLink}
+                  onClick={(e) => vaiAlCapitolo(e, 'introduzione')}
+                  className="inline-block mt-3 text-brand-700 font-semibold underline"
+                >
+                  Apri la guida completa →
+                </a>
+              </div>
+            )}
+
+            {haDomanda &&
+              risultati.map((r) => (
+                <div
+                  key={r.voce.id}
+                  className="border border-slate-200 rounded-xl p-3 bg-slate-50"
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <h3 className="font-bold text-slate-900 text-sm">
+                      {r.voce.titolo}
+                    </h3>
+                    {r.voce.tag && (
+                      <span className="text-[10px] uppercase font-bold text-slate-400 shrink-0">
+                        {r.voce.tag}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
+                    {r.estratto}
+                  </p>
+                  <a
+                    href={`/guida#${r.voce.capitoloId}`}
+                    {...propsLink}
+                    onClick={(e) => vaiAlCapitolo(e, r.voce.capitoloId)}
+                    className="inline-block mt-2 text-xs font-semibold text-brand-700 hover:text-brand-900 underline"
+                  >
+                    Capitolo {r.voce.capitoloNum} · {r.voce.capitoloTitolo} →
+                  </a>
+                </div>
+              ))}
+          </div>
+        </>
+      )}
 
       <div className="text-[10px] text-slate-400 px-3 py-2 border-t border-slate-200 shrink-0">
         <p>
-          {iaAttiva
-            ? "Tutto viene dalla guida dell'app. La ricerca resta nel tuo browser; solo il pulsante ✨ manda la domanda in rete."
-            : "Risposte prese dalla guida dell'app. Nessun dato inviato in rete."}
+          {modalitaChat
+            ? "Le risposte le scrive un modello linguistico a partire dai capitoli della guida: se qualcosa non torna, fanno fede quelli. La conversazione non viene salvata."
+            : iaAttiva
+              ? 'La ricerca resta nel tuo browser.'
+              : "Risposte prese dalla guida dell'app. Nessun dato inviato in rete."}
         </p>
-        <p className="text-slate-500 mt-0.5">
-          Non hai trovato quello che cerchi? <Feedback />
-        </p>
+        <div className="text-slate-500 mt-0.5 flex flex-wrap gap-x-2">
+          {serveLicenza && haLicenza && !mostraCampoLicenza && (
+            <button
+              type="button"
+              onClick={apriCampoLicenza}
+              className="underline"
+            >
+              Abbonamento attivo · cambia chiave
+            </button>
+          )}
+          <span>
+            Non hai trovato quello che cerchi? <Feedback />
+          </span>
+        </div>
       </div>
     </div>
   );

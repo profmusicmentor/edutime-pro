@@ -2,9 +2,11 @@
  * Il lato browser dell'assistente IA: parla con /api/assistente.
  *
  * La ricerca nella guida resta quella locale di `guidaIndice`: gratuita,
- * istantanea e senza rete. Questa parte è un di più che si accende solo
- * quando la persona preme il pulsante, e manda in rete due cose sole: la
- * domanda e i capitoli di guida che la ricerca locale ha già scelto.
+ * istantanea e senza rete. Questa parte è un di più per gli abbonati: una
+ * conversazione a più battute con un modello linguistico. In rete vanno lo
+ * scambio finora e i capitoli di guida che la ricerca locale ha scelto per
+ * l'ultima domanda. La conversazione non viene salvata da nessuna parte:
+ * vive nella pagina finché è aperta.
  *
  * Nessuna chiave qui dentro. La chiave del modello vive su Vercel, dietro
  * l'endpoint: se stesse nel bundle sarebbe leggibile da chiunque apra gli
@@ -12,6 +14,14 @@
  */
 
 import type { Risultato } from './guidaIndice';
+
+/** Il numero massimo di domande per conversazione (allineato al server). */
+export const MAX_TURNI = 5;
+
+export interface Messaggio {
+  ruolo: 'user' | 'assistant';
+  testo: string;
+}
 
 const INDIRIZZO = '/api/assistente';
 
@@ -41,6 +51,12 @@ export interface RispostaIA {
  * invece di mostrarlo come un guasto qualsiasi.
  */
 export class ErroreLicenza extends Error {}
+
+/**
+ * Errore lanciato quando la conversazione ha esaurito le sue battute. Il
+ * pannello lo riconosce e propone di cominciarne una nuova.
+ */
+export class ErroreLimiteConversazione extends Error {}
 
 /** La chiave di abbonamento salvata su questo browser, o stringa vuota. */
 export const leggiLicenza = (): string => {
@@ -93,19 +109,21 @@ export function statoIA(): Promise<StatoIA> {
 }
 
 /**
- * Manda la domanda al modello, insieme ai capitoli trovati dalla ricerca
- * locale. Se qualcosa va storto lancia un Error con un messaggio già scritto
- * per essere mostrato così com'è.
+ * Manda la conversazione al modello, insieme ai capitoli trovati dalla ricerca
+ * locale per l'ultima domanda. `messaggi` va dal più vecchio al più recente e
+ * finisce con la riga `user` a cui rispondere adesso. Se qualcosa va storto
+ * lancia un Error con un messaggio già scritto per essere mostrato così com'è
+ * (o un ErroreLicenza / ErroreLimiteConversazione per i due casi speciali).
  */
-export async function chiediAllIA(
-  domanda: string,
+export async function chiediInChat(
+  messaggi: Messaggio[],
   risultati: Risultato[]
 ): Promise<RispostaIA> {
   const risposta = await fetch(INDIRIZZO, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      domanda,
+      messaggi,
       clientId: idCliente(),
       licenza: leggiLicenza(),
       contesto: risultati.map((r) => ({
@@ -121,6 +139,7 @@ export async function chiediAllIA(
     rimaste?: number;
     errore?: string;
     licenzaMancante?: boolean;
+    limiteConversazione?: boolean;
   } = {};
   try {
     dati = await risposta.json();
@@ -133,6 +152,9 @@ export async function chiediAllIA(
 
   if (risposta.status === 402 || dati.licenzaMancante) {
     throw new ErroreLicenza(messaggio);
+  }
+  if (risposta.status === 409 || dati.limiteConversazione) {
+    throw new ErroreLimiteConversazione(messaggio);
   }
 
   if (!risposta.ok || !dati.risposta) {
