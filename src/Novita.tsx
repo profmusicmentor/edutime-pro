@@ -86,7 +86,12 @@ export default function Novita({
 
   if (!aperto) return null;
 
-  const blocchi = modo === 'nuove' ? novitaNonLette() : NOVITA;
+  // In elenco i rilasci si leggono dal più vecchio al più recente, come
+  // una cronaca: `NOVITA` è ordinata al contrario, quindi si rovescia una
+  // copia e non l'array del modulo.
+  const blocchi = (modo === 'nuove' ? novitaNonLette() : NOVITA)
+    .slice()
+    .reverse();
   if (blocchi.length === 0) return null;
 
   return (

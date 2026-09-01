@@ -1,5 +1,6 @@
 /**
  * Elenco delle novità dell'app, dalla più recente alla più vecchia.
+ * Il pannello le mostra all'incontrario, dalla più vecchia alla più recente.
  *
  * `NOVITA_VERSIONE` è la firma dell'ultimo aggiornamento: quando cambia, chi
  * apre EduTime Pro vede una volta sola il pannello con le ultime modifiche.
