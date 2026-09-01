@@ -54,7 +54,7 @@ export const chapters: Chapter[] = [
             href="#primaria"
             className="text-brand-700 font-semibold underline"
           >
-            12 · Se lavori alla scuola primaria
+            13 · Se lavori alla scuola primaria
           </a>
           .
         </span>
@@ -267,7 +267,7 @@ export const chapters: Chapter[] = [
       {
         title: '🔄 Allinea Sostegno',
         tag: 'post-generazione',
-        body: 'Ricalcola solo le ore di sostegno: cancella le assegnazioni esistenti e le ricolloca negli slot dove c\'è già una materia del docente titolare della classe. Va eseguito dopo aver generato o modificato le materie.',
+        body: 'Ricalcola solo le ore di sostegno: cancella le assegnazioni esistenti e le ricolloca negli slot dove c\'è già una materia del docente titolare della classe, saltando le ore in cui il docente di sostegno è indisponibile. Va eseguito dopo aver generato o modificato le materie.',
       },
       {
         title: 'Stampa A3 📄',
@@ -1158,8 +1158,240 @@ export const chapters: Chapter[] = [
     ),
   },
   {
-    id: 'primaria',
+    id: 'sostegno',
     num: '12',
+    title: 'I docenti di sostegno',
+    intro: (
+      <>
+        Il sostegno non ha ore proprie sul tabellone: si appoggia alle lezioni
+        già in griglia, in compresenza con il docente titolare. Per questo il
+        suo orario si costruisce sempre <B>dopo</B> quello delle materie, e
+        un'ora di sostegno non aggiunge un'ora alla classe. Qui c'è tutto il
+        percorso in fila, dall'inserimento del docente alla verifica finale.
+      </>
+    ),
+    cards: [
+      {
+        title: "Come si imposta l'orario di sostegno",
+        tag: 'i quattro passi',
+        body: (
+          <Ul
+            items={[
+              <>
+                Inserisci il docente scegliendo <B>Tipo: Sostegno</B>, nel
+                riquadro ➕ Inserimento Rapido dell'Orario Generale.
+              </>,
+              <>
+                Scrivi le ore settimanali classe per classe nel Registro
+                Cattedre, sotto-scheda <B>🤝 Sostegno</B>.
+              </>,
+              <>
+                Metti giorno libero e indisponibilità in «Sezioni &amp;
+                Regole», dove il docente di sostegno compare come gli altri.
+              </>,
+              <>
+                Premi <B>✨ Auto-Genera Orario</B> con la spunta{' '}
+                <B>Sostegno</B> attiva, poi controlla nella vista Sostegno.
+              </>,
+            ]}
+          />
+        ),
+      },
+      {
+        title: '1 · Inserisci il docente di sostegno',
+        tag: 'anagrafica',
+        body: (
+          <>
+            <p>
+              Vai in <B>Orario Generale</B>: sotto la tabella c'è il riquadro{' '}
+              <B>➕ Inserimento Rapido</B>. Scrivi cognome e nome, scegli{' '}
+              <B>Sostegno</B> nel menu a tendina e premi <B>Aggiungi Staff</B>.
+            </p>
+            <p className="mt-2">
+              Il campo <B>Materia/Strumento</B> va compilato lo stesso, anche se
+              per il sostegno non serve a niente: scrivi «Sostegno» e vai
+              avanti, l'app registra comunque la materia SOSTEGNO. Se lo lasci
+              vuoto il pulsante non fa nulla e sembra rotto.
+            </p>
+            <p className="mt-2">
+              Da quel momento il docente compare nella sotto-scheda{' '}
+              <B>🤝 Sostegno</B> del Registro Cattedre e negli elenchi di
+              «Sezioni &amp; Regole».
+            </p>
+          </>
+        ),
+      },
+      {
+        title: '2 · Le ore di sostegno, classe per classe',
+        tag: 'registro cattedre',
+        body: (
+          <>
+            <p>
+              <B>Registro Cattedre</B> → sotto-scheda <B>🤝 Sostegno</B>. Nella
+              riga del docente scrivi le ore settimanali sotto ogni classe in
+              cui segue un alunno: chi è diviso su tre classi ha tre numeri, uno
+              per colonna. Il <B>Totale</B> a inizio riga si aggiorna da solo, e
+              il pulsante <B>➕</B> in fondo alla riga fa la stessa cosa da un
+              modulo.
+            </p>
+            <p className="mt-2">
+              Due differenze rispetto ai docenti di materia: qui non c'è la
+              colonna delle supplenze, perché fra i sostituti l'app propone i
+              docenti curricolari; e la casella <B>2h</B> non ha effetto sul
+              sostegno, perché le sue ore seguono le lezioni della classe e non
+              si possono scegliere a coppie.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: '3 · Giorno libero e indisponibilità',
+        tag: 'sezioni & regole',
+        body: (
+          <>
+            <p>
+              I docenti di sostegno stanno negli elenchi di «Sezioni &amp;
+              Regole» come tutti gli altri: <B>🌴 Indisponibilità</B> per il
+              giorno libero e per le ore singole, <B>⏱️ Limite ore buca</B> per
+              il singolo docente. Vale anche il tetto{' '}
+              <B>📆 Massimo ore al giorno</B>.
+            </p>
+            <p className="mt-2">
+              Sia <B>✨ Auto-Genera Orario</B> sia <B>🔄 Allinea Sostegno</B>{' '}
+              saltano le ore in cui il docente è indisponibile. Il tetto{' '}
+              <B>📆 Massimo ore al giorno</B> invece lo controlla solo la
+              generazione: se usi Allinea Sostegno su un docente con molte ore,
+              dai un'occhiata alla vista Sostegno.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: '4 · Genera',
+        tag: 'auto-generazione',
+        body: (
+          <>
+            <p>
+              In «Sezioni &amp; Regole», dentro <B>⚡ Cosa Generare</B>, tieni
+              spuntato <B>Sostegno</B>. Poi premi <B>✨ Auto-Genera Orario</B>:
+              l'app piazza prima le materie, poi appoggia le ore di sostegno
+              sulle lezioni della classe assegnata, salta le ore in cui il
+              docente è indisponibile o ha già raggiunto il tetto giornaliero e
+              non lo mette mai in due classi nella stessa ora.
+            </p>
+            <p className="mt-2">
+              Il report di fine generazione conta le materie e le compresenze,
+              non le ore di sostegno: se qualcuna resta fuori non compare
+              nessun avviso, e te ne accorgi solo guardando la vista Sostegno.
+              Capita quando la classe ha meno lezioni delle ore da coprire o
+              quando il giorno libero taglia via troppe ore utili.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: '🔄 Allinea Sostegno: quando premerlo',
+        tag: 'dopo le modifiche a mano',
+        body: (
+          <>
+            <p>
+              Se sposti le materie a mano, le ore di sostegno restano dov'erano
+              e possono finire su una cella diventata vuota. Il pulsante nella
+              barra in alto cancella tutte le ore di sostegno e le rimette sulle
+              lezioni di adesso, senza toccare le materie.
+            </p>
+            <p className="mt-2">
+              Tre cose da sapere: lavora solo dove la classe ha già una materia,
+              salta le ore in cui il docente è indisponibile ma non guarda il
+              tetto di ore al giorno, e non mostra nessun riepilogo di fine
+              lavoro. È lo strumento giusto dopo una sistemata alle materie, non
+              un sostituto della generazione.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: 'Aggiungere o togliere una singola ora',
+        tag: 'vista classe',
+        body: (
+          <>
+            <p>
+              Per il caso isolato non serve rigenerare tutto: in{' '}
+              <B>Viste Singole</B> → vista <B>Classe</B> clicca la cella e usa{' '}
+              <B>Assegna Sostegno</B>. Nell'elenco chi ha il giorno libero in
+              quell'ora è spento e marcato <B>NON DISP.</B>, chi è già impegnato
+              altrove porta l'etichetta <B>Occupato</B>. Dalla stessa finestra
+              si toglie l'assegnazione.
+            </p>
+            <p className="mt-2">
+              Ricorda che il sostegno va su un'ora in cui la classe ha già
+              lezione: è una compresenza, non un'ora in più nell'orario della
+              classe.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: 'Dove si controlla il risultato',
+        tag: 'verifica',
+        body: (
+          <Ul
+            items={[
+              <>
+                Vista <B>Sostegno</B>: per ogni ora, in quale classe il docente
+                è in compresenza. È il controllo più veloce.
+              </>,
+              <>
+                Vista <B>Classe</B>: la cella mostra materia, docente titolare e
+                sostegno affiancato.
+              </>,
+              <>
+                Scheda <B>Conflitti</B>: segnala il docente di sostegno che
+                risulta in due classi nella stessa ora.
+              </>,
+              <>
+                Vista <B>Equità</B>: conta ore buco, entrate posticipate e
+                uscite anticipate anche per i docenti di sostegno.
+              </>,
+            ]}
+          />
+        ),
+      },
+      {
+        title: 'Il sostegno e le sostituzioni',
+        tag: 'copertura',
+        body: (
+          <>
+            <p>
+              Quando manca un docente curricolare e in quell'ora la classe ha
+              già il sostegno, la scheda Sostituzioni scrive{' '}
+              <B>✅ Coperta da sostegno</B> e non chiede altro.
+            </p>
+            <p className="mt-2">
+              Al contrario, l'assenza di un docente di sostegno non si può
+              ancora registrare: nel modulo delle assenze compaiono solo i
+              docenti di materia. Per ora quelle ore si gestiscono fuori
+              dall'app.
+            </p>
+          </>
+        ),
+      },
+    ],
+    note: {
+      title: "L'ordine giusto, in tre righe",
+      body: (
+        <>
+          Prima le cattedre di materia, poi <B>✨ Auto-Genera Orario</B> con la
+          spunta Sostegno attiva, infine i controlli. Ogni volta che rimetti
+          mano alle materie ripassa da <B>🔄 Allinea Sostegno</B> e ricontrolla
+          la vista Sostegno.
+        </>
+      ),
+    },
+  },
+  {
+    id: 'primaria',
+    num: '13',
     title: 'Se lavori alla scuola primaria',
     intro: (
       <>
@@ -1315,7 +1547,7 @@ export const chapters: Chapter[] = [
   },
   {
     id: 'concetti',
-    num: '13',
+    num: '14',
     title: 'Concetti chiave',
     intro: <>Il bignami da tenere sotto mano mentre lavori.</>,
     cards: [
@@ -1438,7 +1670,7 @@ export const chapters: Chapter[] = [
   },
   {
     id: 'trasparenza',
-    num: '14',
+    num: '15',
     title: 'Trasparenza e privacy',
     intro: (
       <>

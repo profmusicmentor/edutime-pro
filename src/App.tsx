@@ -4659,6 +4659,12 @@ export default function App() {
         const shuffled = [...classMaterie].sort(() => Math.random() - 0.5);
         for (let slot of shuffled) {
           if (placed >= assign.hours) break;
+          // Giorno libero e ore bloccate valgono anche qui. Prima questo
+          // pulsante ricollocava alla cieca e poteva riportare a scuola un
+          // docente nel suo giorno libero, al contrario dell'auto-generazione
+          // che quelle ore le salta.
+          if (isTeacherOff(generationRules, sos.id, slot.day, slot.hour))
+            continue;
           const isBusy = newTimetable.some(
             (s) =>
               s.teacherId === sos.id &&

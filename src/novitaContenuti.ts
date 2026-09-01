@@ -21,7 +21,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-09-01b';
+export const NOVITA_VERSIONE = '2026-09-01c';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -33,6 +33,14 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-01c',
+    data: '1 settembre 2026',
+    voci: [
+      '«🔄 Allinea Sostegno» ora rispetta il giorno libero. Prima ricollocava le ore alla cieca e poteva rimettere un docente di sostegno a scuola nel suo giorno libero o in un\'ora che aveva bloccato, mentre l\'auto-generazione quelle ore le saltava già: adesso i due pulsanti si comportano allo stesso modo.',
+      'Nuovo capitolo della guida: «I docenti di sostegno». Finora il sostegno era spiegato a pezzi, sparso fra il Registro Cattedre, la barra in alto e le viste, e chi lo chiedeva all\'assistente non trovava una risposta sola. Ora c\'è il percorso intero in fila: come si inserisce il docente, come si scrivono le ore classe per classe, dove si mettono giorno libero e indisponibilità, cosa fa davvero «🔄 Allinea Sostegno» e dove si controlla il risultato. Ci sono scritte anche tre cose che prima si scoprivano per prova: la casella «2h» non ha effetto sulle ore di sostegno, il report di fine generazione non conta quelle ore, e l\'assenza di un docente di sostegno non si può ancora registrare nelle Sostituzioni.',
+    ],
+  },
   {
     versione: '2026-09-01b',
     data: '1 settembre 2026',
