@@ -11,10 +11,25 @@ import {
 } from './assistenteIA';
 
 /**
- * Dove si compra l'abbonamento all'assistente IA. Da sostituire con il link di
- * checkout LemonSqueezy del prodotto «EduTime Pro · Assistente IA».
+ * Dove si compra l'abbonamento all'assistente IA: il checkout LemonSqueezy del
+ * prodotto «EduTime Pro · Assistente IA». Link diretto e non `?embed=1`: la
+ * finestra sovrapposta di LemonSqueezy vuole il suo `lemon.js` nella pagina, e
+ * qui non serve caricare uno script esterno per aprire una scheda.
  */
-const LINK_ABBONAMENTO = 'https://biscottodigitale.com/app/edutime-pro/';
+const LINK_ABBONAMENTO =
+  'https://biscottodigitale.lemonsqueezy.com/checkout/buy/179a5734-074d-48cb-9eec-ee9b25c9e77a';
+
+/** Prezzo dell'abbonamento annuale, scritto in un posto solo. */
+const PREZZO_ABBONAMENTO = "9,90 € l'anno";
+
+/**
+ * Fino a questa data la chat è aperta a tutti: il server ha
+ * ASSISTENTE_RICHIEDE_LICENZA spento e chiunque può provarla. La striscia qui
+ * sotto lo dice, perché una prova che non si sa di avere non fa comprare
+ * niente. Quando l'interruttore si accende, `serveLicenza` diventa vero, la
+ * striscia sparisce da sola e al suo posto arriva il pannello della chiave.
+ */
+const FINE_PROVA = '5 settembre';
 
 /**
  * Assistente della guida: pannello di aiuto in basso a destra.
@@ -166,13 +181,33 @@ export default function Assistente({ inGuida = false }: Props) {
       </div>
 
       {modalitaChat ? (
-        <AssistenteChat
-          inGuida={inGuida}
-          onLicenzaRifiutata={(messaggio) => {
-            setAvvisoLicenza(messaggio);
-            apriCampoLicenza();
-          }}
-        />
+        <>
+          {!serveLicenza && (
+            <div className="shrink-0 bg-brand-50 border-b border-brand-200 px-3 py-2 flex items-center gap-2">
+              <p className="text-[11px] text-slate-700 leading-snug flex-1">
+                ✨ <strong className="text-brand-800">Prova gratuita</strong>{' '}
+                fino al {FINE_PROVA}. Poi la chat con l'assistente è per gli
+                abbonati: {PREZZO_ABBONAMENTO}. La ricerca nei capitoli resta
+                gratis per sempre.
+              </p>
+              <a
+                href={LINK_ABBONAMENTO}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 text-[11px] font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg px-3 py-2"
+              >
+                Abbonati
+              </a>
+            </div>
+          )}
+          <AssistenteChat
+            inGuida={inGuida}
+            onLicenzaRifiutata={(messaggio) => {
+              setAvvisoLicenza(messaggio);
+              apriCampoLicenza();
+            }}
+          />
+        </>
       ) : (
         <>
           <div className="p-3 border-b border-slate-200 shrink-0">
@@ -194,9 +229,9 @@ export default function Assistente({ inGuida = false }: Props) {
                 </p>
                 <p className="text-[11px] text-slate-600 mt-1 leading-snug">
                   La ricerca nei capitoli qui sotto resta gratis e senza limiti.
-                  Con l'abbonamento annuale puoi anche fare domande a parole tue
-                  e ricevere una risposta scritta, in una conversazione fino a{' '}
-                  {MAX_TURNI} domande.
+                  Con l'abbonamento annuale ({PREZZO_ABBONAMENTO}) puoi anche
+                  fare domande a parole tue e ricevere una risposta scritta, in
+                  una conversazione fino a {MAX_TURNI} domande.
                 </p>
                 {avvisoLicenza && (
                   <p className="text-xs text-fucsia-600 mt-2">{avvisoLicenza}</p>

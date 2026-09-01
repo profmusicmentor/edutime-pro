@@ -20,7 +20,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-08-31c';
+export const NOVITA_VERSIONE = '2026-09-01';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -32,6 +32,13 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-01',
+    data: '1 settembre 2026',
+    voci: [
+      'L\'assistente che risponde a parole tue è acceso, e fino al 5 settembre lo puoi provare senza pagare niente. Apri «💬 Serve aiuto?» in basso a destra e scrivi la domanda come la diresti a un collega: «un docente è assente, come organizzo la supplenza?», «perché la generazione lascia ore scoperte?». L\'assistente legge i 14 capitoli della guida e ti risponde in poche righe, con sotto i capitoli da cui ha preso la risposta, e puoi incalzarlo fino a cinque volte di fila. Dal 5 settembre questa parte diventa un abbonamento annuale da 9,90 €, con la chiave da incollare una volta sola nel pannello. La ricerca nei capitoli, quella che hai sempre usato, resta gratis e senza limiti anche dopo. Le tue domande escono ripulite da nomi, email e numeri; l\'orario della tua scuola non esce mai.',
+    ],
+  },
   {
     versione: '2026-08-31c',
     data: '31 agosto 2026',
