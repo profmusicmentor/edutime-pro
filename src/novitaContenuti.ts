@@ -21,7 +21,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-09-01d';
+export const NOVITA_VERSIONE = '2026-09-01e';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -33,6 +33,14 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-01e',
+    data: '1 settembre 2026',
+    voci: [
+      'Nella scheda «🧑\u200d🏫 Consigli di classe» c\'è il pulsante «Importa da PDF 📄»: se gli elenchi dei docenti classe per classe esistono già in un PDF, non serve più ribatterli a mano. Il file si apre dentro il browser e non esce dal computer. L\'app riconosce gli elenchi a blocchi («CLASSE 1A» e sotto i nomi) e quelli a righe («ROSSI MARIO - Lettere - 1A, 2A»), e vanno bene anche un TXT, un CSV o il testo incollato. Prima di scrivere qualcosa compare l\'anteprima: ogni nome ha la sua spunta, quelli già presenti in app sono segnati come tali e i nomi nuovi vengono creati nel Registro Cattedre con materia «DA COMPLETARE», senza ore e senza entrare nella generazione dell\'orario. Reimportare lo stesso file non crea doppioni.',
+      'Se il PDF è fatto a tabelle strane e l\'app non ne cava niente, compare «Fammi aiutare dall\'IA»: fa rileggere il testo a un modello linguistico e fa parte dell\'abbonamento, come l\'assistente della Guida. Parte solo dopo una spunta, mai da sola, perché è l\'unico punto dell\'app in cui i nomi dei docenti escono davvero dal computer e arrivano alla società che gestisce il modello. La lettura fatta dall\'app, invece, non manda niente a nessuno. Nella guida c\'è il capitolo nuovo «Scheda: Consigli di classe» con tutto il percorso.',
+    ],
+  },
   {
     versione: '2026-09-01d',
     data: '1 settembre 2026',

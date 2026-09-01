@@ -12,6 +12,7 @@
  * solo. Nel documento restano solo l'elenco dei consigli e la configurazione.
  */
 import { useMemo, useState } from 'react';
+import ImportaDocenti from './ImportaDocenti';
 import { buildXlsx } from './xlsxWriter';
 import type { XlsxRow, XlsxSheet, XlsxStyle } from './xlsxWriter';
 
@@ -352,6 +353,19 @@ interface Props {
     consigli?: ConsiglioClasse[];
     config?: ConsigliConfig;
   }) => void;
+  /**
+   * Riceve il risultato dell'import da PDF: i consigli già uniti a quelli che
+   * c'erano, e i docenti che nell'app non esistevano e vanno creati. Sono due
+   * scritture diverse (i consigli e il registro dei docenti) e devono partire
+   * insieme, per questo non passano dal solito `onChange`. Se manca, il
+   * pulsante «Importa da PDF» non compare.
+   */
+  onImporta?: (
+    nuoviDocenti: { id: string; name: string }[],
+    nuoviConsigli: ConsiglioClasse[]
+  ) => void;
+  /** In sola lettura non si importa niente. */
+  readOnly?: boolean;
 }
 
 const inputCls =
@@ -367,6 +381,8 @@ export default function ConsigliClasse({
   consigli,
   config,
   onChange,
+  onImporta,
+  readOnly,
 }: Props) {
   const [subTab, setSubTab] = useState<'classi' | 'calendario' | 'docenti'>(
     'classi'
@@ -375,6 +391,7 @@ export default function ConsigliClasse({
   const [ricerca, setRicerca] = useState('');
   const [nuovoDoc, setNuovoDoc] = useState<Record<string, string>>({});
   const [nuovoJolly, setNuovoJolly] = useState('');
+  const [importaAperto, setImportaAperto] = useState(false);
 
   const multiSede = sedi.length > 1;
 
@@ -458,6 +475,43 @@ export default function ConsigliClasse({
       }));
     if (mancanti.length) setConsigli([...consigli, ...mancanti]);
   };
+  /**
+   * Porta dentro quello che l'import ha letto dal PDF. I consigli che già
+   * esistono non si buttano: i docenti letti si aggiungono a quelli che ci
+   * sono, senza doppioni, così un import fatto due volte non fa danni e un
+   * elenco corretto a mano non si perde.
+   */
+  const applicaImport = (
+    perClasse: { classe: string; docentiIds: string[] }[],
+    nuoviDocenti: { id: string; name: string }[]
+  ) => {
+    const valide = new Set(classi.map((c) => c.id));
+    const aggiornati = consigli.slice();
+
+    perClasse.forEach(({ classe, docentiIds }) => {
+      if (!valide.has(classe)) return;
+      const posto = aggiornati.findIndex((c) => c.classId === classe);
+      if (posto >= 0) {
+        aggiornati[posto] = {
+          ...aggiornati[posto],
+          docentiIds: Array.from(
+            new Set([...aggiornati[posto].docentiIds, ...docentiIds])
+          ),
+        };
+      } else {
+        aggiornati.push({
+          id: rid('cc'),
+          classId: classe,
+          docentiIds: Array.from(new Set(docentiIds)),
+          sedeId: null,
+        });
+      }
+    });
+
+    onImporta?.(nuoviDocenti, aggiornati);
+    setImportaAperto(false);
+  };
+
   const rimuoviConsiglio = (id: string) =>
     setConsigli(consigli.filter((c) => c.id !== id));
   const patchConsiglio = (id: string, patch: Partial<ConsiglioClasse>) =>
@@ -631,6 +685,15 @@ export default function ConsigliClasse({
 
   return (
     <div className="space-y-5">
+      {importaAperto && (
+        <ImportaDocenti
+          classi={classi.map((c) => c.id)}
+          staff={staff.map((s) => ({ id: String(s.id), name: String(s.name) }))}
+          onChiudi={() => setImportaAperto(false)}
+          onApplica={applicaImport}
+        />
+      )}
+
       {/* intestazione */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -646,6 +709,15 @@ export default function ConsigliClasse({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            {onImporta && !readOnly && (
+              <button
+                onClick={() => setImportaAperto(true)}
+                className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm"
+                title="Carica il PDF con i docenti classe per classe"
+              >
+                Importa da PDF 📄
+              </button>
+            )}
             <button
               onClick={esportaExcel}
               className="bg-salvia-600 hover:bg-salvia-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm"

@@ -15,6 +15,7 @@ import type {
   AssembleeConfig,
   PersonaExtra,
 } from './Assemblee';
+import { MATERIA_DA_COMPLETARE } from './ImportaDocenti';
 import ConsigliClasse, {
   DEFAULT_CONSIGLI_CONFIG,
   normalizeConsigli,
@@ -6666,6 +6667,61 @@ export default function App() {
       assembleeConfig,
       nuoviConsigli,
       nuovaConsigliConfig
+    );
+  };
+
+  /**
+   * L'import dei consigli da un elenco PDF tocca due cose in un colpo solo: i
+   * consigli di classe e, quando nel documento c'è un docente che nell'app
+   * non esiste, il registro dei docenti. Vanno scritti insieme, altrimenti i
+   * consigli finirebbero a puntare a un id che non c'è ancora.
+   *
+   * I docenti nati così arrivano senza cattedra e con la materia da
+   * completare: servono a comporre il consiglio, non a costruire l'orario, e
+   * senza ore assegnate il generatore non li piazza da nessuna parte.
+   */
+  const handleImportaConsigli = (
+    nuoviDocenti: { id: string; name: string }[],
+    nuoviConsigli: ConsiglioClasse[]
+  ) => {
+    if (readOnlyMode) return;
+
+    const aggiunti = nuoviDocenti.map((d) => ({
+      id: d.id,
+      name: d.name.toUpperCase(),
+      subject: MATERIA_DA_COMPLETARE,
+      color: '#195275',
+      assignments: [],
+    }));
+    const teachersAggiornati = aggiunti.length
+      ? [...teachers, ...aggiunti]
+      : teachers;
+
+    if (aggiunti.length) setTeachers(teachersAggiornati);
+    setConsigli(nuoviConsigli);
+
+    pushDataToCloud(
+      timetable,
+      teachersAggiornati,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses,
+      rooms,
+      sedi,
+      absences,
+      substitutions,
+      assemblee,
+      personaleExtra,
+      assembleeConfig,
+      nuoviConsigli,
+      consigliConfig
     );
   };
 
@@ -14314,6 +14370,8 @@ export default function App() {
             consigli={consigli}
             config={consigliConfig}
             onChange={handleConsigliChange}
+            onImporta={handleImportaConsigli}
+            readOnly={readOnlyMode}
           />
         )}
       </main>

@@ -181,7 +181,7 @@ export async function scollegaLicenza(): Promise<void> {
  * dallo stesso browser. Se `localStorage` è chiuso si va avanti lo stesso e
  * il conteggio ricade sull'indirizzo di rete.
  */
-const idCliente = (): string | null => {
+export const idCliente = (): string | null => {
   try {
     const salvato = localStorage.getItem(CHIAVE_CLIENTE);
     if (salvato) return salvato;

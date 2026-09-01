@@ -1683,8 +1683,120 @@ export const chapters: Chapter[] = [
     ],
   },
   {
-    id: 'trasparenza',
+    id: 'consigli-di-classe',
     num: '15',
+    title: 'Scheda: Consigli di classe',
+    intro: (
+      <>
+        Da un elenco di classi e dai docenti che le seguono, l'app monta il
+        calendario delle riunioni: più consigli in contemporanea, uno per sala,
+        senza mai mettere lo stesso docente in due riunioni nello stesso
+        orario. L'elenco dei docenti si può riempire dalle cattedre già
+        inserite oppure importarlo dal PDF che la scuola ha già.
+      </>
+    ),
+    cards: [
+      {
+        title: 'Come si compone un consiglio',
+        tag: 'classi e docenti',
+        body: (
+          <>
+            Con <B>«+ Crea un consiglio per ogni classe»</B> l'app crea un
+            consiglio per ogni classe attiva e, per ciascuna, ci mette i
+            docenti che nel <B>Registro Cattedre</B> hanno ore in quella
+            classe. È un punto di partenza, non un vincolo: si aggiungono e si
+            tolgono nomi a mano, e un consiglio si può disattivare senza
+            cancellarlo.
+          </>
+        ),
+      },
+      {
+        title: 'Importare i docenti da un PDF',
+        tag: 'import',
+        body: (
+          <>
+            Se gli elenchi «classe per classe» esistono già in un PDF, il
+            pulsante <B>«Importa da PDF 📄»</B> evita di ribattere tutto.
+            L'app apre il file <B>nel browser</B>, e il documento non esce
+            dal computer: cerca le classi dell'istituto con i nomi che le
+            accompagnano. Riconosce i due modi in cui questi elenchi sono
+            scritti quasi sempre: a blocchi («CLASSE 1A» e sotto i nomi) e a
+            righe («ROSSI MARIO - Lettere - 1A, 2A»). Vanno bene anche un file
+            TXT o CSV, o il testo incollato a mano nel riquadro. Prima di
+            scrivere qualunque cosa compare l'anteprima: ogni nome ha la sua
+            spunta e si toglie con un clic.
+          </>
+        ),
+      },
+      {
+        title: 'I nomi che nell\'app non ci sono ancora',
+        tag: 'import',
+        body: (
+          <>
+            Nell'anteprima ogni nome porta un'etichetta: <B>già in app</B>{' '}
+            quando è stato riconosciuto fra i docenti esistenti,{' '}
+            <B>nuovo</B> quando verrà creato, <B>da scegliere</B> quando i
+            candidati sono più d'uno e la scelta la fai tu da un menù. I
+            docenti creati così finiscono nel Registro Cattedre con materia{' '}
+            <B>«DA COMPLETARE»</B> e senza ore: servono a comporre il consiglio
+            e non entrano nella generazione dell'orario finché non gli assegni
+            delle cattedre. Reimportare lo stesso file non fa danni: i nomi già
+            presenti vengono riconosciuti e i consigli non si sdoppiano.
+          </>
+        ),
+      },
+      {
+        title: 'Se il PDF si legge male: la lettura assistita',
+        tag: 'abbonamento',
+        body: (
+          <>
+            Quando il documento è fatto a tabelle strane e dall'anteprima esce
+            poco o niente, compare il pulsante{' '}
+            <B>«Fammi aiutare dall'IA»</B>, che fa rileggere il testo a un
+            modello linguistico. Fa parte dell'<B>abbonamento</B>, insieme
+            all'assistente della Guida, e parte solo dopo una spunta, mai da
+            sola. Il motivo della spunta è scritto lì: in quel caso il testo
+            del documento, <B>nomi dei docenti compresi</B>, esce dal computer
+            e arriva alla società che gestisce il modello. La lettura fatta
+            dall'app, invece, non manda niente a nessuno.
+          </>
+        ),
+      },
+      {
+        title: 'Calendario, sale e docenti jolly',
+        tag: 'calendario',
+        body: (
+          <>
+            Imposti giorno, ora di inizio, durata e quante sale hai a
+            disposizione: l'app piazza tanti consigli in contemporanea quante
+            sono le sale, e le sale possono stare in sedi diverse. I docenti
+            che stanno in tante classi (religione, motoria, sostegno
+            itinerante) si segnano come <B>jolly</B>: non bloccano il
+            parallelo, compaiono in più consigli insieme e l'app avvisa che per
+            loro i turni vanno concordati a parte. Con la spunta della{' '}
+            <B>pausa pranzo</B>, chi ha fatto l'ultima ora del mattino resta
+            fuori dal primo consiglio del pomeriggio.
+          </>
+        ),
+      },
+      {
+        title: 'Il calendario non si salva',
+        tag: 'come funziona',
+        body: (
+          <>
+            Nel documento della scuola restano solo l'elenco dei consigli e le
+            impostazioni: il calendario si ricalcola ogni volta. Basta cambiare
+            un docente o un orario e si aggiorna da solo. Con{' '}
+            <B>«Esporta Excel 📊»</B> escono due fogli: il calendario e il
+            prospetto degli impegni di ogni docente.
+          </>
+        ),
+      },
+    ],
+  },
+  {
+    id: 'trasparenza',
+    num: '16',
     title: 'Trasparenza e privacy',
     intro: (
       <>
@@ -1760,6 +1872,25 @@ export const chapters: Chapter[] = [
         title: 'Nomi e ruoli: etichette, non identità',
         tag: 'dati inseriti',
         body: "I nominativi che si inseriscono (docenti, classi) sono etichette libere scelte da chi usa l'app, non identità verificate. Restano visibili solo a chi conosce il codice scuola.",
+      },
+      {
+        title: 'Quando qualcosa esce davvero: le funzioni con IA',
+        tag: 'dati inseriti',
+        body: (
+          <>
+            Due funzioni dell'abbonamento parlano con un modello linguistico, e
+            conviene sapere cosa gli mandano. L'<B>assistente della Guida</B>{' '}
+            manda la domanda ripulita dai nomi propri e i pezzi di guida, che
+            sono pubblici: l'orario, le classi e i docenti non passano di lì.
+            La <B>lettura assistita di un PDF</B>, nella scheda Consigli di
+            classe, è l'unica eccezione: lì i nomi servono, quindi il testo del
+            documento esce dal computer e arriva alla società che gestisce il
+            modello (Google, OpenAI o Anthropic, secondo il motore
+            configurato). Per questo non parte mai da sola: prima c'è una
+            spunta che lo dice, e l'import fatto dall'app senza IA continua a
+            non mandare niente a nessuno.
+          </>
+        ),
       },
       {
         title: "Non è intelligenza artificiale generativa",
