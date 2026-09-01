@@ -5,7 +5,9 @@ import AssistenteChat from './AssistenteChat';
 import {
   statoIA,
   leggiLicenza,
-  salvaLicenza,
+  leggiIstanza,
+  collegaLicenza,
+  scollegaLicenza,
   MAX_TURNI,
   type StatoIA,
 } from './assistenteIA';
@@ -21,6 +23,14 @@ const LINK_ABBONAMENTO =
 
 /** Prezzo dell'abbonamento annuale, scritto in un posto solo. */
 const PREZZO_ABBONAMENTO = "9,90 € l'anno";
+
+/**
+ * Quanti dispositivi può collegare una chiave. Il numero che conta davvero è
+ * quello impostato sul prodotto in LemonSqueezy, che è anche quello che
+ * rifiuta le attivazioni di troppo: questo serve solo a scriverlo nel
+ * pannello, e va tenuto uguale a quello del negozio.
+ */
+const MAX_DISPOSITIVI = 3;
 
 /**
  * Fino a questa data la chat è aperta a tutti: il server ha
@@ -67,6 +77,8 @@ export default function Assistente({ inGuida = false }: Props) {
   const [bozzaLicenza, setBozzaLicenza] = useState('');
   const [campoLicenzaAperto, setCampoLicenzaAperto] = useState(false);
   const [avvisoLicenza, setAvvisoLicenza] = useState('');
+  /** Vero mentre si parla col negozio per collegare o scollegare la chiave. */
+  const [licenzaInCorso, setLicenzaInCorso] = useState(false);
 
   const iaAttiva = Boolean(ia?.disponibile);
   const serveLicenza = Boolean(ia?.richiedeLicenza);
@@ -75,14 +87,69 @@ export default function Assistente({ inGuida = false }: Props) {
     serveLicenza && (campoLicenzaAperto || !haLicenza);
   const modalitaChat = iaAttiva && !mostraCampoLicenza;
 
-  const attivaLicenza = () => {
-    const pulita = bozzaLicenza.trim();
-    if (!pulita) return;
-    salvaLicenza(pulita);
-    setLicenza(pulita);
+  const chiudiCampoLicenza = () => {
     setBozzaLicenza('');
     setCampoLicenzaAperto(false);
     setAvvisoLicenza('');
+  };
+
+  /**
+   * Collega la chiave a questo dispositivo. Non basta più salvarla nel
+   * browser: il negozio registra l'attivazione e conta i dispositivi, quindi
+   * qui si aspetta la sua risposta e, se dice di no, si mostra il perché
+   * (chiave sbagliata, abbonamento scaduto, troppi dispositivi).
+   */
+  const attivaLicenza = async () => {
+    const pulita = bozzaLicenza.trim();
+    if (!pulita || licenzaInCorso) return;
+
+    // Stessa chiave e collegamento ancora buono: non si rifà l'attivazione,
+    // altrimenti si occuperebbe un secondo posto per niente.
+    if (pulita === licenza && leggiIstanza()) {
+      chiudiCampoLicenza();
+      return;
+    }
+
+    setLicenzaInCorso(true);
+    setAvvisoLicenza('');
+    try {
+      // Cambio di chiave: prima si libera il posto della vecchia, così non
+      // resta occupato su un abbonamento che qui non si userà più. Da quel
+      // momento il browser non ha più nessuna chiave, e lo stato lo deve dire:
+      // se la nuova viene rifiutata, il pannello non può restare a dire
+      // «abbonamento attivo» con dietro il vuoto.
+      if (licenza && licenza !== pulita) {
+        await scollegaLicenza();
+        setLicenza('');
+      }
+      await collegaLicenza(pulita);
+      setLicenza(pulita);
+      chiudiCampoLicenza();
+    } catch (e) {
+      setAvvisoLicenza(
+        e instanceof Error
+          ? e.message
+          : 'Non sono riuscito a collegare la chiave. Riprova fra poco.'
+      );
+    } finally {
+      setLicenzaInCorso(false);
+    }
+  };
+
+  /** Toglie la chiave da questo dispositivo e libera il posto nel negozio. */
+  const togliLicenza = async () => {
+    if (licenzaInCorso) return;
+    setLicenzaInCorso(true);
+    try {
+      await scollegaLicenza();
+    } finally {
+      setLicenza('');
+      setBozzaLicenza('');
+      setAvvisoLicenza(
+        'Chiave tolta da questo dispositivo. Il posto è di nuovo libero.'
+      );
+      setLicenzaInCorso(false);
+    }
   };
 
   const apriCampoLicenza = () => {
@@ -241,19 +308,26 @@ export default function Assistente({ inGuida = false }: Props) {
                   value={bozzaLicenza}
                   onChange={(e) => setBozzaLicenza(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') attivaLicenza();
+                    if (e.key === 'Enter') void attivaLicenza();
                   }}
+                  disabled={licenzaInCorso}
                   placeholder="Incolla qui la chiave di abbonamento"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mt-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mt-2 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-slate-100"
                 />
+                <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                  La stessa chiave vale su {MAX_DISPOSITIVI} dispositivi (per
+                  esempio il computer di scuola e quello di casa). Quando ne
+                  cambi uno, togli prima la chiave da quello vecchio: il posto
+                  torna libero subito.
+                </p>
                 <div className="flex gap-2 mt-2">
                   <button
                     type="button"
-                    onClick={attivaLicenza}
+                    onClick={() => void attivaLicenza()}
                     className="flex-1 text-sm font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg px-3 py-2 disabled:opacity-50"
-                    disabled={!bozzaLicenza.trim()}
+                    disabled={!bozzaLicenza.trim() || licenzaInCorso}
                   >
-                    Attiva
+                    {licenzaInCorso ? 'Controllo…' : 'Attiva'}
                   </button>
                   <a
                     href={LINK_ABBONAMENTO}
@@ -264,18 +338,27 @@ export default function Assistente({ inGuida = false }: Props) {
                     Abbonati
                   </a>
                 </div>
-                {campoLicenzaAperto && haLicenza && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCampoLicenzaAperto(false);
-                      setBozzaLicenza('');
-                    }}
-                    className="text-[11px] text-slate-500 underline mt-2"
-                  >
-                    Annulla
-                  </button>
-                )}
+                <div className="flex flex-wrap gap-x-3 mt-2">
+                  {campoLicenzaAperto && haLicenza && (
+                    <button
+                      type="button"
+                      onClick={chiudiCampoLicenza}
+                      className="text-[11px] text-slate-500 underline"
+                    >
+                      Annulla
+                    </button>
+                  )}
+                  {haLicenza && (
+                    <button
+                      type="button"
+                      onClick={() => void togliLicenza()}
+                      disabled={licenzaInCorso}
+                      className="text-[11px] text-slate-500 underline disabled:opacity-50"
+                    >
+                      Togli la chiave da questo dispositivo
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 

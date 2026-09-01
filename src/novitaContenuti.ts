@@ -20,7 +20,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-09-01';
+export const NOVITA_VERSIONE = '2026-09-01b';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -32,6 +32,13 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-01b',
+    data: '1 settembre 2026',
+    voci: [
+      'La chiave dell\'abbonamento ora si collega al dispositivo. Quando la incolli nel pannello dell\'assistente, EduTime Pro la registra e ti dice subito se va bene: prima si limitava a tenersela, e ti accorgevi di un errore solo alla prima domanda. La stessa chiave vale su tre dispositivi, per esempio il computer di scuola, quello di casa e il tablet. Se cambi computer, apri il pannello sul vecchio e premi «Togli la chiave da questo dispositivo»: il posto torna libero subito e puoi collegare il nuovo. Se la chiave è già su due dispositivi te lo scrive, invece di lasciarti nel dubbio.',
+    ],
+  },
   {
     versione: '2026-09-01',
     data: '1 settembre 2026',

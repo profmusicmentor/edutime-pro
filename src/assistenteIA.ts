@@ -31,6 +31,21 @@ const CHIAVE_CLIENTE = 'edutime.assistenteIA.cliente';
 /** Dove il browser tiene la chiave di abbonamento incollata dall'utente. */
 const CHIAVE_LICENZA = 'edutime.assistenteIA.licenza';
 
+/**
+ * Dove il browser tiene l'identificativo dell'attivazione su questo
+ * dispositivo, che LemonSqueezy restituisce quando la chiave viene collegata.
+ * Senza, il server non accetta la chiave: è quello che impedisce a una chiave
+ * sola di girare fra scuole diverse.
+ *
+ * Se l'utente svuota i dati del sito lo perde, e ricollegando la chiave occupa
+ * un secondo posto: quello vecchio si libera dalla scheda della licenza nel
+ * negozio.
+ */
+const CHIAVE_ISTANZA = 'edutime.assistenteIA.dispositivo';
+
+/** Endpoint che collega e scollega la chiave da questo dispositivo. */
+const INDIRIZZO_LICENZA = '/api/licenza';
+
 export interface StatoIA {
   disponibile: boolean;
   motore?: string;
@@ -77,6 +92,88 @@ export const salvaLicenza = (valore: string): void => {
     /* browser senza storage: la chiave vale solo per questa sessione */
   }
 };
+
+/** L'attivazione di questo dispositivo, o stringa vuota. */
+export const leggiIstanza = (): string => {
+  try {
+    return localStorage.getItem(CHIAVE_ISTANZA)?.trim() || '';
+  } catch {
+    return '';
+  }
+};
+
+/** Salva l'attivazione; una stringa vuota la cancella. */
+export const salvaIstanza = (valore: string): void => {
+  try {
+    const pulita = valore.trim();
+    if (pulita) localStorage.setItem(CHIAVE_ISTANZA, pulita);
+    else localStorage.removeItem(CHIAVE_ISTANZA);
+  } catch {
+    /* browser senza storage: l'attivazione vale solo per questa sessione */
+  }
+};
+
+/**
+ * Collega la chiave a questo dispositivo e conserva l'attivazione. Lancia un
+ * Error con un messaggio già scritto per essere mostrato così com'è: chiave
+ * sbagliata, abbonamento scaduto, oppure tetto di dispositivi raggiunto.
+ */
+export async function collegaLicenza(chiave: string): Promise<void> {
+  const pulita = chiave.trim();
+
+  let risposta: Response;
+  try {
+    risposta = await fetch(INDIRIZZO_LICENZA, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ azione: 'attiva', licenza: pulita }),
+    });
+  } catch {
+    throw new Error(
+      'Non riesco a collegarmi per controllare la chiave. Controlla la connessione e riprova.'
+    );
+  }
+
+  let dati: { istanza?: string; errore?: string } = {};
+  try {
+    dati = await risposta.json();
+  } catch {
+    /* corpo vuoto o non JSON: sotto c'è già un messaggio di scorta */
+  }
+
+  if (!risposta.ok || !dati.istanza) {
+    throw new Error(
+      dati.errore || 'Non sono riuscito a collegare la chiave. Riprova fra poco.'
+    );
+  }
+
+  salvaLicenza(pulita);
+  salvaIstanza(dati.istanza);
+}
+
+/**
+ * Toglie la chiave da questo dispositivo e libera il posto nel negozio. Il
+ * browser dimentica chiave e attivazione in ogni caso: se il negozio non
+ * risponde il posto resta occupato, e si libera dalla scheda della licenza.
+ */
+export async function scollegaLicenza(): Promise<void> {
+  const chiave = leggiLicenza();
+  const istanza = leggiIstanza();
+
+  salvaLicenza('');
+  salvaIstanza('');
+
+  if (!chiave || !istanza) return;
+  try {
+    await fetch(INDIRIZZO_LICENZA, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ azione: 'libera', licenza: chiave, istanza }),
+    });
+  } catch {
+    /* il posto si libera dal negozio: qui non c'è altro da fare */
+  }
+}
 
 /**
  * Un identificatore che non dice niente di chi lo porta: non è un login, non
@@ -126,6 +223,7 @@ export async function chiediInChat(
       messaggi,
       clientId: idCliente(),
       licenza: leggiLicenza(),
+      istanza: leggiIstanza(),
       contesto: risultati.map((r) => ({
         titolo: r.voce.titolo,
         capitolo: r.voce.capitoloTitolo,
@@ -139,6 +237,7 @@ export async function chiediInChat(
     rimaste?: number;
     errore?: string;
     licenzaMancante?: boolean;
+    riattivare?: boolean;
     limiteConversazione?: boolean;
   } = {};
   try {
@@ -151,6 +250,11 @@ export async function chiediInChat(
     dati.errore || "L'assistente non è riuscito a rispondere. Riprova fra poco.";
 
   if (risposta.status === 402 || dati.licenzaMancante) {
+    // Il collegamento di questo dispositivo non vale più: si butta, così alla
+    // prossima Attiva se ne fa uno nuovo invece di ripresentare quello morto.
+    // La riattivazione non è automatica di proposito: un'attivazione tolta dal
+    // negozio deve restare tolta.
+    if (dati.riattivare) salvaIstanza('');
     throw new ErroreLicenza(messaggio);
   }
   if (risposta.status === 409 || dati.limiteConversazione) {

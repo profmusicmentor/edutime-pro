@@ -152,6 +152,7 @@ export default async function handler(request: Request): Promise<Response> {
     contesto?: unknown;
     clientId?: unknown;
     licenza?: unknown;
+    istanza?: unknown;
   };
   try {
     body = await request.json();
@@ -160,10 +161,20 @@ export default async function handler(request: Request): Promise<Response> {
   }
 
   // Il primo cancello, prima di qualunque lavoro: se l'assistente è a
-  // pagamento, senza una chiave di abbonamento valida qui non si prosegue.
-  const licenza = await verificaLicenza(body.licenza);
+  // pagamento, senza una chiave di abbonamento valida e collegata a questo
+  // dispositivo qui non si prosegue. `riattivare` dice al browser che la
+  // chiave regge ma il collegamento è saltato: butta via l'istanza vecchia e
+  // rifà l'attivazione, invece di mandare la persona a ricomprare.
+  const licenza = await verificaLicenza(body.licenza, body.istanza);
   if (!licenza.valida) {
-    return json({ errore: licenza.motivo, licenzaMancante: true }, 402);
+    return json(
+      {
+        errore: licenza.motivo,
+        licenzaMancante: true,
+        riattivare: licenza.riattivare === true,
+      },
+      402
+    );
   }
 
   // La conversazione arriva dal browser: righe `user` e `assistant` in ordine,

@@ -99,6 +99,7 @@ Il motore si cambia da variabile d'ambiente, senza toccare il codice:
 | `ASSISTENTE_RICHIEDE_LICENZA` | `1` pretende una chiave di abbonamento valida | assente (assistente libero) |
 | `LEMONSQUEEZY_STORE_ID` | se c'è, la chiave deve essere di questo negozio | nessuno |
 | `LEMONSQUEEZY_PRODUCT_ID` | se c'è, la chiave deve essere di questo prodotto | nessuno |
+| `LICENZA_TENTATIVI_IP` | attivazioni al giorno per indirizzo | `20` |
 
 Il motore `openai` non parla solo con OpenAI: quasi tutti i fornitori espongono
 lo stesso formato `/chat/completions`, quindi basta puntare `OPENAI_BASE_URL`
@@ -116,17 +117,48 @@ un piano a pagamento.
 La chat è un servizio in abbonamento annuale. Con
 `ASSISTENTE_RICHIEDE_LICENZA=1` l'endpoint pretende una chiave di licenza
 LemonSqueezy valida prima di ogni risposta: la convalida `api/_licenza.ts`
-mandando una richiesta `x-www-form-urlencoded` all'endpoint pubblico
-`/v1/licenses/validate` (nessuna chiave API del negozio), con una cache in
+mandando una richiesta `x-www-form-urlencoded` agli endpoint pubblici
+`/v1/licenses/*` (nessuna chiave API del negozio), con una cache in
 memoria e, se LemonSqueezy non risponde, si lascia passare chi poco prima era
 in regola. Quando l'abbonamento non viene rinnovato LemonSqueezy segna la
 chiave come scaduta e la convalida comincia a rifiutarla da sola. Senza la
 variabile, o con un valore diverso da `1`, l'assistente risponde a tutti:
-serve a provare la qualità dei modelli prima di montare il pagamento. La
-chiave si incolla una volta sola nel pannello e resta nel browser
-(`localStorage`). I tetti di `api/_limite.ts` valgono comunque: con la chat una
+serve a provare la qualità dei modelli prima di montare il pagamento.
+I tetti di `api/_limite.ts` valgono comunque: con la chat una
 conversazione piena pesa `ASSISTENTE_MAX_TURNI` chiamate, e il predefinito di
 50 domande al giorno per persona equivale a una decina di conversazioni.
+
+#### Chiave legata al dispositivo
+
+La sola convalida non basta a fermare una chiave che gira di mano in mano:
+`/v1/licenses/validate` risponde «buona» a chiunque la mandi. Per questo la
+chiave va prima **attivata** sul dispositivo. Il pannello chiama
+`POST /api/licenza` con `{ azione: 'attiva', licenza }`; l'endpoint gira la
+richiesta a `/v1/licenses/activate`, LemonSqueezy registra un'istanza e ne
+restituisce l'identificativo, che il browser conserva accanto alla chiave in
+`localStorage`. Da lì in poi ogni domanda porta con sé chiave **e** istanza, e
+`verificaLicenza` passa solo se quell'istanza risulta ancora registrata.
+
+Quante attivazioni può avere una chiave lo decide il prodotto su LemonSqueezy
+(*Products → variante → License keys → activation limit*), non il codice:
+oltre il tetto è LemonSqueezy stesso a rifiutare. La costante
+`MAX_DISPOSITIVI` in `src/Assistente.tsx` serve solo a scrivere il numero nel
+pannello e va tenuta uguale a quella del negozio. Il tetto vale per le chiavi
+nuove: quelle già emesse tengono il limite che avevano, modificabile dalla
+scheda della singola licenza.
+
+`POST /api/licenza` con `{ azione: 'libera', licenza, istanza }` chiama
+`/v1/licenses/deactivate` e restituisce il posto: è il pulsante «Togli la
+chiave da questo dispositivo». Serve anche a chi cambia computer, altrimenti i
+posti si esaurirebbero senza modo di recuperarli se non dal pannello del
+negozio. Chi svuota i dati del sito perde l'istanza e ricollegando la chiave ne
+occupa una seconda: quella vecchia si libera dalla scheda della licenza.
+
+Quando LemonSqueezy dice che l'istanza non esiste più (attivazione tolta dal
+negozio o da un altro dispositivo) la risposta porta `riattivare: true`: il
+browser butta via l'istanza morta e riapre il campo della chiave. La
+riattivazione non è automatica di proposito, altrimenti togliere un'attivazione
+non servirebbe a niente.
 
 ## Sviluppo
 
