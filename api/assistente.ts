@@ -62,6 +62,10 @@ const ISTRUZIONI = [
   '  «Segnala un bug o un suggerimento» in fondo al pannello.',
   '- Scrivi in italiano semplice, al massimo sei frasi. Se servono dei',
   '  passaggi usa un elenco puntato corto. Niente titoli, niente introduzioni.',
+  '- Scrivi in testo semplice, senza formattazione: niente asterischi, niente',
+  '  grassetto, niente markdown. Il pannello mostra il testo così com\'è, e gli',
+  '  asterischi si vedrebbero tutti. I nomi delle schede e dei pulsanti vanno',
+  '  fra virgolette basse, per esempio «Stampa».',
   "- Parla solo di come si usa l'app. Non commentare persone e non rispondere",
   '  su altri argomenti.',
   '- Questa è una conversazione a più battute: puoi tenere conto di quello che',
@@ -75,6 +79,21 @@ interface Capitolo {
   capitolo?: string;
   testo?: string;
 }
+
+/**
+ * Il pannello mostra la risposta come testo semplice (`whitespace-pre-wrap`),
+ * quindi un modello che scrive in markdown lascia gli asterischi in bella
+ * vista. Le istruzioni glielo vietano, ma i modelli disubbidiscono: questa è
+ * la rete di sicurezza che toglie i marcatori più comuni senza toccare il
+ * resto della frase.
+ */
+const senzaMarcatori = (testo: string): string =>
+  testo
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/(^|\s)\*([^*\n]+)\*(?=[\s.,;:!?)]|$)/g, '$1$2')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*\*\s+/gm, '- ');
 
 const pulisci = (valore: unknown, max: number): string =>
   String(valore ?? '')
@@ -254,7 +273,7 @@ export default async function handler(request: Request): Promise<Response> {
     });
 
     return json({
-      risposta: testo,
+      risposta: senzaMarcatori(testo),
       rimaste: Math.max(0, limiteGiorno - usoCliente),
     });
   } catch (errore) {
