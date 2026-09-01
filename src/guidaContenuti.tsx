@@ -1235,11 +1235,17 @@ export const chapters: Chapter[] = [
               modulo.
             </p>
             <p className="mt-2">
-              Due differenze rispetto ai docenti di materia: qui non c'è la
-              colonna delle supplenze, perché fra i sostituti l'app propone i
-              docenti curricolari; e la casella <B>2h</B> non ha effetto sul
-              sostegno, perché le sue ore seguono le lezioni della classe e non
-              si possono scegliere a coppie.
+              Una differenza rispetto ai docenti di materia: qui non c'è la
+              colonna delle supplenze, perché per coprire un docente di materia
+              l'app propone i colleghi curricolari.
+            </p>
+            <p className="mt-2">
+              La casella <B>2h</B> invece funziona anche qui. Attivala e il
+              docente prende le ore di quella classe una accanto all'altra,
+              partendo dai giorni in cui la classe ha almeno due lezioni di
+              fila. Resta una preferenza, non un obbligo: un'ora già presa
+              altrove, il giorno libero o il tetto di ore al giorno possono
+              spezzare la coppia.
             </p>
           </>
         ),
@@ -1368,10 +1374,18 @@ export const chapters: Chapter[] = [
               <B>✅ Coperta da sostegno</B> e non chiede altro.
             </p>
             <p className="mt-2">
-              Al contrario, l'assenza di un docente di sostegno non si può
-              ancora registrare: nel modulo delle assenze compaiono solo i
-              docenti di materia. Per ora quelle ore si gestiscono fuori
-              dall'app.
+              Anche l'assenza di un docente di sostegno si registra qui: nel
+              menu <B>Docente</B> del modulo i nomi sono divisi in due gruppi,
+              materia e sostegno. Scegli il nome e l'app elenca le sue ore di
+              sostegno di quel giorno, una per una.
+            </p>
+            <p className="mt-2">
+              I nomi proposti partono dai <B>colleghi di sostegno liberi</B> in
+              quell'ora, prima quelli che seguono già la stessa classe; poi
+              vengono i docenti curricolari con la spunta delle supplenze.
+              Mancano invece «Dividi alunni», «Anticipa lezione» ed
+              entrata/uscita fuori orario: servono quando la classe resta senza
+              docente, e qui la classe è regolarmente in orario col curricolare.
             </p>
           </>
         ),

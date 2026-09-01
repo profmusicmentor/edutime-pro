@@ -21,7 +21,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-09-01c';
+export const NOVITA_VERSIONE = '2026-09-01d';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -34,11 +34,19 @@ export type VoceNovita = {
 
 export const NOVITA: VoceNovita[] = [
   {
+    versione: '2026-09-01d',
+    data: '1 settembre 2026',
+    voci: [
+      'La casella «2h» adesso funziona anche per i docenti di sostegno. Prima si poteva spuntare, restava spuntata e non cambiava niente: le ore venivano sparse a caso fra le lezioni della classe. Adesso il docente prende le ore di quella classe una accanto all\'altra, e l\'app parte dai giorni in cui la classe ha almeno due lezioni di fila. Resta una preferenza, non un obbligo: un\'ora già presa in un\'altra classe, il giorno libero o il tetto di ore al giorno possono spezzare la coppia. Vale sia per «✨ Auto-Genera Orario» sia per «🔄 Allinea Sostegno».',
+      'L\'assenza di un docente di sostegno si registra come quella di tutti gli altri. Nel modulo delle assenze, in «🩹 Sostituzioni», il menu dei docenti è ora diviso in due gruppi: materia e sostegno. Scegli il nome e l\'app elenca le sue ore di sostegno di quel giorno e propone chi può coprirle, partendo dai colleghi di sostegno liberi in quell\'ora — prima quelli che seguono già la stessa classe — e poi dai docenti curricolari con la spunta delle supplenze. Se in quell\'ora c\'è già un altro docente di sostegno nella classe, l\'ora risulta coperta. Non compaiono «Dividi alunni», «Anticipa lezione» ed entrata o uscita fuori orario: quelle servono quando la classe resta senza docente, mentre qui la classe è regolarmente in orario col curricolare. Le ore coperte così finiscono nella stampa e nell\'export del giorno, e i permessi brevi del sostegno entrano nel conteggio delle ore da recuperare.',
+    ],
+  },
+  {
     versione: '2026-09-01c',
     data: '1 settembre 2026',
     voci: [
       '«🔄 Allinea Sostegno» ora rispetta il giorno libero. Prima ricollocava le ore alla cieca e poteva rimettere un docente di sostegno a scuola nel suo giorno libero o in un\'ora che aveva bloccato, mentre l\'auto-generazione quelle ore le saltava già: adesso i due pulsanti si comportano allo stesso modo.',
-      'Nuovo capitolo della guida: «I docenti di sostegno». Finora il sostegno era spiegato a pezzi, sparso fra il Registro Cattedre, la barra in alto e le viste, e chi lo chiedeva all\'assistente non trovava una risposta sola. Ora c\'è il percorso intero in fila: come si inserisce il docente, come si scrivono le ore classe per classe, dove si mettono giorno libero e indisponibilità, cosa fa davvero «🔄 Allinea Sostegno» e dove si controlla il risultato. Ci sono scritte anche tre cose che prima si scoprivano per prova: la casella «2h» non ha effetto sulle ore di sostegno, il report di fine generazione non conta quelle ore, e l\'assenza di un docente di sostegno non si può ancora registrare nelle Sostituzioni.',
+      'Nuovo capitolo della guida: «I docenti di sostegno». Finora il sostegno era spiegato a pezzi, sparso fra il Registro Cattedre, la barra in alto e le viste, e chi lo chiedeva all\'assistente non trovava una risposta sola. Ora c\'è il percorso intero in fila: come si inserisce il docente, come si scrivono le ore classe per classe, dove si mettono giorno libero e indisponibilità, cosa fa davvero «🔄 Allinea Sostegno» e dove si controlla il risultato. C\'è scritta anche una cosa che prima si scopriva per prova: il report di fine generazione non conta le ore di sostegno.',
     ],
   },
   {

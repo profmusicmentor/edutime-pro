@@ -1128,6 +1128,41 @@ const hoursOfTeacherOnDay = (tt: any[], teacherId: string, day: number) =>
   tt.filter((s) => s.teacherId === teacherId && s.day === day).length;
 
 /**
+ * L'ordine con cui un docente di sostegno prova le ore di una classe.
+ *
+ * Senza la preferenza «2h» le ore si mescolano, come è sempre stato:
+ * sparpagliare evita che lo stesso docente si prenda sempre le prime ore.
+ *
+ * Con la preferenza attiva si procede giorno per giorno e, dentro il giorno,
+ * in ordine di ora: le ore che il docente ottiene in quella classe cadono
+ * così una accanto all'altra. I giorni si mescolano fra loro, ma vengono
+ * prima quelli che offrono almeno una coppia di ore adiacenti — altrimenti
+ * la preferenza si consumerebbe sui giorni in cui la classe ha una lezione
+ * sola e non ci sarebbe nessuna coppia da formare.
+ *
+ * Resta una preferenza morbida, come per i docenti di materia: le ore già
+ * occupate, il giorno libero e il tetto giornaliero possono spezzare la
+ * coppia, e chi chiama questa funzione applica comunque i suoi filtri.
+ */
+const orderSlotsForSostegno = (slots: any[], preferConsecutive: boolean) => {
+  if (!preferConsecutive) return [...slots].sort(() => Math.random() - 0.5);
+  const byDay = new Map<number, any[]>();
+  slots.forEach((slot) => {
+    if (!byDay.has(slot.day)) byDay.set(slot.day, []);
+    (byDay.get(slot.day) as any[]).push(slot);
+  });
+  const groups = Array.from(byDay.values()).map((group) => {
+    const sorted = [...group].sort((a, b) => a.hour - b.hour);
+    const pairs = sorted.filter(
+      (slot, i) => i > 0 && sorted[i - 1].hour === slot.hour - 1
+    ).length;
+    return { sorted, pairs, tieBreak: Math.random() };
+  });
+  groups.sort((a, b) => b.pairs - a.pairs || a.tieBreak - b.tieBreak);
+  return groups.flatMap((g) => g.sorted);
+};
+
+/**
  * Tetto giornaliero effettivo di un docente: il limite scelto dalla scuola,
  * abbassato alla sua quota giornaliera (ore di cattedra divise per i giorni in
  * cui è a scuola) quando questa è più stretta. È la regola che distribuisce la
@@ -4446,10 +4481,13 @@ export default function App() {
         assigns.forEach((assign: any) => {
           const targetClassId = assign.classId;
           const targetHours = assign.hours;
-          const occupiedSlots = newTimetable.filter(
-            (slot) => slot.classId === targetClassId && slot.type === 'materia'
+          const occupiedSlots = orderSlotsForSostegno(
+            newTimetable.filter(
+              (slot) =>
+                slot.classId === targetClassId && slot.type === 'materia'
+            ),
+            !!sos.preferConsecutive
           );
-          occupiedSlots.sort(() => Math.random() - 0.5);
           let assignedHours = 0;
           for (let i = 0; i < occupiedSlots.length; i++) {
             if (assignedHours >= targetHours) break;
@@ -4656,7 +4694,10 @@ export default function App() {
           (s) => s.classId === assign.classId
         );
         let placed = 0;
-        const shuffled = [...classMaterie].sort(() => Math.random() - 0.5);
+        const shuffled = orderSlotsForSostegno(
+          classMaterie,
+          !!sos.preferConsecutive
+        );
         for (let slot of shuffled) {
           if (placed >= assign.hours) break;
           // Giorno libero e ore bloccate valgono anche qui. Prima questo
@@ -6688,18 +6729,29 @@ export default function App() {
    * già assegnato un sostituto, o da coprire) e candidati sostituti
    * ordinati per priorità (1: insegna già in quella classe, 2: stessa
    * materia dell'assente, 3: altri disponibili).
+   *
+   * Vale anche per i docenti di sostegno: in quel caso le ore da coprire
+   * sono le loro ore di sostegno e i candidati partono dai colleghi di
+   * sostegno liberi.
    */
   const getSubstitutionSuggestions = (absence: any) => {
     if (absence.type !== 'assenza' && absence.type !== 'permesso') return [];
     const day = getDayIndexFromDate(absence.date);
     if (day < 0) return [];
-    const absentTeacher = teachers.find((t) => t.id === absence.teacherId);
+    const isSostegnoAbsence = sostegno.some(
+      (s: any) => s.id === absence.teacherId
+    );
+    const absentTeacher = [...teachers, ...sostegno].find(
+      (t: any) => t.id === absence.teacherId
+    );
     const teacherLessons = timetable
       .filter(
         (s) =>
           s.teacherId === absence.teacherId &&
           s.day === day &&
-          (s.type === 'materia' || s.type === 'pomeriggio_musica') &&
+          (isSostegnoAbsence
+            ? s.type === 'sostegno'
+            : s.type === 'materia' || s.type === 'pomeriggio_musica') &&
           (absence.fromHour === undefined || s.hour >= absence.fromHour) &&
           (absence.toHour === undefined || s.hour <= absence.toHour)
       )
@@ -6712,12 +6764,17 @@ export default function App() {
           sub.day === day &&
           sub.hour === lesson.hour
       );
+      // Un'ora è «coperta dal sostegno» solo se in quella classe c'è un
+      // altro docente di sostegno: le ore dell'assente non coprono se
+      // stesse, altrimenti l'assenza di un docente di sostegno risulterebbe
+      // sempre già risolta.
       const coveredBySostegno = timetable.some(
         (s) =>
           s.type === 'sostegno' &&
           s.classId === lesson.classId &&
           s.day === day &&
-          s.hour === lesson.hour
+          s.hour === lesson.hour &&
+          s.teacherId !== absence.teacherId
       );
       let candidates: any[] = [];
       if (!coveredBySostegno && !existingSub) {
@@ -6726,34 +6783,58 @@ export default function App() {
           lesson.hour,
           absence.date
         );
-        candidates = teachers
-          .filter(
-            (t) =>
-              t.id !== absence.teacherId &&
-              t.availableForPaidSubstitution &&
-              !isTeacherOff(generationRules, t.id, day, lesson.hour) &&
-              !busyTeacherIds.has(t.id)
-          )
+        const isFree = (t: any) =>
+          t.id !== absence.teacherId &&
+          !isTeacherOff(generationRules, t.id, day, lesson.hour) &&
+          !busyTeacherIds.has(t.id);
+        // Quando manca un docente di sostegno la classe resta in orario col
+        // suo docente curricolare: da coprire c'è l'alunno. Il primo nome da
+        // proporre è quindi un collega di sostegno libero, meglio ancora se
+        // segue già quella classe. I curricolari disponibili restano in
+        // fondo alla lista, per le scuole che coprono anche così.
+        const colleghiSostegno = isSostegnoAbsence
+          ? sostegno.filter(isFree).map((s: any) => ({
+              teacherId: s.id,
+              name: s.name,
+              subject: s.subject,
+              priority: (s.assignments || []).some(
+                (a: any) => a.classId === lesson.classId
+              )
+                ? 0
+                : 1,
+            }))
+          : [];
+        const curricolari = teachers
+          .filter((t) => isFree(t) && t.availableForPaidSubstitution)
           .map((t) => {
             const teachesThisClass = (t.assignments || []).some(
               (a: any) => a.classId === lesson.classId
             );
             const sameSubject = t.subject === absentTeacher?.subject;
-            const priority = teachesThisClass ? 0 : sameSubject ? 1 : 2;
+            const priority = isSostegnoAbsence
+              ? 2
+              : teachesThisClass
+              ? 0
+              : sameSubject
+              ? 1
+              : 2;
             return {
               teacherId: t.id,
               name: t.name,
               subject: t.subject,
               priority,
             };
-          })
-          .sort((a, b) => a.priority - b.priority);
+          });
+        candidates = [...colleghiSostegno, ...curricolari].sort(
+          (a, b) => a.priority - b.priority
+        );
       }
       return {
         day,
         hour: lesson.hour,
         classId: lesson.classId,
         subject: lesson.subject,
+        isSostegno: isSostegnoAbsence,
         coveredBySostegno,
         existingSub,
         candidates,
@@ -6972,7 +7053,9 @@ export default function App() {
           (slot) =>
             slot.teacherId === a.teacherId &&
             slot.day === day &&
-            (slot.type === 'materia' || slot.type === 'pomeriggio_musica')
+            (slot.type === 'materia' ||
+              slot.type === 'pomeriggio_musica' ||
+              slot.type === 'sostegno')
         );
         const lezioniPermesso = lezioniGiorno.filter(
           (slot) =>
@@ -6993,7 +7076,7 @@ export default function App() {
           id: a.id,
           teacherId: a.teacherId,
           nome:
-            teachers.find((t) => t.id === a.teacherId)?.name || a.teacherId,
+            allStaff.find((t) => t.id === a.teacherId)?.name || a.teacherId,
           date: a.date,
           ore,
           oreServizio,
@@ -7024,7 +7107,7 @@ export default function App() {
     });
     perDocente.sort((x, y) => x.nome.localeCompare(y.nome));
     return { righe, perDocente };
-  }, [absences, timetable, teachers, mergedHoursMap]);
+  }, [absences, timetable, allStaff, mergedHoursMap]);
 
   /** Segna un permesso come recuperato, o torna indietro. */
   const handleToggleRecupero = (absenceId: string) => {
@@ -8314,7 +8397,7 @@ export default function App() {
       }">Nessuna assenza segnalata per questa data.</td></tr>`;
     }
     teacherAbsences.forEach((absence, idx) => {
-      const teacher = teachers.find((t) => t.id === absence.teacherId);
+      const teacher = allStaff.find((t) => t.id === absence.teacherId);
       const lessons = getSubstitutionSuggestions(absence);
       html += `<tr><td>${idx + 1}</td><td class="name-cell">${escapeXml(
         teacher?.name || absence.teacherId
@@ -8372,7 +8455,7 @@ export default function App() {
     let rowIdx = 0;
     Object.entries(subsByTeacher).forEach(([tid, subs]) => {
       rowIdx++;
-      const teacher = teachers.find((t) => t.id === tid);
+      const teacher = allStaff.find((t) => t.id === tid);
       html += `<tr><td>${rowIdx}</td><td class="name-cell">${escapeXml(
         teacher?.name || tid
       )}</td>`;
@@ -8478,7 +8561,7 @@ export default function App() {
       const entra = sub.method === 'entrata_posticipata';
       const oraRif = entra ? sub.entryFromHour : sub.exitAfterHour;
       const orario = mergedHoursMap[oraRif]?.time || '';
-      const docente = teachers.find((t) => t.id === sub.teacherOriginal);
+      const docente = allStaff.find((t) => t.id === sub.teacherOriginal);
       html += `<tr><td class="name-cell">Classe ${escapeXml(
         sub.classId
       )} — ${escapeXml(entra ? 'ENTRA più tardi' : 'ESCE prima')}</td><td>${escapeXml(
@@ -13423,11 +13506,22 @@ export default function App() {
                         className="text-sm border border-slate-300 rounded-lg p-2 bg-white disabled:opacity-50"
                       >
                         <option value="">— Seleziona —</option>
-                        {teachers.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
-                          </option>
-                        ))}
+                        <optgroup label="Docenti di materia">
+                          {teachers.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                        {sostegno.length > 0 && (
+                          <optgroup label="Docenti di sostegno">
+                            {sostegno.map((s: any) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
                       </select>
                     </div>
                   ) : (
@@ -13522,7 +13616,7 @@ export default function App() {
                     const isClassBased =
                       absence.type === 'entrata_posticipata' ||
                       absence.type === 'uscita_anticipata';
-                    const teacher = teachers.find(
+                    const teacher = allStaff.find(
                       (t) => t.id === absence.teacherId
                     );
                     const suggestions = isClassBased
@@ -13624,7 +13718,9 @@ export default function App() {
                                 </div>
                                 {s.coveredBySostegno ? (
                                   <span className="text-xs font-bold text-salvia-700 bg-salvia-50 px-2 py-1 rounded">
-                                    ✅ Coperta da sostegno
+                                    {s.isSostegno
+                                      ? '✅ Coperta da un collega di sostegno'
+                                      : '✅ Coperta da sostegno'}
                                   </span>
                                 ) : s.existingSub ? (
                                   <div className="flex items-center gap-2">
@@ -13632,7 +13728,7 @@ export default function App() {
                                       {s.existingSub.method ===
                                       'docente_disponibile'
                                         ? `Sostituto: ${
-                                            teachers.find(
+                                            allStaff.find(
                                               (t) =>
                                                 t.id ===
                                                 s.existingSub.teacherSubstitute
@@ -13763,38 +13859,58 @@ export default function App() {
                                     >
                                       Sorveglianza
                                     </button>
-                                    <button
-                                      onClick={() =>
-                                        handleConfirmSubstitution(
-                                          absence,
-                                          s.hour,
-                                          s.classId,
-                                          s.subject,
-                                          'divisione_alunni'
-                                        )
-                                      }
-                                      disabled={readOnlyMode}
-                                      className="text-xs font-bold px-2 py-1 rounded-lg border bg-bruciato-50 border-bruciato-200 text-bruciato-700 hover:bg-bruciato-100 cursor-pointer disabled:opacity-50"
-                                    >
-                                      Dividi alunni
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        setAnticipoPanel(
-                                          anticipoAperto
-                                            ? null
-                                            : {
-                                                absenceId: absence.id,
-                                                hour: s.hour,
-                                              }
-                                        )
-                                      }
-                                      disabled={readOnlyMode}
-                                      title="Una collega della stessa classe anticipa la lezione che avrebbe più tardi"
-                                      className="text-xs font-bold px-2 py-1 rounded-lg border bg-brand-50 border-brand-200 text-brand-700 hover:bg-brand-100 cursor-pointer disabled:opacity-50"
-                                    >
-                                      ⏪ Anticipa lezione
-                                    </button>
+                                    {/*
+                                      Dividere gli alunni, anticipare la
+                                      lezione, far entrare la classe più
+                                      tardi: sono tutte cose che si fanno
+                                      quando la classe resta senza docente.
+                                      Se a mancare è il sostegno la classe è
+                                      regolarmente in orario col docente
+                                      curricolare, quindi queste strade non
+                                      si aprono nemmeno.
+                                    */}
+                                    {s.isSostegno && (
+                                      <span className="text-xs text-slate-500 italic">
+                                        La classe resta in orario: qui si
+                                        copre solo il sostegno.
+                                      </span>
+                                    )}
+                                    {!s.isSostegno && (
+                                      <button
+                                        onClick={() =>
+                                          handleConfirmSubstitution(
+                                            absence,
+                                            s.hour,
+                                            s.classId,
+                                            s.subject,
+                                            'divisione_alunni'
+                                          )
+                                        }
+                                        disabled={readOnlyMode}
+                                        className="text-xs font-bold px-2 py-1 rounded-lg border bg-bruciato-50 border-bruciato-200 text-bruciato-700 hover:bg-bruciato-100 cursor-pointer disabled:opacity-50"
+                                      >
+                                        Dividi alunni
+                                      </button>
+                                    )}
+                                    {!s.isSostegno && (
+                                      <button
+                                        onClick={() =>
+                                          setAnticipoPanel(
+                                            anticipoAperto
+                                              ? null
+                                              : {
+                                                  absenceId: absence.id,
+                                                  hour: s.hour,
+                                                }
+                                          )
+                                        }
+                                        disabled={readOnlyMode}
+                                        title="Una collega della stessa classe anticipa la lezione che avrebbe più tardi"
+                                        className="text-xs font-bold px-2 py-1 rounded-lg border bg-brand-50 border-brand-200 text-brand-700 hover:bg-brand-100 cursor-pointer disabled:opacity-50"
+                                      >
+                                        ⏪ Anticipa lezione
+                                      </button>
+                                    )}
                                     {/*
                                       Quando l'ora scoperta è la prima o
                                       l'ultima della classe si può chiudere
@@ -13804,7 +13920,8 @@ export default function App() {
                                       sul pulsante, così chi avvisa le
                                       famiglie non deve andarlo a cercare.
                                     */}
-                                    {(() => {
+                                    {!s.isSostegno &&
+                                      (() => {
                                       const v = getVariazioniClasse(
                                         absence,
                                         s.hour,
@@ -14002,8 +14119,8 @@ export default function App() {
                     ])
                   )
                     .sort((a, b) =>
-                      (teachers.find((t) => t.id === a)?.name || a).localeCompare(
-                        teachers.find((t) => t.id === b)?.name || b
+                      (allStaff.find((t) => t.id === a)?.name || a).localeCompare(
+                        allStaff.find((t) => t.id === b)?.name || b
                       )
                     )
                     .map((tid) => (
@@ -14012,7 +14129,7 @@ export default function App() {
                         className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-center"
                       >
                         <div className="text-xs font-bold text-slate-700">
-                          {teachers.find((t) => t.id === tid)?.name || tid}
+                          {allStaff.find((t) => t.id === tid)?.name || tid}
                         </div>
                         <div className="flex items-baseline justify-center gap-3 mt-1">
                           <span
