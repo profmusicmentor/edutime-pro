@@ -206,6 +206,21 @@ async function chiediGemini(cfg: Configurazione, d: Domanda): Promise<string> {
 /* Formato OpenAI (OpenAI, Groq, OpenRouter, DeepSeek, Mistral…)       */
 /* ------------------------------------------------------------------ */
 
+/**
+ * I modelli «che ragionano» (DeepSeek, Qwen thinking, o1…) scrivono prima un
+ * ragionamento interno che non si vede ma si paga come testo prodotto. Per una
+ * risposta pescata dalla guida non serve, e c'è di peggio: quel ragionamento
+ * consuma il tetto di max_token, e quando se lo mangia tutto il campo
+ * `content` arriva vuoto e l'assistente sembra rotto. Su OpenRouter si spegne
+ * con `reasoning: { enabled: false }`, che gli altri fornitori del formato
+ * OpenAI non conoscono: si manda solo lì. ASSISTENTE_REASONING='1' lo rimette
+ * acceso, se un giorno servisse un modello che senza ragionamento risponde
+ * peggio.
+ */
+const ragionamentoDaSpegnere = (base: string): boolean =>
+  (process.env.ASSISTENTE_REASONING || '').trim() !== '1' &&
+  /openrouter\.ai/i.test(base);
+
 async function chiediOpenAi(cfg: Configurazione, d: Domanda): Promise<string> {
   const base = (
     process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
@@ -221,6 +236,8 @@ async function chiediOpenAi(cfg: Configurazione, d: Domanda): Promise<string> {
     temperature: 0.2,
   };
 
+  if (ragionamentoDaSpegnere(base)) corpo.reasoning = { enabled: false };
+
   const invia = (body: Record<string, unknown>) =>
     fetch(`${base}/chat/completions`, {
       method: 'POST',
@@ -230,6 +247,13 @@ async function chiediOpenAi(cfg: Configurazione, d: Domanda): Promise<string> {
       },
       body: JSON.stringify(body),
     });
+
+  const leggiTesto = async (risposta: Response): Promise<string> => {
+    const dati = (await risposta.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    return (dati.choices?.[0]?.message?.content ?? '').trim();
+  };
 
   let risposta = await invia(corpo);
 
@@ -250,6 +274,10 @@ async function chiediOpenAi(cfg: Configurazione, d: Domanda): Promise<string> {
       delete corretto.temperature;
       cambiato = true;
     }
+    if (/reasoning/i.test(dettaglio)) {
+      delete corretto.reasoning;
+      cambiato = true;
+    }
 
     if (!cambiato) {
       throw new ErroreMotore(
@@ -265,11 +293,18 @@ async function chiediOpenAi(cfg: Configurazione, d: Domanda): Promise<string> {
     );
   }
 
-  const dati = (await risposta.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
+  let testo = await leggiTesto(risposta);
 
-  const testo = (dati.choices?.[0]?.message?.content ?? '').trim();
+  // Rete di sicurezza per i modelli che ragionano e non li abbiamo spenti
+  // (fornitore diverso da OpenRouter, o interruttore ASSISTENTE_REASONING):
+  // se il ragionamento si è mangiato tutto il tetto, il testo arriva vuoto.
+  // Meglio un secondo tentativo senza ragionamento che un errore in faccia a
+  // chi ha pagato l'abbonamento. Si riprova una volta sola.
+  if (!testo && !corpo.reasoning) {
+    const riprova = await invia({ ...corpo, reasoning: { enabled: false } });
+    if (riprova.ok) testo = await leggiTesto(riprova);
+  }
+
   if (!testo) throw new ErroreMotore('Il modello ha risposto senza testo.');
   return testo;
 }
