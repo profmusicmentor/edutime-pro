@@ -21,7 +21,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-09-02';
+export const NOVITA_VERSIONE = '2026-09-02b';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -33,6 +33,15 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-02b',
+    data: '2 settembre 2026',
+    voci: [
+      'Il «Monte ore» in «Gestione Sezioni» si riesce finalmente a cambiare. Prima, appena si cancellava il numero, la casella tornava da sola a 30 e non si riusciva più a scriverci dentro: alla primaria diventava impossibile impostare 24 o 27. Adesso la casella resta vuota mentre si scrive, accetta anche le mezze ore, e sotto ci sono i valori pronti 24, 27, 30, 36 e 40 da premere per impostarli in un colpo solo.',
+      'Il lucchetto «🔒 Sola Lettura» adesso si nota. Sotto l\'intestazione compare una fascia gialla che spiega perché i comandi sono grigi, con il pulsante «🔓 Torna a modificare». Il blocco riguarda solo il proprio browser: non dipende dal cloud né dal collega che ha passato il codice scuola, e chi ha il codice può sempre scrivere.',
+      'Nei «🧑\u200d🏫 Consigli di classe» il piano dice quante sale sta usando davvero, per esempio «Sale usate: 1 su 3», e spiega il perché: due consigli occupano due sale nello stesso momento solo se non hanno nessun docente in comune, altrimenti le riunioni vanno una dopo l\'altra e le altre sale restano vuote.',
+    ],
+  },
   {
     versione: '2026-09-02',
     data: '2 settembre 2026',

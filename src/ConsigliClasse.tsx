@@ -572,6 +572,14 @@ export default function ConsigliClasse({
 
   const slotPerGiornoUI = slotAlGiorno(config);
 
+  /**
+   * Sale davvero occupate dal piano. Due consigli stanno in due sale nello
+   * stesso momento solo se non hanno nessun docente in comune: quando i
+   * docenti si ripetono il piano usa una sala sola, e chi ne aveva create
+   * tre pensava che le altre venissero ignorate.
+   */
+  const saleUsate = new Set(piano.righe.map((r) => r.salaId)).size;
+
   /** «12/09/2026» oppure «dal 12/09/2026 al 15/09/2026» */
   const periodoTesto =
     piano.giornate.length > 1
@@ -1179,6 +1187,18 @@ export default function ConsigliClasse({
             {piano.avvisiJolly.join(' · ')}
           </div>
         )}
+        {piano.righe.length > 0 && saleUsate < config.sale.length && (
+          <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-600">
+            <span className="font-bold">
+              Sale usate: {saleUsate} su {config.sale.length}.
+            </span>{' '}
+            Due consigli occupano due sale nello stesso momento solo quando non
+            hanno nessun docente in comune. Qui i docenti si ripetono, quindi
+            le riunioni vanno una dopo l'altra e le altre sale restano vuote.
+            Non è un errore: per riempirle servono consigli con docenti
+            diversi, oppure segna come jolly chi può spostarsi.
+          </div>
+        )}
 
         <div className="mt-4 flex flex-wrap gap-2">
           {tabBtn('classi', `📋 Classi e docenti (${nConsigliAttivi})`)}
@@ -1382,7 +1402,8 @@ export default function ConsigliClasse({
           ) : (
             <>
               <div className="text-sm text-slate-500 mb-3">
-                {piano.righe.length} consigli · {config.sale.length} sale ·{' '}
+                {piano.righe.length} consigli · {saleUsate} sale su{' '}
+                {config.sale.length} ·{' '}
                 {piano.giornate.length}{' '}
                 {piano.giornate.length === 1 ? 'pomeriggio' : 'pomeriggi'} ·{' '}
                 {periodoTesto} · dalle {config.oraInizio} alle {config.oraFine}

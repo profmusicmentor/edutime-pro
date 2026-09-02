@@ -2568,6 +2568,15 @@ export default function App() {
     'anno'
   );
   const [readOnlyMode, setReadOnlyMode] = useState(false);
+  /**
+   * Testo che si sta scrivendo nel campo «Monte ore», sezione per sezione.
+   * Serve perché il campo possa restare vuoto mentre si cancella: prima il
+   * valore tornava da solo a 30 appena la casella si svuotava, e alla primaria
+   * diventava impossibile scriverci 24 o 27.
+   */
+  const [weeklyHoursDraft, setWeeklyHoursDraft] = useState<
+    Record<string, string>
+  >({});
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [invitedCode] = useState<string | null>(() => codeFromUrl());
   const [cloudStatus, setCloudStatus] = useState<CloudStatus>('connessione');
@@ -9067,6 +9076,31 @@ export default function App() {
         </div>
       </header>
       {/*
+        Avviso di sola lettura. Il lucchetto nell'intestazione dice lo stato ma
+        non si nota: chi lo accendeva per sbaglio trovava tutti i comandi grigi
+        e lo scambiava per un limite del cloud o del link ricevuto dal collega.
+      */}
+      {readOnlyMode && (
+        <div className="bg-amber-400 text-brand-950 px-4 py-2.5 shrink-0 print:hidden">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+            <p className="text-xs sm:text-sm font-semibold">
+              🔒 Sei in <u>sola lettura</u>: vedi tutto, ma i comandi restano
+              grigi.{' '}
+              <span className="font-normal">
+                È un blocco di questo browser, non dipende dal cloud né da chi
+                ti ha passato il codice scuola.
+              </span>
+            </p>
+            <button
+              onClick={() => setReadOnlyMode(false)}
+              className="shrink-0 bg-brand-900 hover:bg-brand-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+            >
+              🔓 Torna a modificare
+            </button>
+          </div>
+        </div>
+      )}
+      {/*
         Avviso di salvataggio fallito. Sta sotto l'intestazione, largo quanto
         la pagina, perché il badge piccolo nell'angolo non bastava: chi non lo
         notava continuava a lavorare credendo che tutto fosse al sicuro.
@@ -12860,7 +12894,7 @@ export default function App() {
                                 if (readOnlyMode) return;
                                 const newName = window
                                   .prompt(
-                                    `Nuovo nome per la sezione {section}:`,
+                                    `Nuovo nome per la sezione ${section}:`,
                                     section
                                   )
                                   ?.toUpperCase();
@@ -12952,19 +12986,66 @@ export default function App() {
                               min={1}
                               max={60}
                               step={0.5}
-                              value={getSectionWeeklyHours(section)}
-                              onChange={(e) =>
-                                handleUpdateSection(
-                                  section,
-                                  'weeklyHours',
-                                  Number(e.target.value)
-                                )
+                              value={
+                                weeklyHoursDraft[section] ??
+                                String(getSectionWeeklyHours(section))
+                              }
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                setWeeklyHoursDraft((d) => ({
+                                  ...d,
+                                  [section]: raw,
+                                }));
+                                const n = Number(raw.replace(',', '.'));
+                                if (raw.trim() !== '' && n > 0)
+                                  handleUpdateSection(
+                                    section,
+                                    'weeklyHours',
+                                    n
+                                  );
+                              }}
+                              onBlur={() =>
+                                setWeeklyHoursDraft((d) => {
+                                  const rest = { ...d };
+                                  delete rest[section];
+                                  return rest;
+                                })
                               }
                               disabled={readOnlyMode}
                               list="monte-ore-tipici"
                               className="w-16 text-center border border-slate-300 rounded p-1 font-normal focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
                             />
                           </label>
+                          <div className="flex flex-wrap gap-1 justify-end -mt-1">
+                            {COMMON_WEEKLY_HOURS.map((h) => (
+                              <button
+                                key={h}
+                                type="button"
+                                onClick={() => {
+                                  if (readOnlyMode) return;
+                                  setWeeklyHoursDraft((d) => {
+                                    const rest = { ...d };
+                                    delete rest[section];
+                                    return rest;
+                                  });
+                                  handleUpdateSection(
+                                    section,
+                                    'weeklyHours',
+                                    h
+                                  );
+                                }}
+                                disabled={readOnlyMode}
+                                title={`Monte ore di ${h} ore a settimana`}
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                                  getSectionWeeklyHours(section) === h
+                                    ? 'bg-brand-600 text-white border-brand-600'
+                                    : 'bg-white text-slate-500 border-slate-300 hover:border-brand-400'
+                                }`}
+                              >
+                                {h}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       );
                     }
