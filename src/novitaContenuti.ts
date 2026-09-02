@@ -21,7 +21,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-09-01e';
+export const NOVITA_VERSIONE = '2026-09-02';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -33,6 +33,14 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-02',
+    data: '2 settembre 2026',
+    voci: [
+      'Il calendario dei «🧑‍🏫 Consigli di classe» non va più a finire di sera tardi o di notte. Prima le riunioni si accodavano una dopo l\'altra senza mai fermarsi; adesso si imposta la fascia oraria del pomeriggio («Dalle» e «Alle») e nessun consiglio finisce oltre quell\'ora. Quando un pomeriggio è pieno, l\'app passa al giorno feriale successivo: con «Pomeriggi a disposizione» si dice quanti giorni può usare (di partenza tre), la domenica resta sempre libera e il sabato si usa solo se lo si accende. Sotto le impostazioni è scritto quanti consigli entrano in un pomeriggio.',
+      'Il calendario esce diviso per giornata, con la data in cima a ogni tabella; nell\'Excel c\'è la colonna «Giorno», sia nel foglio del calendario sia in quello degli impegni per docente. Se i giorni indicati non bastano, le classi che avanzano compaiono fra i «consigli non collocati» con scritto cosa fare: aggiungere giorni o sale, allungare la fascia oraria o accorciare le riunioni.',
+    ],
+  },
   {
     versione: '2026-09-01e',
     data: '1 settembre 2026',

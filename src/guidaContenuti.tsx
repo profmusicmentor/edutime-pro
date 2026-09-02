@@ -1767,15 +1767,34 @@ export const chapters: Chapter[] = [
         tag: 'calendario',
         body: (
           <>
-            Imposti giorno, ora di inizio, durata e quante sale hai a
-            disposizione: l'app piazza tanti consigli in contemporanea quante
-            sono le sale, e le sale possono stare in sedi diverse. I docenti
-            che stanno in tante classi (religione, motoria, sostegno
-            itinerante) si segnano come <B>jolly</B>: non bloccano il
-            parallelo, compaiono in più consigli insieme e l'app avvisa che per
-            loro i turni vanno concordati a parte. Con la spunta della{' '}
-            <B>pausa pranzo</B>, chi ha fatto l'ultima ora del mattino resta
-            fuori dal primo consiglio del pomeriggio.
+            Imposti il giorno di partenza, la fascia oraria (<B>dalle</B> e{' '}
+            <B>alle</B>), la durata e quante sale hai a disposizione: l'app
+            piazza tanti consigli in contemporanea quante sono le sale, e le
+            sale possono stare in sedi diverse. I docenti che stanno in tante
+            classi (religione, motoria, sostegno itinerante) si segnano come{' '}
+            <B>jolly</B>: non bloccano il parallelo, compaiono in più consigli
+            insieme e l'app avvisa che per loro i turni vanno concordati a
+            parte. Con la spunta della <B>pausa pranzo</B>, chi ha fatto
+            l'ultima ora del mattino resta fuori dal primo consiglio del
+            pomeriggio.
+          </>
+        ),
+      },
+      {
+        title: 'Più pomeriggi, mai di sera tardi',
+        tag: 'calendario',
+        body: (
+          <>
+            Nessun consiglio finisce oltre l'ora di fine che hai scritto: quando
+            un pomeriggio è pieno, l'app passa al giorno feriale dopo. Con{' '}
+            <B>«Pomeriggi a disposizione»</B> dici quanti giorni può usare, e la
+            domenica resta sempre libera (il sabato solo se lo accendi). Sotto
+            le impostazioni c'è scritto quanti consigli entrano in un
+            pomeriggio; se i giorni non bastano, le classi che avanzano
+            compaiono fra i <B>consigli non collocati</B>: aggiungi giorni o
+            sale, allunga la fascia oraria o accorcia le riunioni. Il calendario
+            esce diviso per giornata, e nell'Excel c'è la colonna{' '}
+            <B>Giorno</B>.
           </>
         ),
       },
