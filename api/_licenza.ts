@@ -58,12 +58,30 @@ const MSG_SCADUTA =
 const MSG_DISATTIVATA = 'Questa chiave è stata disattivata.';
 const MSG_ALTRO_PRODOTTO = 'Questa chiave è di un altro prodotto.';
 const MSG_ALTRO_NEGOZIO = "Questa chiave non è di EduTime Pro.";
+const MSG_SENZA_CHIAVE =
+  "Le funzioni con l'intelligenza artificiale fanno parte dell'abbonamento EduTime Pro AI. Incolla qui la tua chiave.";
+
 const MSG_DA_COLLEGARE =
   'Collega la chiave a questo dispositivo: incollala qui sotto e premi Attiva.';
 const MSG_TETTO =
   'Questa chiave è già collegata al numero massimo di dispositivi. Apri EduTime Pro sul dispositivo che non usi più e premi «Togli la chiave da questo dispositivo»: il posto torna libero subito.';
 const MSG_LEMON_MUTO =
   'Non riesco a raggiungere il negozio per collegare la chiave. Riprova fra qualche minuto.';
+
+/**
+ * `interruttore` e' il nome della variabile d'ambiente che comanda questa
+ * funzione, al posto di ASSISTENTE_RICHIEDE_LICENZA. Serve alle funzioni che
+ * hanno un calendario loro: la lettura del PDF con l'IA e la proposta di
+ * sistemazione dei conflitti sono in prova libera mentre l'assistente della
+ * guida e' gia' a pagamento, e il giorno in cui entrano nell'abbonamento si
+ * decide da solo, senza toccare quello dell'assistente.
+ *
+ * Vale la regola solita: se la variabile non dice '1', la funzione e' aperta
+ * a tutti e la chiave non viene nemmeno chiesta.
+ */
+export interface OpzioniVerifica {
+  interruttore?: string;
+}
 
 export interface EsitoLicenza {
   valida: boolean;
@@ -175,9 +193,13 @@ function valuta(dati: RispostaLemon): EsitoLicenza {
  */
 export async function verificaLicenza(
   grezzaChiave: unknown,
-  grezzaIstanza?: unknown
+  grezzaIstanza?: unknown,
+  opzioni?: OpzioniVerifica
 ): Promise<EsitoLicenza> {
-  if (!licenzaObbligatoria()) return { valida: true };
+  const obbligatoria = opzioni?.interruttore
+    ? (process.env[opzioni.interruttore] || '').trim() === '1'
+    : licenzaObbligatoria();
+  if (!obbligatoria) return { valida: true };
 
   const chiave = uuid(grezzaChiave);
   if (!chiave) {
@@ -186,7 +208,7 @@ export async function verificaLicenza(
       valida: false,
       motivo: scritta
         ? MSG_STORTA
-        : "L'assistente che scrive le risposte è per chi ha l'abbonamento. Incolla qui la tua chiave.",
+        : MSG_SENZA_CHIAVE,
     };
   }
 

@@ -23,6 +23,15 @@ import ConsigliClasse, {
 } from './ConsigliClasse';
 import type { ConsiglioClasse, ConsigliConfig } from './ConsigliClasse';
 import type { ModoNovita } from './Novita';
+import { idCliente, leggiIstanza, leggiLicenza } from './assistenteIA';
+import {
+  aiutoConflittiDisponibile,
+  chiediProposta,
+  costruisciFotografia,
+  ErroreLicenzaConflitti,
+  provaMosse,
+  type EsitoProva,
+} from './risolviConflittiIA';
 import { applicaTema, temaIniziale } from './tema';
 import type { Tema } from './tema';
 import {
@@ -2503,6 +2512,474 @@ const GiornataDocente = ({
   </div>
 );
 
+/**
+ * Tutti i conflitti di un orario, piu' quante ore ha in griglia ogni classe.
+ *
+ * Sta qui fuori dal componente, e non dentro il useMemo che lo mostra, per un
+ * motivo solo: la proposta di sistemazione scritta dall'IA deve poter
+ * ricalcolare gli stessi conflitti su un orario finto, quello che verrebbe
+ * fuori applicando le mosse, e confrontarlo con quello vero. Il conto e'
+ * identico nei due casi, quindi il codice deve essere lo stesso: se le due
+ * strade divergessero, l'anteprima direbbe una cosa e l'orario ne farebbe
+ * un'altra.
+ */
+const calcolaConflitti = (ctx: any) => {
+  const {
+    timetable,
+    classes,
+    sectionsConfig,
+    allStaff,
+    mergedHoursMap,
+    generationRules,
+    staffHoursPlanned,
+    staffHoursActual,
+    groupConstraints,
+    rooms,
+    sedi,
+    diurnalHours,
+    afternoonHours,
+    getSectionGrid,
+    getSectionWeeklyHours,
+    hourWeight,
+    maxGridDays,
+    gridHourRows,
+    teachers,
+  } = ctx;
+    const conflicts: any[] = [];
+    const classHourCounts: any = {};
+    classes.forEach((c) => {
+      classHourCounts[c.id] = 0;
+    });
+    const teacherSchedules: any = {};
+    const sostegnoSchedules: any = {};
+    const teacherDailyClassCounts: any = {};
+    const maxPerClassPerDay = maxHoursPerClassPerDayFor(generationRules);
+    const roomSchedules: any = {};
+
+    allStaff.forEach((staff) => {
+      const planned = staffHoursPlanned[staff.id] || 0;
+      const actual = staffHoursActual[staff.id] || 0;
+      if (actual > planned) {
+        conflicts.push({
+          type: 'error',
+          message: `Il docente ${staff.name} ha ${formatHours(
+            actual
+          )} ore in orario ma ne sono state assegnate solo ${formatHours(
+            planned
+          )}.`,
+          suggestion: `Rimuovi ${formatHours(
+            actual - planned
+          )} ora/e dalla tabella Orario Generale oppure aggiungi ore nel Registro Cattedre.`,
+          teacherId: staff.id,
+        });
+      }
+      const daysOff = generationRules.teacherDaysOff[staff.id] || [];
+      // Le ore bloccate non hanno un tetto come i giorni liberi: il freno è
+      // che restino abbastanza celle per le ore di cattedra.
+      const hoursOff = (generationRules.teacherHoursOff || {})[staff.id] || [];
+      if (planned > 0 && hoursOff.length > 0) {
+        const staffHours =
+          staff.staffType === 'strumento' ? afternoonHours : gridHourRows;
+        let freeCells = 0;
+        DAYS.slice(0, maxGridDays).forEach((_, d) => {
+          if (daysOff.includes(d)) return;
+          if (staff.staffType === 'strumento' && d === 5) return;
+          staffHours.forEach((h: any) => {
+            if (!hoursOff.includes(hourOffKey(d, h.index))) freeCells++;
+          });
+        });
+        if (freeCells < planned) {
+          conflicts.push({
+            type: 'error',
+            message: `Il docente ${staff.name} ha ${formatHours(
+              planned
+            )} ore pianificate ma solo ${freeCells} celle disponibili dopo giorni e ore di indisponibilità.`,
+            suggestion: `Libera qualche ora nella griglia di indisponibilità oppure riduci le ore in cattedra.`,
+            teacherId: staff.id,
+          });
+        }
+      }
+      // Il tetto di ore al giorno può rendere la cattedra impossibile da
+      // piazzare: meglio dirlo qui che lasciare ore fuori dall'orario senza
+      // spiegazione.
+      const capPerDay = maxHoursPerDayFor(generationRules);
+      if (planned > 0 && capPerDay > 0 && staff.staffType !== 'strumento') {
+        let workDays = 0;
+        DAYS.slice(0, maxGridDays).forEach((_, d) => {
+          if (!daysOff.includes(d)) workDays++;
+        });
+        const capacity = workDays * capPerDay;
+        if (capacity < planned) {
+          conflicts.push({
+            type: 'error',
+            message: `Il docente ${staff.name} ha ${formatHours(
+              planned
+            )} ore pianificate ma con il tetto di ${capPerDay} ore al giorno su ${workDays} giorni ne entrano al massimo ${capacity}.`,
+            suggestion: `Alza il tetto di ore al giorno in "Sezioni & Regole", togli un giorno libero oppure riduci le ore in cattedra.`,
+            teacherId: staff.id,
+          });
+        }
+      }
+      // Giornate rimaste sotto il minimo: il docente viene a scuola per
+      // un'ora sola e la passata di consolidamento non è riuscita a chiuderla.
+      const minPerDay = minHoursPerDayFor(generationRules);
+      if (minPerDay > 1) {
+        const perDay: Record<number, number> = {};
+        timetable.forEach((s) => {
+          if (s.teacherId === staff.id)
+            perDay[s.day] = (perDay[s.day] || 0) + 1;
+        });
+        const corte = Object.entries(perDay)
+          .filter(([, n]) => n < minPerDay)
+          .map(([d]) => DAYS[Number(d)]);
+        if (corte.length > 0) {
+          conflicts.push({
+            type: 'warning',
+            message: `Il docente ${staff.name} ha una giornata sotto il minimo di ${minPerDay} ore (${corte.join(', ')}).`,
+            suggestion: `Sposta a mano quelle ore in un giorno in cui è già a scuola, oppure abbassa il minimo in "Sezioni & Regole".`,
+            teacherId: staff.id,
+          });
+        }
+      }
+      const maxAllowed = getMaxDaysOffForHours(planned);
+      if (planned > 0 && daysOff.length > maxAllowed) {
+        conflicts.push({
+          type: 'error',
+          message: `Il docente ${staff.name} ha ${planned}h pianificate e ${daysOff.length} giorni liberi (max consentito: ${maxAllowed}).`,
+          suggestion: `Con ${planned} ore settimanali, il sistema consente al massimo ${maxAllowed} giorno/i libero/i.`,
+          teacherId: staff.id,
+        });
+      }
+    });
+
+    timetable.forEach((slot) => {
+      const { classId, day, hour, teacherId, type, room } = slot;
+      const classObj = classes.find((c) => c.id === classId);
+      if (!classObj) return;
+
+      // "Lab. Musica" sulle lezioni di strumento e' solo un'etichetta di
+      // comodo quando in "Aule" non c'e' un'aula dedicata a quello strumento:
+      // le lezioni sono individuali e ogni docente ha il suo spazio. Segnalare
+      // un conflitto d'aula li' vorrebbe dire dare al collega un allarme che
+      // non puo' risolvere. Se invece l'aula e' configurata, vale come tutte
+      // le altre.
+      const isEtichettaDiComodo =
+        slot.type === 'pomeriggio_musica' &&
+        getRoomForSubject(slot.subject, rooms) === 'Aula';
+
+      if (room && room !== 'Aula' && room !== 'Classe' && !isEtichettaDiComodo) {
+        const rKey = `${room}_${day}_${hour}`;
+        if (!roomSchedules[rKey]) roomSchedules[rKey] = [];
+        roomSchedules[rKey].push(classId);
+      }
+
+      if (teacherId) {
+        const daysOff = generationRules.teacherDaysOff[teacherId] || [];
+        if (daysOff.includes(day)) {
+          conflicts.push({
+            type: 'error',
+            message: `Il docente ${
+              allStaff.find((t) => t.id === teacherId)?.name
+            } è stato assegnato in un giorno di indisponibilità (${
+              DAYS[day]
+            }).`,
+            slot,
+          });
+        } else if (isTeacherOff(generationRules, teacherId, day, hour)) {
+          const hourLabel =
+            [...diurnalHours, ...afternoonHours].find((h) => h.index === hour)
+              ?.label || `${hour + 1}ª`;
+          conflicts.push({
+            type: 'error',
+            message: `Il docente ${
+              allStaff.find((t) => t.id === teacherId)?.name
+            } è stato assegnato in un'ora di indisponibilità (${
+              DAYS[day]
+            }, ${hourLabel}).`,
+            slot,
+          });
+        }
+      }
+      // I limiti della griglia (quanti giorni, quante ore, se c'è il rientro)
+      // arrivano dalle impostazioni del modello, non più da numeri fissi.
+      const grid = getSectionGrid(classObj.section);
+      if (day >= grid.days && hour < gridSlots(grid)) {
+        conflicts.push({
+          type: 'error',
+          message: `La classe ${classId} ha ore assegnate di ${DAYS[day]}, fuori dai ${grid.days} giorni del suo modello.`,
+          slot,
+        });
+      }
+      // Ore oltre la giornata di quel giorno: capita a chi accorcia un giorno
+      // dopo aver generato l'orario, e va detto invece di lasciarlo in tabella.
+      if (
+        type === 'materia' &&
+        day < grid.days &&
+        hour >= curricularSlotsOn(grid, day) &&
+        hour < curricularSlots(grid)
+      ) {
+        conflicts.push({
+          type: 'error',
+          message: `La classe ${classId} ha una lezione oltre le ${hoursOfDay(
+            grid,
+            day
+          )} ore di ${DAYS[day].toLowerCase()} previste dal suo modello.`,
+          slot,
+        });
+      }
+      if (grid.rientro && hour === curricularSlots(grid) && type === 'materia') {
+        conflicts.push({
+          type: 'error',
+          message: `La classe ${classId} ha una materia nell'ora del rientro pomeridiano.`,
+          slot,
+        });
+      }
+      // Le ore pomeridiane curricolari fanno monte ore come quelle del
+      // mattino: sono le due di educazione motoria che portano la quarta e la
+      // quinta della primaria da 27 a 29 ore. Fuori resta solo il rientro.
+      const isDiurnalClassHour = hour < curricularSlots(grid);
+      if (type === 'materia' && isDiurnalClassHour)
+        classHourCounts[classId] =
+          (classHourCounts[classId] || 0) + hourWeight(hour);
+      if (type === 'materia' && teacherId) {
+        const tcdKey = `${teacherId}_${classId}_${day}`;
+        teacherDailyClassCounts[tcdKey] =
+          (teacherDailyClassCounts[tcdKey] || 0) + 1;
+        if (
+          maxPerClassPerDay > 0 &&
+          teacherDailyClassCounts[tcdKey] > maxPerClassPerDay
+        ) {
+          conflicts.push({
+            type: 'error',
+            message: `Il docente ${
+              allStaff.find((t) => t.id === teacherId)?.name
+            } supera il limite di ${maxPerClassPerDay} ore giornaliere nella classe ${classId}.`,
+            slot,
+          });
+        }
+      }
+      if (
+        teacherId &&
+        (type === 'materia' ||
+          type === 'pomeriggio_musica' ||
+          type === 'compresenza')
+      ) {
+        const key = `${day}_${hour}`;
+        if (!teacherSchedules[teacherId]) teacherSchedules[teacherId] = {};
+        if (!teacherSchedules[teacherId][key])
+          teacherSchedules[teacherId][key] = [];
+        teacherSchedules[teacherId][key].push(classId);
+        if (teacherSchedules[teacherId][key].length > 1) {
+          conflicts.push({
+            type: 'conflict',
+            message: `Il docente ${
+              allStaff.find((t) => t.id === teacherId)?.name
+            } è assegnato a più classi contemporaneamente (${teacherSchedules[
+              teacherId
+            ][key].join(', ')}) il ${DAYS[day]} alle ore ${
+              mergedHoursMap[hour]?.label
+            }.`,
+            slot,
+          });
+        }
+      }
+      if (
+        teacherId &&
+        room &&
+        (type === 'materia' || type === 'pomeriggio_musica')
+      ) {
+        const currentSede = getSedeForSlot(slot, rooms, classes, sectionsConfig);
+        if (currentSede) {
+          const nextSlot = timetable.find(
+            (s) =>
+              s.teacherId === teacherId &&
+              s.day === day &&
+              s.hour === hour + 1 &&
+              (s.type === 'materia' || s.type === 'pomeriggio_musica')
+          );
+          if (nextSlot) {
+            const nextSede = getSedeForSlot(
+              nextSlot,
+              rooms,
+              classes,
+              sectionsConfig
+            );
+            if (nextSede && nextSede !== currentSede) {
+              const sedeName = (id: string) =>
+                sedi.find((s) => s.id === id)?.name || id;
+              conflicts.push({
+                type: 'error',
+                message: `Il docente ${
+                  allStaff.find((t) => t.id === teacherId)?.name
+                } passa dalla sede "${sedeName(
+                  currentSede
+                )}" alla sede "${sedeName(
+                  nextSede
+                )}" il ${DAYS[day]} tra le ore ${
+                  mergedHoursMap[hour]?.label
+                } e ${mergedHoursMap[hour + 1]?.label}, senza un'ora di buco per lo spostamento.`,
+                suggestion: `Lascia un'ora libera tra le due lezioni in sedi diverse, oppure assegna un altro docente.`,
+                slot,
+              });
+            }
+          }
+        }
+      }
+      if (type === 'sostegno' && teacherId) {
+        const key = `${day}_${hour}`;
+        if (!sostegnoSchedules[teacherId]) sostegnoSchedules[teacherId] = {};
+        if (!sostegnoSchedules[teacherId][key])
+          sostegnoSchedules[teacherId][key] = [];
+        sostegnoSchedules[teacherId][key].push(classId);
+        if (sostegnoSchedules[teacherId][key].length > 1) {
+          conflicts.push({
+            type: 'conflict',
+            message: `Il docente di sostegno ${
+              allStaff.find((s) => s.id === teacherId)?.name
+            } si trova in più classi contemporaneamente.`,
+            slot,
+          });
+        }
+      }
+    });
+
+    Object.entries(roomSchedules).forEach(([key, cls]: any) => {
+      const [roomName] = key.split('_');
+      if (cls.length > roomCapacity(roomName, rooms)) {
+        const [room, day, hour] = key.split('_');
+        conflicts.push({
+          type: 'error',
+          message: `Conflitto Aula: ${room} (${roomCapacity(
+            room,
+            rooms
+          )} disponibile/i) è occupata contemporaneamente da ${cls.join(
+            ', '
+          )}.`,
+          suggestion: `Sposta una delle lezioni in un'altra ora o assegna un'altra aula.`,
+          slot: timetable.find(
+            (s) =>
+              s.room === room &&
+              s.day === parseInt(day) &&
+              s.hour === parseInt(hour)
+          ),
+        });
+      }
+    });
+
+    // Una materia collegata a un'aula speciale può chiedere più ore di quante
+    // l'aula ne offra in una settimana: le ore in eccesso non entrano
+    // nell'orario e sembrano sparite. Meglio dirlo prima di generare.
+    const oreRichiestePerMateria: Record<string, number> = {};
+    teachers.forEach((t) => {
+      (t.assignments || []).forEach((a: any) => {
+        oreRichiestePerMateria[t.subject] =
+          (oreRichiestePerMateria[t.subject] || 0) + a.hours;
+      });
+    });
+    const celleSettimanali = maxGridDays * gridHourRows.length;
+    const materiePerAula: Record<string, string[]> = {};
+    Object.keys(oreRichiestePerMateria).forEach((subject) => {
+      const room = getRoomForSubject(subject, rooms);
+      if (!room || room === 'Aula' || room === 'Classe') return;
+      if (!materiePerAula[room]) materiePerAula[room] = [];
+      materiePerAula[room].push(subject);
+    });
+    Object.entries(materiePerAula).forEach(([room, subjects]) => {
+      const richieste = subjects.reduce(
+        (sum, s) => sum + (oreRichiestePerMateria[s] || 0),
+        0
+      );
+      const disponibili = celleSettimanali * roomCapacity(room, rooms);
+      if (richieste > disponibili) {
+        conflicts.push({
+          type: 'error',
+          message: `${subjects.join(' e ')} ${
+            subjects.length > 1 ? 'chiedono' : 'chiede'
+          } ${formatHours(
+            richieste
+          )} ore ma "${room}" ne offre ${disponibili} a settimana: ${formatHours(
+            richieste - disponibili
+          )} ore non entreranno in orario.`,
+          suggestion: `In "Aule e Laboratori" aumenta quante ${room} ci sono, oppure scollega la materia dall'aula se si può fare in classe.`,
+        });
+      }
+    });
+
+    groupConstraints.forEach((gc) => {
+      const slots1 = timetable.filter(
+        (s) => s.classId === gc.class1 && s.subject === gc.subject
+      );
+      const slots2 = timetable.filter(
+        (s) => s.classId === gc.class2 && s.subject === gc.subject
+      );
+      let overlap = false;
+      slots1.forEach((s1) => {
+        if (slots2.some((s2) => s2.day === s1.day && s2.hour === s1.hour))
+          overlap = true;
+      });
+      if (!overlap && slots1.length > 0 && slots2.length > 0) {
+        conflicts.push({
+          type: 'warning',
+          message: `Accorpamento non rispettato: ${gc.class1} e ${gc.class2} dovrebbero avere ${gc.subject} contemporaneamente.`,
+        });
+      }
+    });
+
+    // Materie che la scuola ha messo fra quelle da non affiancare e che sono
+    // finite lo stesso giorno: è un avviso, non un errore. La regola è una
+    // preferenza didattica e l'app preferisce appaiarle piuttosto che
+    // lasciare un'ora fuori dall'orario.
+    separationViolations(timetable, generationRules).forEach((v) => {
+      conflicts.push({
+        type: 'warning',
+        message: `Nella classe ${v.classId} ${v.subjects.join(
+          ' e '
+        )} capitano nello stesso giorno (${DAYS[v.day] || `giorno ${v.day + 1}`}).`,
+        suggestion:
+          'Sono materie che hai messo fra quelle da non affiancare: l\'orario non è riuscito a dividerle. Scambia a mano una delle due ore con una lezione di un altro giorno, oppure togli la coppia in "Sezioni & Regole" se non ti serve più.',
+      });
+    });
+
+    classes.forEach((c) => {
+      const hrs = classHourCounts[c.id] || 0;
+      const expected = getSectionWeeklyHours(c.section);
+      if (hrs === expected || hrs === 0) return;
+      // Il Registro Cattedre dice quante ore sono state assegnate ai docenti,
+      // questo conteggio dice quante ne sono davvero finite in orario: se i
+      // due numeri non coincidono è perché qualche ora non è stata piazzata.
+      const inCattedra = teachers.reduce(
+        (sum, t) =>
+          sum +
+          (t.assignments || [])
+            .filter((a: any) => a.classId === c.id)
+            .reduce((s: number, a: any) => s + a.hours, 0),
+        0
+      );
+      const fuori = inCattedra - hrs;
+      conflicts.push({
+        type: 'warning',
+        message:
+          fuori > 0
+            ? `La classe ${c.id} ha ${formatHours(
+                hrs
+              )} ore in orario sulle ${formatHours(
+                expected
+              )} previste: ${formatHours(fuori)} ${
+                fuori === 1
+                  ? 'ora è in cattedra ma non è stata piazzata'
+                  : 'ore sono in cattedra ma non sono state piazzate'
+              }.`
+            : `La classe ${c.id} ha ${formatHours(
+                hrs
+              )} ore in orario sulle ${formatHours(expected)} previste.`,
+        suggestion:
+          fuori > 0
+            ? `Guarda gli altri conflitti: di solito è un'aula satura o un docente senza celle libere. Puoi anche rigenerare o assegnare le ore a mano.`
+            : `Controlla le ore assegnate ai docenti per questa classe nel Registro Cattedre.`,
+      });
+    });
+    return { conflicts, classHourCounts };};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('master-view');
   const [sectionsConfig, setSectionsConfig] = useState<any>(
@@ -3532,442 +4009,37 @@ export default function App() {
     return hours;
   }, [allStaff, timetable, mergedHoursMap]);
 
-  const validationResult = useMemo(() => {
-    const conflicts: any[] = [];
-    const classHourCounts: any = {};
-    classes.forEach((c) => {
-      classHourCounts[c.id] = 0;
-    });
-    const teacherSchedules: any = {};
-    const sostegnoSchedules: any = {};
-    const teacherDailyClassCounts: any = {};
-    const maxPerClassPerDay = maxHoursPerClassPerDayFor(generationRules);
-    const roomSchedules: any = {};
+  /**
+   * Tutto quello che serve a contare i conflitti di un orario qualsiasi.
+   * Prende l'orario come parametro, e non dallo stato, perche' la proposta
+   * dell'IA deve poter pesare anche gli orari finti: quelli che verrebbero
+   * fuori applicando una mossa, prima di applicarla davvero.
+   */
+  const contestoConflitti = (orario: any[]) => ({
+    timetable: orario,
+    classes,
+    sectionsConfig,
+    allStaff,
+    mergedHoursMap,
+    generationRules,
+    staffHoursPlanned,
+    staffHoursActual,
+    groupConstraints,
+    rooms,
+    sedi,
+    diurnalHours,
+    afternoonHours,
+    getSectionGrid,
+    getSectionWeeklyHours,
+    hourWeight,
+    maxGridDays,
+    gridHourRows,
+    teachers,
+  });
 
-    allStaff.forEach((staff) => {
-      const planned = staffHoursPlanned[staff.id] || 0;
-      const actual = staffHoursActual[staff.id] || 0;
-      if (actual > planned) {
-        conflicts.push({
-          type: 'error',
-          message: `Il docente ${staff.name} ha ${formatHours(
-            actual
-          )} ore in orario ma ne sono state assegnate solo ${formatHours(
-            planned
-          )}.`,
-          suggestion: `Rimuovi ${formatHours(
-            actual - planned
-          )} ora/e dalla tabella Orario Generale oppure aggiungi ore nel Registro Cattedre.`,
-          teacherId: staff.id,
-        });
-      }
-      const daysOff = generationRules.teacherDaysOff[staff.id] || [];
-      // Le ore bloccate non hanno un tetto come i giorni liberi: il freno è
-      // che restino abbastanza celle per le ore di cattedra.
-      const hoursOff = (generationRules.teacherHoursOff || {})[staff.id] || [];
-      if (planned > 0 && hoursOff.length > 0) {
-        const staffHours =
-          staff.staffType === 'strumento' ? afternoonHours : gridHourRows;
-        let freeCells = 0;
-        DAYS.slice(0, maxGridDays).forEach((_, d) => {
-          if (daysOff.includes(d)) return;
-          if (staff.staffType === 'strumento' && d === 5) return;
-          staffHours.forEach((h: any) => {
-            if (!hoursOff.includes(hourOffKey(d, h.index))) freeCells++;
-          });
-        });
-        if (freeCells < planned) {
-          conflicts.push({
-            type: 'error',
-            message: `Il docente ${staff.name} ha ${formatHours(
-              planned
-            )} ore pianificate ma solo ${freeCells} celle disponibili dopo giorni e ore di indisponibilità.`,
-            suggestion: `Libera qualche ora nella griglia di indisponibilità oppure riduci le ore in cattedra.`,
-            teacherId: staff.id,
-          });
-        }
-      }
-      // Il tetto di ore al giorno può rendere la cattedra impossibile da
-      // piazzare: meglio dirlo qui che lasciare ore fuori dall'orario senza
-      // spiegazione.
-      const capPerDay = maxHoursPerDayFor(generationRules);
-      if (planned > 0 && capPerDay > 0 && staff.staffType !== 'strumento') {
-        let workDays = 0;
-        DAYS.slice(0, maxGridDays).forEach((_, d) => {
-          if (!daysOff.includes(d)) workDays++;
-        });
-        const capacity = workDays * capPerDay;
-        if (capacity < planned) {
-          conflicts.push({
-            type: 'error',
-            message: `Il docente ${staff.name} ha ${formatHours(
-              planned
-            )} ore pianificate ma con il tetto di ${capPerDay} ore al giorno su ${workDays} giorni ne entrano al massimo ${capacity}.`,
-            suggestion: `Alza il tetto di ore al giorno in "Sezioni & Regole", togli un giorno libero oppure riduci le ore in cattedra.`,
-            teacherId: staff.id,
-          });
-        }
-      }
-      // Giornate rimaste sotto il minimo: il docente viene a scuola per
-      // un'ora sola e la passata di consolidamento non è riuscita a chiuderla.
-      const minPerDay = minHoursPerDayFor(generationRules);
-      if (minPerDay > 1) {
-        const perDay: Record<number, number> = {};
-        timetable.forEach((s) => {
-          if (s.teacherId === staff.id)
-            perDay[s.day] = (perDay[s.day] || 0) + 1;
-        });
-        const corte = Object.entries(perDay)
-          .filter(([, n]) => n < minPerDay)
-          .map(([d]) => DAYS[Number(d)]);
-        if (corte.length > 0) {
-          conflicts.push({
-            type: 'warning',
-            message: `Il docente ${staff.name} ha una giornata sotto il minimo di ${minPerDay} ore (${corte.join(', ')}).`,
-            suggestion: `Sposta a mano quelle ore in un giorno in cui è già a scuola, oppure abbassa il minimo in "Sezioni & Regole".`,
-            teacherId: staff.id,
-          });
-        }
-      }
-      const maxAllowed = getMaxDaysOffForHours(planned);
-      if (planned > 0 && daysOff.length > maxAllowed) {
-        conflicts.push({
-          type: 'error',
-          message: `Il docente ${staff.name} ha ${planned}h pianificate e ${daysOff.length} giorni liberi (max consentito: ${maxAllowed}).`,
-          suggestion: `Con ${planned} ore settimanali, il sistema consente al massimo ${maxAllowed} giorno/i libero/i.`,
-          teacherId: staff.id,
-        });
-      }
-    });
-
-    timetable.forEach((slot) => {
-      const { classId, day, hour, teacherId, type, room } = slot;
-      const classObj = classes.find((c) => c.id === classId);
-      if (!classObj) return;
-
-      // "Lab. Musica" sulle lezioni di strumento e' solo un'etichetta di
-      // comodo quando in "Aule" non c'e' un'aula dedicata a quello strumento:
-      // le lezioni sono individuali e ogni docente ha il suo spazio. Segnalare
-      // un conflitto d'aula li' vorrebbe dire dare al collega un allarme che
-      // non puo' risolvere. Se invece l'aula e' configurata, vale come tutte
-      // le altre.
-      const isEtichettaDiComodo =
-        slot.type === 'pomeriggio_musica' &&
-        getRoomForSubject(slot.subject, rooms) === 'Aula';
-
-      if (room && room !== 'Aula' && room !== 'Classe' && !isEtichettaDiComodo) {
-        const rKey = `${room}_${day}_${hour}`;
-        if (!roomSchedules[rKey]) roomSchedules[rKey] = [];
-        roomSchedules[rKey].push(classId);
-      }
-
-      if (teacherId) {
-        const daysOff = generationRules.teacherDaysOff[teacherId] || [];
-        if (daysOff.includes(day)) {
-          conflicts.push({
-            type: 'error',
-            message: `Il docente ${
-              allStaff.find((t) => t.id === teacherId)?.name
-            } è stato assegnato in un giorno di indisponibilità (${
-              DAYS[day]
-            }).`,
-            slot,
-          });
-        } else if (isTeacherOff(generationRules, teacherId, day, hour)) {
-          const hourLabel =
-            [...diurnalHours, ...afternoonHours].find((h) => h.index === hour)
-              ?.label || `${hour + 1}ª`;
-          conflicts.push({
-            type: 'error',
-            message: `Il docente ${
-              allStaff.find((t) => t.id === teacherId)?.name
-            } è stato assegnato in un'ora di indisponibilità (${
-              DAYS[day]
-            }, ${hourLabel}).`,
-            slot,
-          });
-        }
-      }
-      // I limiti della griglia (quanti giorni, quante ore, se c'è il rientro)
-      // arrivano dalle impostazioni del modello, non più da numeri fissi.
-      const grid = getSectionGrid(classObj.section);
-      if (day >= grid.days && hour < gridSlots(grid)) {
-        conflicts.push({
-          type: 'error',
-          message: `La classe ${classId} ha ore assegnate di ${DAYS[day]}, fuori dai ${grid.days} giorni del suo modello.`,
-          slot,
-        });
-      }
-      // Ore oltre la giornata di quel giorno: capita a chi accorcia un giorno
-      // dopo aver generato l'orario, e va detto invece di lasciarlo in tabella.
-      if (
-        type === 'materia' &&
-        day < grid.days &&
-        hour >= curricularSlotsOn(grid, day) &&
-        hour < curricularSlots(grid)
-      ) {
-        conflicts.push({
-          type: 'error',
-          message: `La classe ${classId} ha una lezione oltre le ${hoursOfDay(
-            grid,
-            day
-          )} ore di ${DAYS[day].toLowerCase()} previste dal suo modello.`,
-          slot,
-        });
-      }
-      if (grid.rientro && hour === curricularSlots(grid) && type === 'materia') {
-        conflicts.push({
-          type: 'error',
-          message: `La classe ${classId} ha una materia nell'ora del rientro pomeridiano.`,
-          slot,
-        });
-      }
-      // Le ore pomeridiane curricolari fanno monte ore come quelle del
-      // mattino: sono le due di educazione motoria che portano la quarta e la
-      // quinta della primaria da 27 a 29 ore. Fuori resta solo il rientro.
-      const isDiurnalClassHour = hour < curricularSlots(grid);
-      if (type === 'materia' && isDiurnalClassHour)
-        classHourCounts[classId] =
-          (classHourCounts[classId] || 0) + hourWeight(hour);
-      if (type === 'materia' && teacherId) {
-        const tcdKey = `${teacherId}_${classId}_${day}`;
-        teacherDailyClassCounts[tcdKey] =
-          (teacherDailyClassCounts[tcdKey] || 0) + 1;
-        if (
-          maxPerClassPerDay > 0 &&
-          teacherDailyClassCounts[tcdKey] > maxPerClassPerDay
-        ) {
-          conflicts.push({
-            type: 'error',
-            message: `Il docente ${
-              allStaff.find((t) => t.id === teacherId)?.name
-            } supera il limite di ${maxPerClassPerDay} ore giornaliere nella classe ${classId}.`,
-            slot,
-          });
-        }
-      }
-      if (
-        teacherId &&
-        (type === 'materia' ||
-          type === 'pomeriggio_musica' ||
-          type === 'compresenza')
-      ) {
-        const key = `${day}_${hour}`;
-        if (!teacherSchedules[teacherId]) teacherSchedules[teacherId] = {};
-        if (!teacherSchedules[teacherId][key])
-          teacherSchedules[teacherId][key] = [];
-        teacherSchedules[teacherId][key].push(classId);
-        if (teacherSchedules[teacherId][key].length > 1) {
-          conflicts.push({
-            type: 'conflict',
-            message: `Il docente ${
-              allStaff.find((t) => t.id === teacherId)?.name
-            } è assegnato a più classi contemporaneamente (${teacherSchedules[
-              teacherId
-            ][key].join(', ')}) il ${DAYS[day]} alle ore ${
-              mergedHoursMap[hour]?.label
-            }.`,
-            slot,
-          });
-        }
-      }
-      if (
-        teacherId &&
-        room &&
-        (type === 'materia' || type === 'pomeriggio_musica')
-      ) {
-        const currentSede = getSedeForSlot(slot, rooms, classes, sectionsConfig);
-        if (currentSede) {
-          const nextSlot = timetable.find(
-            (s) =>
-              s.teacherId === teacherId &&
-              s.day === day &&
-              s.hour === hour + 1 &&
-              (s.type === 'materia' || s.type === 'pomeriggio_musica')
-          );
-          if (nextSlot) {
-            const nextSede = getSedeForSlot(
-              nextSlot,
-              rooms,
-              classes,
-              sectionsConfig
-            );
-            if (nextSede && nextSede !== currentSede) {
-              const sedeName = (id: string) =>
-                sedi.find((s) => s.id === id)?.name || id;
-              conflicts.push({
-                type: 'error',
-                message: `Il docente ${
-                  allStaff.find((t) => t.id === teacherId)?.name
-                } passa dalla sede "${sedeName(
-                  currentSede
-                )}" alla sede "${sedeName(
-                  nextSede
-                )}" il ${DAYS[day]} tra le ore ${
-                  mergedHoursMap[hour]?.label
-                } e ${mergedHoursMap[hour + 1]?.label}, senza un'ora di buco per lo spostamento.`,
-                suggestion: `Lascia un'ora libera tra le due lezioni in sedi diverse, oppure assegna un altro docente.`,
-                slot,
-              });
-            }
-          }
-        }
-      }
-      if (type === 'sostegno' && teacherId) {
-        const key = `${day}_${hour}`;
-        if (!sostegnoSchedules[teacherId]) sostegnoSchedules[teacherId] = {};
-        if (!sostegnoSchedules[teacherId][key])
-          sostegnoSchedules[teacherId][key] = [];
-        sostegnoSchedules[teacherId][key].push(classId);
-        if (sostegnoSchedules[teacherId][key].length > 1) {
-          conflicts.push({
-            type: 'conflict',
-            message: `Il docente di sostegno ${
-              allStaff.find((s) => s.id === teacherId)?.name
-            } si trova in più classi contemporaneamente.`,
-            slot,
-          });
-        }
-      }
-    });
-
-    Object.entries(roomSchedules).forEach(([key, cls]: any) => {
-      const [roomName] = key.split('_');
-      if (cls.length > roomCapacity(roomName, rooms)) {
-        const [room, day, hour] = key.split('_');
-        conflicts.push({
-          type: 'error',
-          message: `Conflitto Aula: ${room} (${roomCapacity(
-            room,
-            rooms
-          )} disponibile/i) è occupata contemporaneamente da ${cls.join(
-            ', '
-          )}.`,
-          suggestion: `Sposta una delle lezioni in un'altra ora o assegna un'altra aula.`,
-          slot: timetable.find(
-            (s) =>
-              s.room === room &&
-              s.day === parseInt(day) &&
-              s.hour === parseInt(hour)
-          ),
-        });
-      }
-    });
-
-    // Una materia collegata a un'aula speciale può chiedere più ore di quante
-    // l'aula ne offra in una settimana: le ore in eccesso non entrano
-    // nell'orario e sembrano sparite. Meglio dirlo prima di generare.
-    const oreRichiestePerMateria: Record<string, number> = {};
-    teachers.forEach((t) => {
-      (t.assignments || []).forEach((a: any) => {
-        oreRichiestePerMateria[t.subject] =
-          (oreRichiestePerMateria[t.subject] || 0) + a.hours;
-      });
-    });
-    const celleSettimanali = maxGridDays * gridHourRows.length;
-    const materiePerAula: Record<string, string[]> = {};
-    Object.keys(oreRichiestePerMateria).forEach((subject) => {
-      const room = getRoomForSubject(subject, rooms);
-      if (!room || room === 'Aula' || room === 'Classe') return;
-      if (!materiePerAula[room]) materiePerAula[room] = [];
-      materiePerAula[room].push(subject);
-    });
-    Object.entries(materiePerAula).forEach(([room, subjects]) => {
-      const richieste = subjects.reduce(
-        (sum, s) => sum + (oreRichiestePerMateria[s] || 0),
-        0
-      );
-      const disponibili = celleSettimanali * roomCapacity(room, rooms);
-      if (richieste > disponibili) {
-        conflicts.push({
-          type: 'error',
-          message: `${subjects.join(' e ')} ${
-            subjects.length > 1 ? 'chiedono' : 'chiede'
-          } ${formatHours(
-            richieste
-          )} ore ma "${room}" ne offre ${disponibili} a settimana: ${formatHours(
-            richieste - disponibili
-          )} ore non entreranno in orario.`,
-          suggestion: `In "Aule e Laboratori" aumenta quante ${room} ci sono, oppure scollega la materia dall'aula se si può fare in classe.`,
-        });
-      }
-    });
-
-    groupConstraints.forEach((gc) => {
-      const slots1 = timetable.filter(
-        (s) => s.classId === gc.class1 && s.subject === gc.subject
-      );
-      const slots2 = timetable.filter(
-        (s) => s.classId === gc.class2 && s.subject === gc.subject
-      );
-      let overlap = false;
-      slots1.forEach((s1) => {
-        if (slots2.some((s2) => s2.day === s1.day && s2.hour === s1.hour))
-          overlap = true;
-      });
-      if (!overlap && slots1.length > 0 && slots2.length > 0) {
-        conflicts.push({
-          type: 'warning',
-          message: `Accorpamento non rispettato: ${gc.class1} e ${gc.class2} dovrebbero avere ${gc.subject} contemporaneamente.`,
-        });
-      }
-    });
-
-    // Materie che la scuola ha messo fra quelle da non affiancare e che sono
-    // finite lo stesso giorno: è un avviso, non un errore. La regola è una
-    // preferenza didattica e l'app preferisce appaiarle piuttosto che
-    // lasciare un'ora fuori dall'orario.
-    separationViolations(timetable, generationRules).forEach((v) => {
-      conflicts.push({
-        type: 'warning',
-        message: `Nella classe ${v.classId} ${v.subjects.join(
-          ' e '
-        )} capitano nello stesso giorno (${DAYS[v.day] || `giorno ${v.day + 1}`}).`,
-        suggestion:
-          'Sono materie che hai messo fra quelle da non affiancare: l\'orario non è riuscito a dividerle. Scambia a mano una delle due ore con una lezione di un altro giorno, oppure togli la coppia in "Sezioni & Regole" se non ti serve più.',
-      });
-    });
-
-    classes.forEach((c) => {
-      const hrs = classHourCounts[c.id] || 0;
-      const expected = getSectionWeeklyHours(c.section);
-      if (hrs === expected || hrs === 0) return;
-      // Il Registro Cattedre dice quante ore sono state assegnate ai docenti,
-      // questo conteggio dice quante ne sono davvero finite in orario: se i
-      // due numeri non coincidono è perché qualche ora non è stata piazzata.
-      const inCattedra = teachers.reduce(
-        (sum, t) =>
-          sum +
-          (t.assignments || [])
-            .filter((a: any) => a.classId === c.id)
-            .reduce((s: number, a: any) => s + a.hours, 0),
-        0
-      );
-      const fuori = inCattedra - hrs;
-      conflicts.push({
-        type: 'warning',
-        message:
-          fuori > 0
-            ? `La classe ${c.id} ha ${formatHours(
-                hrs
-              )} ore in orario sulle ${formatHours(
-                expected
-              )} previste: ${formatHours(fuori)} ${
-                fuori === 1
-                  ? 'ora è in cattedra ma non è stata piazzata'
-                  : 'ore sono in cattedra ma non sono state piazzate'
-              }.`
-            : `La classe ${c.id} ha ${formatHours(
-                hrs
-              )} ore in orario sulle ${formatHours(expected)} previste.`,
-        suggestion:
-          fuori > 0
-            ? `Guarda gli altri conflitti: di solito è un'aula satura o un docente senza celle libere. Puoi anche rigenerare o assegnare le ore a mano.`
-            : `Controlla le ore assegnate ai docenti per questa classe nel Registro Cattedre.`,
-      });
-    });
-    return { conflicts, classHourCounts };
-  }, [
+  const validationResult = useMemo(
+    () => calcolaConflitti(contestoConflitti(timetable)),
+    [
     timetable,
     classes,
     sectionsConfig,
@@ -3981,6 +4053,7 @@ export default function App() {
     sedi,
     diurnalHours,
     afternoonHours,
+    teachers,
   ]);
 
   /**
@@ -4016,6 +4089,127 @@ export default function App() {
       mixedClasses
     );
     setEditingCell(null);
+  };
+
+  /* ------------------------------- l'aiuto dell'IA sui conflitti */
+
+  const [iaConflittiPronta, setIaConflittiPronta] = useState(false);
+  const [iaConflittiInCorso, setIaConflittiInCorso] = useState(false);
+  const [iaConflittiErrore, setIaConflittiErrore] = useState('');
+  const [iaConflittiNota, setIaConflittiNota] = useState('');
+  const [iaConflittiEsito, setIaConflittiEsito] = useState<EsitoProva | null>(
+    null
+  );
+
+  useEffect(() => {
+    let vivo = true;
+    aiutoConflittiDisponibile().then((ok) => {
+      if (vivo) setIaConflittiPronta(ok);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  /** Tutte le caselle della griglia: i posti dove una lezione puo' stare. */
+  const celleDellaGriglia = () => {
+    const celle: { day: number; hour: number }[] = [];
+    for (let day = 0; day < maxGridDays; day += 1) {
+      for (let hour = 0; hour < gridHourRows.length; hour += 1) {
+        celle.push({ day, hour });
+      }
+    }
+    return celle;
+  };
+
+  /**
+   * Il docente in quella casella non ha lezione e non l'ha bloccata fra le
+   * sue indisponibilita'. E' l'elenco che il modello riceve al posto di
+   * indovinare da solo dove si puo' spostare una lezione.
+   */
+  const docenteLiberoIn = (teacherId: string, day: number, hour: number) => {
+    if (!teacherId) return false;
+    if (isTeacherOff(generationRules, teacherId, day, hour)) return false;
+    return !timetable.some(
+      (s: any) => s.teacherId === teacherId && s.day === day && s.hour === hour
+    );
+  };
+
+  /**
+   * Chiede al modello come sistemare i conflitti, poi prova le sue mosse
+   * sull'orario e tiene solo quelle che migliorano. Qui non si scrive niente:
+   * il risultato finisce nell'anteprima, e l'orario cambia solo con «Applica».
+   */
+  const chiediAiutoConflitti = async () => {
+    if (readOnlyMode || iaConflittiInCorso) return;
+    setIaConflittiErrore('');
+    setIaConflittiNota('');
+    setIaConflittiEsito(null);
+    setIaConflittiInCorso(true);
+    try {
+      const foto = costruisciFotografia({
+        conflitti: validationResult.conflicts,
+        timetable,
+        staff: allStaff,
+        giorni: DAYS_IN_USE,
+        celle: celleDellaGriglia(),
+        docenteLibero: docenteLiberoIn,
+      });
+      const proposta = await chiediProposta(foto, {
+        licenza: leggiLicenza(),
+        istanza: leggiIstanza(),
+        clientId: idCliente(),
+      });
+      const esito = provaMosse(
+        proposta.mosse,
+        timetable,
+        (orario) => calcolaConflitti(contestoConflitti(orario)).conflicts,
+        DAYS_IN_USE
+      );
+      setIaConflittiNota(proposta.nota);
+      setIaConflittiEsito(esito);
+      if (!esito.accettate.length && !proposta.nota) {
+        setIaConflittiErrore(
+          'Non ho trovato nessuno spostamento che migliori l’orario. Questi conflitti vanno sistemati a mano.'
+        );
+      }
+    } catch (e) {
+      if (e instanceof ErroreLicenzaConflitti) {
+        setIaConflittiErrore(
+          `${e.message} L'aiuto sui conflitti fa parte dell'abbonamento EduTime Pro AI: la chiave si incolla nel pannello dell'assistente, in fondo alla Guida.`
+        );
+      } else {
+        setIaConflittiErrore(
+          e instanceof Error ? e.message : 'Proposta non riuscita.'
+        );
+      }
+    } finally {
+      setIaConflittiInCorso(false);
+    }
+  };
+
+  /** Scrive nell'orario le mosse dell'anteprima. */
+  const applicaMosseIa = () => {
+    if (!iaConflittiEsito || readOnlyMode) return;
+    if (!iaConflittiEsito.accettate.length) return;
+    const nuovo = iaConflittiEsito.timetable;
+    setTimetable(nuovo);
+    pushDataToCloud(
+      nuovo,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses
+    );
+    setIaConflittiEsito(null);
+    setIaConflittiNota('');
   };
 
   const handleRemoveSlot = (slotToRemove: any) => {
@@ -13478,6 +13672,126 @@ export default function App() {
                   </p>
                 </div>
               </div>
+              {iaConflittiPronta && validationResult.conflicts.length > 0 && (
+                <div className="mb-6 bg-brand-50 border border-brand-100 rounded-2xl p-4 space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="max-w-2xl">
+                      <h3 className="font-bold text-slate-800 text-sm">
+                        ✨ Fatti aiutare dall&apos;IA
+                      </h3>
+                      <p className="text-xs text-slate-600 mt-1">
+                        L&apos;IA guarda i conflitti qui sotto e propone degli
+                        spostamenti. Prima di mostrarteli, l&apos;app li prova
+                        uno per uno e tiene solo quelli che tolgono davvero un
+                        problema: l&apos;orario non si muove finché non premi
+                        «Applica». I nomi dei docenti non escono dal
+                        computer, al loro posto vanno delle sigle. Fino al 5
+                        settembre 2026 si prova senza chiave; dopo fa parte
+                        dell&apos;abbonamento EduTime Pro AI.
+                      </p>
+                    </div>
+                    <button
+                      onClick={chiediAiutoConflitti}
+                      disabled={readOnlyMode || iaConflittiInCorso}
+                      className="shrink-0 bg-fucsia-600 hover:bg-fucsia-700 disabled:opacity-40 text-white font-bold text-xs py-2 px-4 rounded-lg shadow-sm cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      {iaConflittiInCorso
+                        ? 'Sto pensando…'
+                        : 'Proponi gli spostamenti'}
+                    </button>
+                  </div>
+
+                  {iaConflittiErrore && (
+                    <div className="bg-fucsia-50 border border-fucsia-200 rounded-lg p-3 text-xs text-fucsia-800">
+                      {iaConflittiErrore}
+                    </div>
+                  )}
+
+                  {iaConflittiNota && !iaConflittiEsito?.accettate.length && (
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 text-xs text-slate-600">
+                      {iaConflittiNota}
+                    </div>
+                  )}
+
+                  {iaConflittiEsito && (
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                      <div className="text-sm font-bold text-slate-800">
+                        Conflitti: da {iaConflittiEsito.primaTotale} a{' '}
+                        {iaConflittiEsito.dopoTotale} (errori: da{' '}
+                        {iaConflittiEsito.primaErrori} a{' '}
+                        {iaConflittiEsito.dopoErrori})
+                      </div>
+
+                      {iaConflittiEsito.accettate.length > 0 ? (
+                        <ul className="space-y-2">
+                          {iaConflittiEsito.accettate.map((m, i) => (
+                            <li
+                              key={`ia-ok-${i}`}
+                              className="text-xs text-slate-700 bg-salvia-50 border border-salvia-100 rounded-lg p-2"
+                            >
+                              <span className="font-bold">
+                                {m.descrizione}
+                                {m.scambio ? ' (scambio)' : ''}
+                              </span>
+                              {m.mossa.perche && (
+                                <span className="block text-slate-600 mt-0.5">
+                                  {m.mossa.perche}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-slate-600">
+                          Nessuna delle mosse proposte migliora l&apos;orario.
+                        </p>
+                      )}
+
+                      {iaConflittiEsito.scartate.length > 0 && (
+                        <details className="text-xs text-slate-500">
+                          <summary className="cursor-pointer font-semibold">
+                            Mosse scartate dall&apos;app:{' '}
+                            {iaConflittiEsito.scartate.length}
+                          </summary>
+                          <ul className="mt-2 space-y-1">
+                            {iaConflittiEsito.scartate.map((m, i) => (
+                              <li key={`ia-no-${i}`}>
+                                {m.descrizione} - {m.motivo}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={applicaMosseIa}
+                          disabled={
+                            readOnlyMode ||
+                            iaConflittiEsito.accettate.length === 0
+                          }
+                          className="bg-salvia-600 hover:bg-salvia-700 disabled:opacity-40 text-white font-bold text-xs py-2 px-4 rounded-lg shadow-sm cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          Applica {iaConflittiEsito.accettate.length}{' '}
+                          {iaConflittiEsito.accettate.length === 1
+                            ? 'spostamento'
+                            : 'spostamenti'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIaConflittiEsito(null);
+                            setIaConflittiNota('');
+                          }}
+                          className="bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs py-2 px-4 rounded-lg cursor-pointer"
+                        >
+                          Lascia stare
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {validationResult.conflicts.length === 0 ? (
                 <div className="p-8 text-center bg-salvia-50 border border-salvia-100 rounded-2xl">
                   <h3 className="text-lg font-bold text-salvia-800 mb-1">

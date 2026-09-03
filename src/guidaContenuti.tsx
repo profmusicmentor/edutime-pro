@@ -832,6 +832,11 @@ export const chapters: Chapter[] = [
         body: 'Il primo pulsante porta alla vista della classe coinvolta ed evidenzia la cella per qualche secondo; il secondo cancella subito la lezione problematica.',
       },
       {
+        title: "✨ Fatti aiutare dall'IA",
+        tag: 'abbonamento',
+        body: "Sopra l'elenco dei conflitti c'è un riquadro che chiede all'IA come sistemarli. L'IA propone degli spostamenti; prima di mostrarteli l'app li prova uno per uno e tiene solo quelli che tolgono davvero un problema, buttando gli altri. Vedi l'anteprima con quanti conflitti restano, e l'orario cambia solo quando premi «Applica». Ai docenti l'IA non arriva per nome: al loro posto escono delle sigle (D1, D2, D3). Fino al 5 settembre 2026 si prova senza chiave; dopo fa parte dell'abbonamento EduTime Pro AI, e senza chiave i conflitti si sistemano a mano come sempre.",
+      },
+      {
         title: 'Controlli eseguiti',
         tag: 'elenco',
         body: (
@@ -1897,7 +1902,7 @@ export const chapters: Chapter[] = [
         tag: 'dati inseriti',
         body: (
           <>
-            Due funzioni dell'abbonamento parlano con un modello linguistico, e
+            Tre funzioni dell'abbonamento parlano con un modello linguistico, e
             conviene sapere cosa gli mandano. L'<B>assistente della Guida</B>{' '}
             manda la domanda ripulita dai nomi propri e i pezzi di guida, che
             sono pubblici: l'orario, le classi e i docenti non passano di lì.
@@ -1910,6 +1915,11 @@ export const chapters: Chapter[] = [
             non mandare niente a nessuno.
           </>
         ),
+      },
+      {
+        title: "L'aiuto sui conflitti: cosa esce e cosa no",
+        tag: 'dati inseriti',
+        body: "Il riquadro «Fatti aiutare dall'IA» della scheda Conflitti manda fuori le ore delle classi coinvolte: classe, giorno, ora, materia, aula. I nomi dei docenti no: il browser li sostituisce con delle sigle (D1, D2, D3) prima di partire, anche dentro il testo dei conflitti, e la tabella che lega le sigle ai nomi resta sul computer. Al modello servono le caselle, non chi ci insegna. Quello che torna indietro sono solo proposte di spostamento: l'orario lo cambia l'app, dopo averle provate, e solo quando premi «Applica».",
       },
       {
         title: "Non è intelligenza artificiale generativa",

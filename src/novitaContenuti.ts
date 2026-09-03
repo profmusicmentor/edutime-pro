@@ -21,7 +21,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-09-02b';
+export const NOVITA_VERSIONE = '2026-09-03';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -33,6 +33,14 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-03',
+    data: '3 settembre 2026',
+    voci: [
+      'Nella scheda «Conflitti» c\u2019è un riquadro nuovo: «✨ Fatti aiutare dall\u2019IA». L\u2019IA guarda i conflitti rimasti e propone degli spostamenti di lezione. Prima di mostrarteli, l\u2019app li prova uno per uno sull\u2019orario e tiene solo quelli che tolgono davvero un problema: vedi quanti conflitti restano, e l\u2019orario cambia solo quando premi «Applica». I nomi dei docenti non escono dal computer, al loro posto vanno delle sigle. Fino al 5 settembre 2026 si prova senza chiave; dopo fa parte dell\u2019abbonamento EduTime Pro AI.',
+      'Anche la lettura del PDF con l\u2019IA nei «Consigli di classe» si prova senza chiave fino al 5 settembre 2026, e da quel giorno entra nell\u2019abbonamento insieme all\u2019aiuto sui conflitti. La lettura fatta dall\u2019app, quella che non manda niente a nessuno, resta gratuita e senza limiti.',
+    ],
+  },
   {
     versione: '2026-09-02b',
     data: '2 settembre 2026',

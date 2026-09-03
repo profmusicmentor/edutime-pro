@@ -145,7 +145,12 @@ export default async function handler(request: Request): Promise<Response> {
   // Primo cancello, prima di qualunque lavoro: la lettura assistita è una
   // funzione dell'abbonamento. Senza chiave valida e collegata a questo
   // dispositivo, qui non si prosegue; l'import in locale resta libero.
-  const licenza = await verificaLicenza(body.licenza, body.istanza);
+  // Questa funzione ha il suo interruttore, separato da quello
+  // dell'assistente della guida: finche' FUNZIONI_IA_RICHIEDONO_LICENZA non
+  // vale '1' la lettura assistita si prova senza chiave.
+  const licenza = await verificaLicenza(body.licenza, body.istanza, {
+    interruttore: 'FUNZIONI_IA_RICHIEDONO_LICENZA',
+  });
   if (!licenza.valida) {
     return json(
       {
