@@ -21,7 +21,7 @@
  * - si tengono gli ultimi sei rilasci e le voci più vecchie si cancellano:
  *   l'elenco completo è un promemoria recente, non l'archivio dell'app.
  */
-export const NOVITA_VERSIONE = '2026-09-03';
+export const NOVITA_VERSIONE = '2026-09-04';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -33,6 +33,13 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-04',
+    data: '4 settembre 2026',
+    voci: [
+      'Le aule adesso rispettano le sedi. Se la scuola ha più plessi, l’Auto-Generazione non manda più una classe in un laboratorio che sta in un altro edificio: cerca il laboratorio di quella materia nella sede della classe e, se lì non c’è, la lezione resta in aula. I laboratori a cui non è stata assegnata nessuna sede continuano a valere per tutti, quindi per le scuole a plesso unico non cambia niente. La stessa regola vale quando si cambia un’ora a mano.',
+    ],
+  },
   {
     versione: '2026-09-03',
     data: '3 settembre 2026',

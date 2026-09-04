@@ -1313,11 +1313,42 @@ const subjectForClass = (staff: any, classId: string) => {
   return scritta ? String(scritta) : staff?.subject || 'Lezione';
 };
 
-const getRoomForSubject = (subject: string, rooms: any[]) => {
-  const match = (rooms || []).find((r) =>
+/**
+ * La sede di una classe, cioè quella della sua sezione. Non guarda l'aula:
+ * serve proprio a decidere quale aula si può usare, e prendere la sede
+ * dall'aula sarebbe un ragionamento circolare.
+ */
+const getSedeForClass = (
+  classId: string | undefined,
+  classesList: any[],
+  sectionsCfg: any
+) => {
+  const classObj = (classesList || []).find((c) => c.id === classId);
+  const section = classObj ? (sectionsCfg || {})[classObj.section] : null;
+  return section && typeof section === 'object' ? section.sedeId : undefined;
+};
+
+/**
+ * L'aula di una materia. Se la classe sta in una sede precisa, l'aula deve
+ * stare nella stessa sede: un laboratorio in un altro plesso non è
+ * raggiungibile, mandarcela sarebbe un orario impossibile da fare. Le aule
+ * senza sede valgono ovunque (scuola a plesso unico, com'era prima), e se
+ * nella sede della classe quel laboratorio non c'è si resta in classe.
+ */
+const getRoomForSubject = (
+  subject: string,
+  rooms: any[],
+  classSedeId?: string
+) => {
+  const candidati = (rooms || []).filter((r) =>
     (r.subjects || []).includes(subject)
   );
-  return match ? match.name : 'Aula';
+  if (candidati.length === 0) return 'Aula';
+  if (!classSedeId) return candidati[0].name;
+  const stessaSede = candidati.find((r) => r.sedeId === classSedeId);
+  if (stessaSede) return stessaSede.name;
+  const senzaSede = candidati.find((r) => !r.sedeId);
+  return senzaSede ? senzaSede.name : 'Aula';
 };
 
 /**
@@ -1400,9 +1431,7 @@ const getSedeForSlot = (
 ) => {
   const roomSede = getRoomSede(slot.room || '', rooms);
   if (roomSede) return roomSede;
-  const classObj = classesList.find((c) => c.id === slot.classId);
-  const section = classObj ? sectionsCfg[classObj.section] : null;
-  return section && typeof section === 'object' ? section.sedeId : undefined;
+  return getSedeForClass(slot.classId, classesList, sectionsCfg);
 };
 
 /**
@@ -1605,7 +1634,11 @@ const canPlaceMateriaHard = (
   if (maxPerClassPerDay > 0 && sameTeacherToday.length >= maxPerClassPerDay)
     return false;
 
-  const room = getRoomForSubject(lesson.subject, rooms);
+  const room = getRoomForSubject(
+    lesson.subject,
+    rooms,
+    getSedeForClass(classId, classesList, sectionsCfg)
+  );
   if (isRoomFull(tt, room, day, hour, rooms)) return false;
 
   const sede = getSedeForSlot(
@@ -1859,7 +1892,11 @@ const repairUnplacedLessons = (
     teacherId: lesson.teacherId,
     subject: lesson.subject,
     type: 'materia',
-    room: getRoomForSubject(lesson.subject, ctx.rooms),
+    room: getRoomForSubject(
+      lesson.subject,
+      ctx.rooms,
+      getSedeForClass(lesson.classId, ctx.classes, ctx.sectionsConfig)
+    ),
   });
 
   for (const lesson of unplaced) {
@@ -3223,7 +3260,12 @@ export default function App() {
       // appena fatta: cambiando docente non deve tornare al default.
       setRoomTouched(
         !!slot?.room &&
-          slot.room !== getRoomForSubject(slot.subject, rooms)
+          slot.room !==
+            getRoomForSubject(
+              slot.subject,
+              rooms,
+              getSedeForClass(editingCell.classId, classes, sectionsConfig)
+            )
       );
     }
   }, [editingCell, timetable, rooms]);
@@ -4453,7 +4495,11 @@ export default function App() {
                 dailyClassLessons.length >= maxPerClassPerDayRule
               )
                 continue;
-              const currentRoom = getRoomForSubject(candidate.subject, rooms);
+              const currentRoom = getRoomForSubject(
+                candidate.subject,
+                rooms,
+                getSedeForClass(cls.id, classes, sectionsConfig)
+              );
               if (isRoomFull(newTimetable, currentRoom, day, hour, rooms))
                 continue;
               const currentSede = getSedeForSlot(
@@ -4589,7 +4635,11 @@ export default function App() {
                 teacherId: lesson.teacherId,
                 subject: lesson.subject,
                 type: 'materia',
-                room: getRoomForSubject(lesson.subject, rooms),
+                room: getRoomForSubject(
+                  lesson.subject,
+                  rooms,
+                  getSedeForClass(cls.id, classes, sectionsConfig)
+                ),
               });
               report.materie.assigned++;
 
@@ -4994,7 +5044,13 @@ export default function App() {
           teachers.find((t) => t.id === teacherId),
           newClassId
         );
-        room = roomTouched ? tempRoom : getRoomForSubject(subject, rooms);
+        room = roomTouched
+          ? tempRoom
+          : getRoomForSubject(
+              subject,
+              rooms,
+              getSedeForClass(newClassId, classes, sectionsConfig)
+            );
       }
       filtered.push({
         classId: newClassId,
@@ -5837,7 +5893,11 @@ export default function App() {
       type = isRientroHour(classId, hour) ? 'pomeriggio_musica' : 'materia';
       room = roomTouched
         ? tempRoom
-        : getRoomForSubject(tDoc?.subject || '', rooms);
+        : getRoomForSubject(
+            tDoc?.subject || '',
+            rooms,
+            getSedeForClass(classId, classes, sectionsConfig)
+          );
     } else if (type === 'sostegno') {
       room = 'Aula';
     } else {
