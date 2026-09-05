@@ -32,6 +32,15 @@ import {
   provaMosse,
   type EsitoProva,
 } from './risolviConflittiIA';
+import PannelloSostituzioni from './PannelloSostituzioni';
+import type { AssegnazioneProposta, BucoScoperto } from './sostituzioniIA';
+import ImportaOrario from './ImportaOrario';
+import type { RigaOrarioLetta } from './importaOrarioIA';
+import RichiesteDocenti from './RichiesteDocenti';
+import DiagnosiGenerazione from './DiagnosiGenerazione';
+import DomandeOrario from './DomandeOrario';
+import Documenti from './Documenti';
+import type { TipoDocumento } from './documentiIA';
 import { applicaTema, temaIniziale } from './tema';
 import type { Tema } from './tema';
 import {
@@ -4153,6 +4162,12 @@ export default function App() {
     };
   }, []);
 
+  /* ------------------------------- le altre finestre con l'aiuto dell'IA */
+
+  const [mostraImportaOrario, setMostraImportaOrario] = useState(false);
+  const [mostraRichieste, setMostraRichieste] = useState(false);
+  const [mostraDomandeOrario, setMostraDomandeOrario] = useState(false);
+
   /** Tutte le caselle della griglia: i posti dove una lezione puo' stare. */
   const celleDellaGriglia = () => {
     const celle: { day: number; hour: number }[] = [];
@@ -7669,6 +7684,438 @@ export default function App() {
     );
   };
 
+  /* ------------------------------- le sostituzioni proposte dall'IA */
+
+  /**
+   * Le ore rimaste scoperte nella data che si sta guardando, con i candidati
+   * che l'app ha già filtrato.
+   *
+   * Sono le stesse righe che si vedono nella scheda: si tengono solo quelle
+   * ancora da assegnare (senza sostituto e senza il sostegno che copre da sé)
+   * e che hanno almeno un candidato. Le altre non si mandano: al modello non
+   * serve sapere di un'ora che è già a posto.
+   */
+  const buchiScoperti = useMemo((): BucoScoperto[] => {
+    const delGiorno = absences.filter((a: any) => a.date === substitutionsDate);
+    const righe: BucoScoperto[] = [];
+
+    delGiorno.forEach((absence: any) => {
+      if (!absence?.teacherId) return;
+      getSubstitutionSuggestions(absence).forEach((s: any) => {
+        if (s.existingSub || s.coveredBySostegno) return;
+        const candidati = (s.candidates || []).filter((c: any) => c?.teacherId);
+        if (!candidati.length) return;
+        righe.push({
+          rif: `${absence.id}-${s.hour}-${s.classId}`,
+          absenceId: absence.id,
+          classId: String(s.classId),
+          hour: Number(s.hour),
+          subject: String(s.subject || ''),
+          candidati: candidati.map((c: any) => ({
+            teacherId: String(c.teacherId),
+            name: String(c.name || ''),
+            priority: Number(c.priority ?? 2),
+          })),
+        });
+      });
+    });
+
+    return righe;
+    // `getSubstitutionSuggestions` si riscrive a ogni render, quindi
+    // l'elenco delle dipendenze è a mano: sono i dati che quella funzione
+    // legge davvero. `teachers` e `sostegno` ci vogliono perché è lì che sta
+    // la spunta delle supplenze retribuite: senza, chi la accende non vede
+    // cambiare i candidati finché non tocca qualcos'altro.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    absences,
+    substitutions,
+    substitutionsDate,
+    timetable,
+    generationRules,
+    teachers,
+    sostegno,
+  ]);
+
+  /**
+   * La data di cui si parla, scritta come la legge una persona. Al modello
+   * serve il giorno della settimana, non il numero: «lunedì» gli dice che
+   * cosa sta guardando, «2026-09-07» no.
+   */
+  const giornoLeggibile = useMemo(() => {
+    const giorno = DAYS_IN_USE[getDayIndexFromDate(substitutionsDate)];
+    return giorno ? `${giorno} ${substitutionsDate}` : substitutionsDate;
+  }, [substitutionsDate, DAYS_IN_USE]);
+
+  /**
+   * Quante ore di sostituzione ha già ricevuto ciascun docente.
+   *
+   * È il dato che l'app da sola non sa pesare e che il modello usa per non
+   * far ricadere tutto sempre sulla stessa persona. Si contano tutte le
+   * sostituzioni registrate, non solo quelle di oggi: l'equità si guarda sul
+   * mese, non sulla mattina.
+   */
+  const caricoSostituzioni = useMemo(() => {
+    const conto = new Map<string, number>();
+    substitutions.forEach((s: any) => {
+      if (!s?.teacherSubstitute) return;
+      const id = String(s.teacherSubstitute);
+      conto.set(id, (conto.get(id) ?? 0) + 1);
+    });
+    return conto;
+  }, [substitutions]);
+
+  /**
+   * Registra in un colpo solo le sostituzioni accettate dall'anteprima.
+   *
+   * Una per una non si può: ogni chiamata leggerebbe l'elenco di prima e
+   * l'ultima cancellerebbe le altre.
+   */
+  const applicaSostituzioniIa = (assegnazioni: AssegnazioneProposta[]) => {
+    if (readOnlyMode || !assegnazioni.length) return;
+    const adesso = Date.now();
+
+    const nuove = assegnazioni.map((a, indice) => {
+      const absence = absences.find((x: any) => x.id === a.buco.absenceId);
+      const day = absence ? getDayIndexFromDate(absence.date) : 0;
+      return {
+        id: `sub_${adesso}_${indice}`,
+        absenceId: a.buco.absenceId,
+        date: absence?.date || substitutionsDate,
+        day,
+        hour: a.buco.hour,
+        classId: a.buco.classId,
+        subjectOriginal: a.buco.subject,
+        teacherOriginal: absence?.teacherId,
+        teacherSubstitute: a.teacherId,
+        method: 'docente_disponibile',
+        paid: true,
+      };
+    });
+
+    const newSubstitutions = [...substitutions, ...nuove];
+    setSubstitutions(newSubstitutions);
+    pushAbsencesSubs(absences, newSubstitutions);
+  };
+
+  /* ------------------------------- l'orario letto da un documento */
+
+  /**
+   * Mette nell'orario le lezioni lette dal documento.
+   *
+   * Le caselle importate sostituiscono quello che c'era: se la 1A aveva già
+   * qualcosa il lunedì alla prima ora, quella lezione se ne va. È scritto
+   * nella finestra prima di premere, perché è il tipo di cosa che non si vuole
+   * scoprire dopo.
+   */
+  const applicaOrarioImportato = (righe: RigaOrarioLetta[]) => {
+    if (readOnlyMode || !righe.length) return;
+
+    const occupate = new Set(
+      righe.map((r) => `${r.classId}_${r.day}_${r.hour}`)
+    );
+    const restanti = timetable.filter(
+      (s: any) => !occupate.has(`${s.classId}_${s.day}_${s.hour}`)
+    );
+
+    const importate = righe.map((r) => ({
+      classId: r.classId,
+      day: r.day,
+      hour: r.hour,
+      teacherId: r.teacherId,
+      subject: r.subject || 'Da completare',
+      type: 'materia',
+      room: getRoomForSubject(
+        r.subject,
+        rooms,
+        getSedeForClass(r.classId, classes, sectionsConfig)
+      ),
+    }));
+
+    const nuovo = [...restanti, ...importate];
+    setTimetable(nuovo);
+    pushDataToCloud(
+      nuovo,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses
+    );
+    setMostraImportaOrario(false);
+  };
+
+  /* ------------------------------- le richieste dei docenti a parole */
+
+  const applicaRegoleDaRichieste = (regoleNuove: Record<string, unknown>) => {
+    if (readOnlyMode) return;
+    setGenerationRules(regoleNuove);
+    pushDataToCloud(
+      timetable,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      regoleNuove,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses
+    );
+    setMostraRichieste(false);
+  };
+
+  /* ------------------------------- «perché non ci riesce?» */
+
+  /** Le sigle con cui i docenti escono da qui: i nomi restano nel browser. */
+  const sigleDocenti = useMemo(() => {
+    const perId = new Map<string, string>();
+    allStaff.forEach((s: any, indice: number) => {
+      perId.set(String(s.id), `D${indice + 1}`);
+    });
+    return perId;
+  }, [allStaff]);
+
+  /**
+   * La fotografia che accompagna la domanda «perché non ci riesce?»: i numeri
+   * del report, le ore rimaste fuori e i vincoli accesi, con le sigle al
+   * posto dei nomi.
+   */
+  const datiDiagnosi = useMemo(() => {
+    const report = generationReport;
+    const numeri: string[] = [];
+    const mancanti: string[] = [];
+
+    if (report?.materie) {
+      numeri.push(`Ore di materia richieste: ${report.materie.requested}`);
+      numeri.push(`Ore assegnate: ${report.materie.assigned}`);
+      if (report.materie.recovered)
+        numeri.push(`Recuperate alla seconda passata: ${report.materie.recovered}`);
+      numeri.push(`Rimaste fuori: ${report.materie.missing?.length ?? 0}`);
+
+      (report.materie.missing || []).forEach((m: any) => {
+        const persona = allStaff.find((s: any) => s.name === m.teacherName);
+        const sigla = persona ? sigleDocenti.get(String(persona.id)) : null;
+        mancanti.push(
+          `${m.classId}|${m.subject || 'materia'}|${sigla || 'docente ignoto'}`
+        );
+      });
+    }
+    if (report?.compresenze?.requested) {
+      numeri.push(
+        `Compresenze richieste: ${report.compresenze.requested}, assegnate: ${report.compresenze.assigned}`
+      );
+    }
+
+    const vincoli: string[] = [
+      `Tetto di ore al giorno per docente: ${generationRules.globalMaxHoursPerDay}`,
+      `Ore dello stesso docente nella stessa classe in un giorno: ${generationRules.globalMaxHoursPerClassPerDay}`,
+      `Buchi ammessi in una giornata: ${generationRules.globalMaxGapHours}`,
+      `Minimo di ore in una giornata: ${generationRules.globalMinHoursPerDay}`,
+      `Giorno libero d'ufficio: ${generationRules.autoDayOff ? 'sì' : 'no'}`,
+      `Materie della stessa famiglia in giorni diversi: ${
+        generationRules.spreadSameSubject ? 'sì' : 'no'
+      }`,
+    ];
+
+    Object.entries(generationRules.teacherDaysOff || {}).forEach(
+      ([id, giorni]) => {
+        const sigla = sigleDocenti.get(String(id));
+        const elenco = (giorni as number[]) || [];
+        if (sigla && elenco.length) {
+          vincoli.push(
+            `${sigla}: giorni liberi ${elenco
+              .map((g) => DAYS_IN_USE[g] || g)
+              .join(', ')}`
+          );
+        }
+      }
+    );
+
+    Object.entries(generationRules.teacherHoursOff || {}).forEach(
+      ([id, ore]) => {
+        const sigla = sigleDocenti.get(String(id));
+        const elenco = (ore as string[]) || [];
+        if (sigla && elenco.length) {
+          vincoli.push(`${sigla}: ore bloccate ${elenco.length}`);
+        }
+      }
+    );
+
+    return {
+      numeri,
+      mancanti,
+      vincoli,
+      griglia: `${maxGridDays} giorni, fino a ${gridHourRows.length} ore al giorno`,
+      regoleAttuali: generationRules as Record<string, unknown>,
+    };
+  }, [
+    generationReport,
+    generationRules,
+    allStaff,
+    sigleDocenti,
+    DAYS_IN_USE,
+    maxGridDays,
+    gridHourRows.length,
+  ]);
+
+  const applicaRegolaDiagnosi = (campo: string, valore: number | boolean) => {
+    if (readOnlyMode) return;
+    const nuove = { ...generationRules, [campo]: valore };
+    setGenerationRules(nuove);
+    pushDataToCloud(
+      timetable,
+      teachers,
+      sostegno,
+      sectionsConfig,
+      strumento,
+      diurnalHours,
+      afternoonHours,
+      nuove,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses
+    );
+  };
+
+  /* ------------------------------- le domande sull'orario */
+
+  const datiDomandeOrario = useMemo(
+    () => ({
+      lezioni: timetable,
+      persone: allStaff.map((s: any) => ({
+        id: String(s.id),
+        name: String(s.name || ''),
+        subject: String(s.subject || ''),
+      })),
+      giorni: DAYS_IN_USE,
+      ore: gridHourRows.length,
+      indisponibile: (teacherId: string, day: number, hour: number) =>
+        isTeacherOff(generationRules, teacherId, day, hour),
+    }),
+    [timetable, allStaff, DAYS_IN_USE, gridHourRows.length, generationRules]
+  );
+
+  /* ------------------------------- i documenti */
+
+  /**
+   * Prepara le righe di dati per il documento scelto.
+   *
+   * Ogni documento vuole cose diverse: la relazione vuole i numeri e i
+   * criteri, il foglio delle sostituzioni vuole l'elenco del giorno. Dove i
+   * nomi non servono si mandano le sigle, e `perSigla` dice al modulo come
+   * rimetterli a posto nel testo finito.
+   */
+  const preparaDatiDocumento = (
+    tipo: TipoDocumento
+  ): { dati: string[]; perSigla?: Map<string, string> } => {
+    const nomiPerSigla = new Map<string, string>();
+    sigleDocenti.forEach((sigla, id) => {
+      const persona = allStaff.find((s: any) => String(s.id) === id);
+      if (persona?.name) nomiPerSigla.set(sigla, String(persona.name));
+    });
+
+    if (tipo === 'foglio-sostituzioni') {
+      const delGiorno = substitutions.filter(
+        (s: any) => s.date === substitutionsDate
+      );
+      const dati = [
+        `Data: ${substitutionsDate}`,
+        ...delGiorno.map((s: any) => {
+          const chi = allStaff.find(
+            (p: any) => String(p.id) === String(s.teacherSubstitute)
+          );
+          const come =
+            s.method === 'docente_disponibile'
+              ? chi?.name || 'docente'
+              : s.method === 'sorveglianza'
+              ? 'sorveglianza'
+              : s.method === 'anticipo'
+              ? `${chi?.name || 'docente'} (anticipa la sua lezione)`
+              : s.method === 'divisione_alunni'
+              ? 'alunni divisi fra le classi'
+              : s.method === 'entrata_posticipata'
+              ? 'la classe entra più tardi'
+              : s.method === 'uscita_anticipata'
+              ? 'la classe esce prima'
+              : 'da definire';
+          return `${s.hour + 1}ª ora | ${s.classId} | ${come}`;
+        }),
+      ];
+      // Qui i nomi ci sono già per esteso: il foglio senza nomi non servirebbe
+      // a niente, e la finestra lo dice prima di partire.
+      return { dati };
+    }
+
+    if (tipo === 'convocazione-consigli') {
+      return {
+        dati: [
+          `Classi dell'istituto: ${classes.map((c: any) => c.id).join(', ')}`,
+          `Giorni di lezione: ${DAYS_IN_USE.join(', ')}`,
+        ],
+      };
+    }
+
+    if (tipo === 'circolare-famiglie') {
+      const variazioni = substitutions.filter(
+        (s: any) =>
+          s.method === 'entrata_posticipata' || s.method === 'uscita_anticipata'
+      );
+      return {
+        dati: [
+          `Data: ${substitutionsDate}`,
+          ...variazioni.map((s: any) =>
+            s.method === 'entrata_posticipata'
+              ? `${s.classId}: entra alla ${(s.entryFromHour ?? s.hour) + 1}ª ora`
+              : `${s.classId}: esce dopo la ${(s.exitAfterHour ?? s.hour) + 1}ª ora`
+          ),
+        ],
+      };
+    }
+
+    // Relazione e circolare ai docenti: numeri e criteri, senza nomi.
+    const oreDiLezione = timetable.length;
+    const conflitti = validationResult?.conflicts?.length ?? 0;
+    const errori =
+      validationResult?.conflicts?.filter((c: any) => c.type !== 'warning')
+        .length ?? 0;
+    const conGiornoLibero = Object.keys(
+      generationRules.teacherDaysOff || {}
+    ).length;
+    const conOreBloccate = Object.keys(
+      generationRules.teacherHoursOff || {}
+    ).length;
+    const conPreferenza = Object.keys(
+      generationRules.teacherHourPreference || {}
+    ).length;
+
+    return {
+      dati: [
+        `Classi: ${classes.length}`,
+        `Docenti: ${allStaff.length}`,
+        `Ore di lezione collocate: ${oreDiLezione}`,
+        `Giorni di lezione: ${DAYS_IN_USE.join(', ')}`,
+        `Ore al giorno: fino a ${gridHourRows.length}`,
+        `Tetto di ore al giorno per docente: ${generationRules.globalMaxHoursPerDay}`,
+        `Buchi ammessi in una giornata: ${generationRules.globalMaxGapHours}`,
+        `Docenti con giorno libero riconosciuto: ${conGiornoLibero}`,
+        `Docenti con ore bloccate accolte: ${conOreBloccate}`,
+        `Docenti con preferenza oraria accolta: ${conPreferenza}`,
+        `Segnalazioni ancora aperte nella scheda Conflitti: ${conflitti} (di cui errori: ${errori})`,
+      ],
+      perSigla: nomiPerSigla,
+    };
+  };
+
   const addGroupConstraint = () => {
     if (
       !newGroupC1 ||
@@ -9496,6 +9943,16 @@ export default function App() {
             >
               🧑‍🏫 Consigli di classe
             </button>
+            <button
+              onClick={() => setActiveTab('documenti')}
+              className={`py-4 px-1 border-b-2 font-bold text-sm transition-all whitespace-nowrap ${
+                activeTab === 'documenti'
+                  ? 'border-brand-600 text-brand-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              📝 Documenti
+            </button>
           </nav>
         </div>
       </div>
@@ -9544,6 +10001,21 @@ export default function App() {
                 </div>
               </div>
               <div className="text-xs text-slate-500 text-right flex items-center gap-3">
+                <button
+                  onClick={() => setMostraDomandeOrario(true)}
+                  className="bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer"
+                  title="Domande sull'orario che hai adesso: chi è libero, quante ore buche, quando una classe fa una materia"
+                >
+                  💬 Chiedi all&apos;orario
+                </button>
+                <button
+                  onClick={() => setMostraImportaOrario(true)}
+                  disabled={readOnlyMode}
+                  className="bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer disabled:cursor-not-allowed"
+                  title="Leggi l'orario che hai già in un PDF o in Excel e portalo dentro l'app"
+                >
+                  📥 Importa orario
+                </button>
                 <div>
                   <p className="font-semibold text-brand-600">
                     ✍️ Modifiche condivise
@@ -11420,6 +11892,14 @@ export default function App() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => setMostraRichieste(true)}
+                  disabled={readOnlyMode}
+                  className="bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer disabled:cursor-not-allowed"
+                  title="Incolla le mail dei docenti: diventano giorni liberi, ore bloccate e preferenze"
+                >
+                  ✉️ Richieste dei docenti
+                </button>
                 <div className="inline-flex rounded-lg border border-slate-200 p-1 bg-slate-50 shrink-0">
                   <button
                     onClick={() => setCattedreSubTab('diurne')}
@@ -13977,6 +14457,14 @@ export default function App() {
                 </div>
               </div>
 
+              <PannelloSostituzioni
+                buchi={buchiScoperti}
+                carico={caricoSostituzioni}
+                giorno={giornoLeggibile}
+                readOnly={readOnlyMode}
+                onApplica={applicaSostituzioniIa}
+              />
+
               <form
                 onSubmit={handleAddAbsence}
                 className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3 mb-6"
@@ -14829,7 +15317,42 @@ export default function App() {
             readOnly={readOnlyMode}
           />
         )}
+        {activeTab === 'documenti' && (
+          <Documenti preparaDati={preparaDatiDocumento} />
+        )}
       </main>
+      {mostraImportaOrario && (
+        <ImportaOrario
+          classi={classes.map((c: any) => String(c.id))}
+          docenti={allStaff.map((s: any) => ({
+            id: String(s.id),
+            name: String(s.name || ''),
+          }))}
+          giorni={DAYS_IN_USE}
+          ore={gridHourRows.length}
+          onChiudi={() => setMostraImportaOrario(false)}
+          onApplica={applicaOrarioImportato}
+        />
+      )}
+      {mostraRichieste && (
+        <RichiesteDocenti
+          docenti={allStaff.map((s: any) => ({
+            id: String(s.id),
+            name: String(s.name || ''),
+          }))}
+          giorni={DAYS_IN_USE}
+          ore={gridHourRows.length}
+          regole={generationRules}
+          onChiudi={() => setMostraRichieste(false)}
+          onApplica={applicaRegoleDaRichieste}
+        />
+      )}
+      {mostraDomandeOrario && (
+        <DomandeOrario
+          dati={datiDomandeOrario}
+          onChiudi={() => setMostraDomandeOrario(false)}
+        />
+      )}
       {editingCell && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full overflow-hidden">
@@ -15572,6 +16095,14 @@ export default function App() {
                   </div>
                 )}
               </div>
+              {generationReport.materie &&
+                generationReport.materie.missing.length > 0 && (
+                  <DiagnosiGenerazione
+                    dati={datiDiagnosi}
+                    readOnly={readOnlyMode}
+                    onApplicaRegola={applicaRegolaDiagnosi}
+                  />
+                )}
               {generationReport.compresenze &&
                 generationReport.compresenze.requested > 0 && (
                   <div className="bg-sky-50 border border-sky-200 p-4 rounded-lg">

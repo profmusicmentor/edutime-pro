@@ -1937,6 +1937,140 @@ export const chapters: Chapter[] = [
       },
     ],
   },
+  {
+    id: 'funzioni-ia',
+    num: '17',
+    title: "Le funzioni con l'intelligenza artificiale",
+    intro: (
+      <>
+        Sette punti dell'app possono chiedere aiuto a un modello linguistico.
+        Fanno tutte parte dell'abbonamento <B>EduTime Pro AI</B>, e senza la
+        chiave l'app continua a funzionare come sempre. In tutte vale la stessa
+        regola: il modello propone, l'app controlla, tu decidi. Niente cambia
+        finché non premi il pulsante che lo dice.
+      </>
+    ),
+    cards: [
+      {
+        title: 'Chi mando a coprire? (Sostituzioni)',
+        tag: 'sostituzioni',
+        body: (
+          <>
+            Nella scheda <B>🩹 Sostituzioni</B>, il riquadro{' '}
+            <B>«✨ Chi mando a coprire?»</B> compare quando ci sono ore scoperte
+            nella data scelta. L'IA sceglie fra i candidati che l'app ha già
+            trovato liberi, tenendo conto di quante ore di sostituzione ognuno
+            ha già ricevuto: serve a non chiamare sempre la stessa persona. Ogni
+            proposta viene ricontrollata dall'app (il docente deve essere fra i
+            candidati di quell'ora e non può finire in due classi
+            contemporaneamente), si toglie con la × e si registra solo premendo{' '}
+            <B>«Applica»</B>. I nomi non escono dal computer: diventano sigle.
+          </>
+        ),
+      },
+      {
+        title: "Importare l'orario che hai già",
+        tag: 'orario generale',
+        body: (
+          <>
+            Nell'<B>Orario Generale</B>, il pulsante <B>«📥 Importa orario»</B>{' '}
+            legge l'orario dell'anno scorso invece di farlo ribattere cella per
+            cella. Si carica un PDF, un TXT o un CSV, oppure si apre il file in
+            Excel, si selezionano le celle, si copiano e si incollano nella
+            finestra. Prima di importare vedi quante lezioni sono pronte, quali
+            righe sono state scartate e quali docenti non risultano ancora nel
+            Registro Cattedre: quelli vanno creati prima, altrimenti le loro ore
+            non si importano. Attenzione: le caselle importate sostituiscono
+            quello che c'era. Qui i nomi escono davvero dal computer, quindi
+            serve la spunta.
+          </>
+        ),
+      },
+      {
+        title: 'Perché non ci riesce?',
+        tag: 'generazione',
+        body: (
+          <>
+            Quando l'Auto-Generazione lascia delle ore non assegnate, nel report
+            compare <B>«✨ Perché non ci riesce?»</B>. L'IA guarda le ore rimaste
+            fuori e i vincoli accesi e dice quale sta stringendo: un tetto di ore
+            al giorno troppo basso, un giorno libero che non ci sta, due materie
+            che non vogliono stare nello stesso giorno. Dove può, propone la
+            modifica come pulsante: la regola cambia quando lo premi, una per
+            volta, così puoi rigenerare e vedere l'effetto. I docenti compaiono
+            come sigle.
+          </>
+        ),
+      },
+      {
+        title: 'Le richieste dei docenti scritte a parole',
+        tag: 'registro cattedre',
+        body: (
+          <>
+            Nel <B>Registro Cattedre</B>, il pulsante{' '}
+            <B>«✉️ Richieste dei docenti»</B> prende le mail arrivate a giugno e
+            a settembre, tutte insieme, e le trasforma in vincoli da spuntare:
+            giorno libero, ora bloccata, preferenza per le prime o per le ultime
+            ore. Ogni riga porta la frase da cui arriva, così il controllo si fa
+            guardando. Le richieste ambigue sono segnate e partono senza spunta,
+            i docenti che non sono in archivio non si possono applicare, e i
+            vincoli già presenti restano come sono. Il testo esce dal computer,
+            quindi serve la spunta: incolla le richieste, non i motivi personali.
+          </>
+        ),
+      },
+      {
+        title: "Chiedi all'orario",
+        tag: 'orario generale',
+        body: (
+          <>
+            Nell'<B>Orario Generale</B>, il pulsante <B>«💬 Chiedi all'orario»</B>{' '}
+            apre una finestra dove si fanno domande a parole: «chi è libero
+            giovedì alla terza ora?», «quali docenti hanno più di tre ore
+            buche?», «in che giorni la 2A ha lezione alla sesta?». I conti li fa
+            l'app prima di chiedere, così le risposte sono quelle vere e non
+            stime a occhio. I nomi diventano sigle e tornano nomi nella risposta.
+          </>
+        ),
+      },
+      {
+        title: 'La scheda Documenti',
+        tag: 'documenti',
+        body: (
+          <>
+            La scheda <B>📝 Documenti</B> scrive i testi che accompagnano
+            l'orario: la <B>relazione al Dirigente</B> sui criteri seguiti, la{' '}
+            <B>circolare ai docenti</B>, l'<B>avviso alle famiglie</B> per
+            entrate e uscite fuori orario, la{' '}
+            <B>comunicazione delle sostituzioni</B> del giorno e la{' '}
+            <B>convocazione dei consigli</B>. I numeri li mette l'app, le frasi
+            le scrive il modello, e il testo resta lì da correggere prima di
+            copiarlo o scaricarlo. Da EduTime Pro non parte niente verso
+            nessuno: le mail le mandi tu. Nei documenti i nomi non escono, tranne
+            nella comunicazione delle sostituzioni, che senza nomi non servirebbe
+            a niente: lì c'è la spunta.
+          </>
+        ),
+      },
+      {
+        title: 'Cosa succede senza la chiave',
+        tag: 'abbonamento',
+        body: (
+          <>
+            Senza abbonamento questi riquadri restano visibili ma avvisano che
+            serve la chiave, e tutto il resto dell'app funziona come prima: le
+            sostituzioni si assegnano a mano con i pulsanti dei candidati,
+            l'orario si compila dalla griglia, i vincoli si mettono uno per uno
+            nel Registro Cattedre, i conflitti si sistemano con «Vedi» e
+            «Rimuovi». La chiave si incolla nel pannello dell'assistente, in
+            fondo a questa guida. Ogni funzione ha anche un tetto di richieste al
+            giorno: quando finisce, l'app lo dice e il lavoro a mano resta senza
+            limiti.
+          </>
+        ),
+      },
+    ],
+  },
 ];
 
 export const steps: { title: string; body: ReactNode }[] = [

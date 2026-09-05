@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { NOVITA, NOVITA_VERSIONE } from './novitaContenuti';
 import type { VoceNovita } from './novitaContenuti';
+import { LINK_ABBONAMENTO, PREZZO_ABBONAMENTO } from './assistenteIA';
 
 /**
  * Pannello delle novità.
@@ -67,6 +68,87 @@ export function novitaAllAvvio(): ModoNovita {
   return novitaNonLette().length > 0 ? 'nuove' : '';
 }
 
+/** Le sette funzioni dell'abbonamento, come si chiamano dentro l'app. */
+const FUNZIONI_IA: { titolo: string; dove: string }[] = [
+  {
+    titolo: 'Chi mando a coprire?',
+    dove: 'Sostituzioni: sceglie i sostituti fra chi è libero, senza far ricadere tutto sulla stessa persona',
+  },
+  {
+    titolo: "Importa l'orario che hai già",
+    dove: "Orario Generale: legge il PDF o il foglio dell'anno scorso invece di farlo ribattere",
+  },
+  {
+    titolo: 'Perché non ci riesce?',
+    dove: 'Report della generazione: dice quale vincolo sta stringendo e cosa conviene mollare',
+  },
+  {
+    titolo: 'Le richieste dei docenti',
+    dove: 'Registro Cattedre: le mail incollate diventano giorni liberi, ore bloccate e preferenze',
+  },
+  {
+    titolo: "Chiedi all'orario",
+    dove: 'Orario Generale: «chi è libero giovedì alla terza?», con i conti fatti dall’app',
+  },
+  {
+    titolo: 'La scheda Documenti',
+    dove: 'Relazione al Dirigente, circolari, avvisi alle famiglie e convocazioni, già scritti',
+  },
+  {
+    titolo: 'Aiuto sui conflitti e lettura dei PDF',
+    dove: 'Conflitti e Consigli di classe: quelli che c’erano già',
+  },
+];
+
+/**
+ * Il riquadro che racconta l'abbonamento, in cima al pannello delle novità.
+ *
+ * Sta qui e non in una striscia fissa dell'app per una ragione sola: chi apre
+ * EduTime Pro sta lavorando, e una pubblicità che resta sullo schermo mentre
+ * si costruisce l'orario è un fastidio. Questo pannello lo si chiude con «Ho
+ * capito» e non torna finché non esce un rilascio nuovo.
+ */
+function RiquadroAbbonamento() {
+  return (
+    <div className="rounded-2xl border border-fucsia-200 bg-fucsia-50 p-4">
+      <span className="bg-fucsia-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+        EduTime Pro AI
+      </span>
+      <h4 className="text-base font-bold text-slate-800 mt-2">
+        Sette cose che adesso le fa l&apos;intelligenza artificiale
+      </h4>
+      <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+        Sono le parti che rubano le serate: scegliere i sostituti, ribattere
+        l&apos;orario dell&apos;anno scorso, capire perché quelle ore non
+        entrano, scrivere la relazione per il Dirigente. In tutte il modello
+        propone e l&apos;app controlla: niente cambia finché non premi tu.
+      </p>
+      <ul className="mt-3 space-y-1.5">
+        {FUNZIONI_IA.map((f) => (
+          <li key={f.titolo} className="text-xs text-slate-700 pl-4 relative">
+            <span className="absolute left-0 top-0 text-fucsia-600">✦</span>
+            <span className="font-bold">{f.titolo}</span> — {f.dove}
+          </li>
+        ))}
+      </ul>
+      <a
+        href={LINK_ABBONAMENTO}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-4 block text-center bg-fucsia-600 hover:bg-fucsia-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all"
+      >
+        Attiva l&apos;abbonamento · {PREZZO_ABBONAMENTO}
+      </a>
+      <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+        Hai già la chiave? Si incolla nel pannello dell&apos;assistente, in
+        fondo alla <b>Guida</b>. Senza abbonamento EduTime Pro continua a
+        funzionare tutto come prima: orario, sostituzioni, conflitti, stampe ed
+        Excel restano gratuiti e senza limiti.
+      </p>
+    </div>
+  );
+}
+
 export default function Novita({
   modo,
   onChiudi,
@@ -113,6 +195,7 @@ export default function Novita({
           </p>
         </div>
         <div className="p-6 overflow-y-auto space-y-6">
+          <RiquadroAbbonamento />
           {blocchi.map((blocco) => (
             <div key={blocco.versione}>
               <h4 className="text-sm font-bold text-slate-700 mb-2">

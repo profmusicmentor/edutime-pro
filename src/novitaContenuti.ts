@@ -25,7 +25,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-04';
+export const NOVITA_VERSIONE = '2026-09-05';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -37,6 +37,19 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-05',
+    data: '5 settembre 2026',
+    voci: [
+      'In «🩹 Sostituzioni» c’è il riquadro «✨ Chi mando a coprire?». L’IA guarda le ore rimaste scoperte quel giorno e sceglie fra i docenti che l’app ha già trovato liberi, tenendo conto di chi ha già coperto tante ore: è il modo di non far ricadere tutto sempre sulla stessa persona. Prima di mostrarti le proposte, l’app ricontrolla che ogni scelta sia davvero fra i candidati di quell’ora e che nessuno finisca in due classi contemporaneamente. Le proposte si tolgono una per una e niente viene registrato finché non premi «Applica». I nomi dei docenti non escono dal computer: al loro posto vanno delle sigle.',
+      'Nell’«Orario Generale» c’è «📥 Importa orario»: se l’orario dell’anno scorso è in un PDF o in un foglio, non serve più ribatterlo cella per cella. Si carica il file (PDF, TXT, CSV) oppure si apre in Excel, si selezionano le celle, si copiano e si incollano nella finestra. Prima di importare vedi quante lezioni sono pronte, quali righe sono state scartate e quali docenti non risultano ancora nel Registro Cattedre. Come per la lettura del PDF dei consigli, qui i nomi escono davvero dal computer, quindi la lettura parte solo dopo la spunta.',
+      'Nel report dell’Auto-Generazione, quando restano ore non assegnate, compare «✨ Perché non ci riesce?». L’IA guarda le ore rimaste fuori e i vincoli accesi e dice in italiano quale sta stringendo, per esempio un tetto di ore al giorno troppo basso o un giorno libero che non ci sta. Dove può, propone la modifica come pulsante: la regola cambia quando la premi tu, una per volta, così puoi rigenerare e vedere l’effetto.',
+      'Nel «Registro Cattedre» c’è «✉️ Richieste dei docenti»: si incollano le mail arrivate a giugno e a settembre, tutte insieme, e tornano indietro come vincoli da spuntare (giorno libero, ora bloccata, preferenza per le prime o per le ultime ore). Ogni riga porta con sé la frase da cui arriva, così il controllo si fa guardando; le richieste ambigue sono segnate e partono senza spunta, e i vincoli già presenti non vengono toccati. Anche qui il testo esce dal computer, quindi serve la spunta: incolla solo le richieste, non i motivi personali.',
+      'Nell’«Orario Generale» c’è «💬 Chiedi all’orario»: domande a parole sull’orario che hai adesso, del tipo «chi è libero giovedì alla terza ora?» o «quali docenti hanno più di tre ore buche?». I conti li fa l’app prima di chiedere, così le risposte sono quelle vere e non stime; i nomi restano nel computer e diventano sigle.',
+      'C’è una scheda nuova, «📝 Documenti»: la relazione per il Dirigente sui criteri seguiti, la circolare ai docenti, l’avviso alle famiglie per entrate e uscite fuori orario, la comunicazione delle sostituzioni del giorno e la convocazione dei consigli. I numeri li mette l’app, le frasi le scrive l’IA, e il testo resta lì da correggere, copiare o scaricare: da EduTime Pro non parte niente verso nessuno.',
+      'Tutte queste funzioni fanno parte dell’abbonamento EduTime Pro AI, come l’aiuto sui conflitti e la lettura del PDF dei consigli. Senza la chiave l’app continua a funzionare come sempre: le sostituzioni si assegnano a mano, l’orario si compila dalla griglia, i vincoli si mettono uno per uno.',
+    ],
+  },
   {
     versione: '2026-09-04',
     data: '4 settembre 2026',
@@ -75,14 +88,6 @@ export const NOVITA: VoceNovita[] = [
     voci: [
       'Nella scheda «🧑\u200d🏫 Consigli di classe» c\'è il pulsante «Importa da PDF 📄»: se gli elenchi dei docenti classe per classe esistono già in un PDF, non serve più ribatterli a mano. Il file si apre dentro il browser e non esce dal computer. L\'app riconosce gli elenchi a blocchi («CLASSE 1A» e sotto i nomi) e quelli a righe («ROSSI MARIO - Lettere - 1A, 2A»), e vanno bene anche un TXT, un CSV o il testo incollato. Prima di scrivere qualcosa compare l\'anteprima: ogni nome ha la sua spunta, quelli già presenti in app sono segnati come tali e i nomi nuovi vengono creati nel Registro Cattedre con materia «DA COMPLETARE», senza ore e senza entrare nella generazione dell\'orario. Reimportare lo stesso file non crea doppioni.',
       'Se il PDF è fatto a tabelle strane e l\'app non ne cava niente, compare «Fammi aiutare dall\'IA»: fa rileggere il testo a un modello linguistico e fa parte dell\'abbonamento, come l\'assistente della Guida. Parte solo dopo una spunta, mai da sola, perché è l\'unico punto dell\'app in cui i nomi dei docenti escono davvero dal computer e arrivano alla società che gestisce il modello. La lettura fatta dall\'app, invece, non manda niente a nessuno. Nella guida c\'è il capitolo nuovo «Scheda: Consigli di classe» con tutto il percorso.',
-    ],
-  },
-  {
-    versione: '2026-09-01d',
-    data: '1 settembre 2026',
-    voci: [
-      'La casella «2h» adesso funziona anche per i docenti di sostegno. Prima si poteva spuntare, restava spuntata e non cambiava niente: le ore venivano sparse a caso fra le lezioni della classe. Adesso il docente prende le ore di quella classe una accanto all\'altra, e l\'app parte dai giorni in cui la classe ha almeno due lezioni di fila. Resta una preferenza, non un obbligo: un\'ora già presa in un\'altra classe, il giorno libero o il tetto di ore al giorno possono spezzare la coppia. Vale sia per «✨ Auto-Genera Orario» sia per «🔄 Allinea Sostegno».',
-      'L\'assenza di un docente di sostegno si registra come quella di tutti gli altri. Nel modulo delle assenze, in «🩹 Sostituzioni», il menu dei docenti è ora diviso in due gruppi: materia e sostegno. Scegli il nome e l\'app elenca le sue ore di sostegno di quel giorno e propone chi può coprirle, partendo dai colleghi di sostegno liberi in quell\'ora — prima quelli che seguono già la stessa classe — e poi dai docenti curricolari con la spunta delle supplenze. Se in quell\'ora c\'è già un altro docente di sostegno nella classe, l\'ora risulta coperta. Non compaiono «Dividi alunni», «Anticipa lezione» ed entrata o uscita fuori orario: quelle servono quando la classe resta senza docente, mentre qui la classe è regolarmente in orario col curricolare. Le ore coperte così finiscono nella stampa e nell\'export del giorno, e i permessi brevi del sostegno entrano nel conteggio delle ore da recuperare.',
     ],
   },
 ];

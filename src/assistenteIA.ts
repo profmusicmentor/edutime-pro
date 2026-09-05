@@ -18,6 +18,21 @@ import type { Risultato } from './guidaIndice';
 /** Il numero massimo di domande per conversazione (allineato al server). */
 export const MAX_TURNI = 5;
 
+/**
+ * Dove si compra l'abbonamento: il checkout LemonSqueezy del prodotto
+ * «EduTime Pro · Assistente IA». Link diretto e non `?embed=1`, perché la
+ * finestra sovrapposta di LemonSqueezy vuole il suo `lemon.js` nella pagina.
+ *
+ * Sta qui, e non nel pannello dell'assistente, perché adesso lo usano in due:
+ * il pannello e il riquadro delle novità. Un indirizzo scritto in due posti è
+ * un indirizzo che prima o poi resta vecchio in uno dei due.
+ */
+export const LINK_ABBONAMENTO =
+  'https://biscottodigitale.lemonsqueezy.com/checkout/buy/179a5734-074d-48cb-9eec-ee9b25c9e77a';
+
+/** Prezzo dell'abbonamento annuale, scritto in un posto solo. */
+export const PREZZO_ABBONAMENTO = "9,90 € l'anno";
+
 export interface Messaggio {
   ruolo: 'user' | 'assistant';
   testo: string;

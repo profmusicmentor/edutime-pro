@@ -9,20 +9,16 @@ import {
   collegaLicenza,
   scollegaLicenza,
   MAX_TURNI,
+  LINK_ABBONAMENTO,
+  PREZZO_ABBONAMENTO,
   type StatoIA,
 } from './assistenteIA';
 
-/**
- * Dove si compra l'abbonamento all'assistente IA: il checkout LemonSqueezy del
- * prodotto «EduTime Pro · Assistente IA». Link diretto e non `?embed=1`: la
- * finestra sovrapposta di LemonSqueezy vuole il suo `lemon.js` nella pagina, e
- * qui non serve caricare uno script esterno per aprire una scheda.
+/*
+ * Il link del checkout e il prezzo stanno in `assistenteIA.ts`: li usa anche
+ * il riquadro delle novità, e un indirizzo scritto in due posti è un
+ * indirizzo che prima o poi resta vecchio in uno dei due.
  */
-const LINK_ABBONAMENTO =
-  'https://biscottodigitale.lemonsqueezy.com/checkout/buy/179a5734-074d-48cb-9eec-ee9b25c9e77a';
-
-/** Prezzo dell'abbonamento annuale, scritto in un posto solo. */
-const PREZZO_ABBONAMENTO = "9,90 € l'anno";
 
 /**
  * Quanti dispositivi può collegare una chiave. Il numero che conta davvero è
