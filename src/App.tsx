@@ -41,6 +41,7 @@ import DiagnosiGenerazione from './DiagnosiGenerazione';
 import DomandeOrario from './DomandeOrario';
 import Documenti from './Documenti';
 import type { TipoDocumento } from './documentiIA';
+import ChiaveAbbonamento from './ChiaveAbbonamento';
 import { applicaTema, temaIniziale } from './tema';
 import type { Tema } from './tema';
 import {
@@ -4168,6 +4169,14 @@ export default function App() {
   const [mostraRichieste, setMostraRichieste] = useState(false);
   const [mostraDomandeOrario, setMostraDomandeOrario] = useState(false);
 
+  /* ------------------------------- la chiave dell'abbonamento */
+
+  const [mostraChiave, setMostraChiave] = useState(false);
+  /** Serve solo a colorare il pulsante in alto: la verita' sta nel browser. */
+  const [chiaveCollegata, setChiaveCollegata] = useState(
+    () => Boolean(leggiLicenza()) && Boolean(leggiIstanza())
+  );
+
   /** Tutte le caselle della griglia: i posti dove una lezione puo' stare. */
   const celleDellaGriglia = () => {
     const celle: { day: number; hour: number }[] = [];
@@ -4233,7 +4242,7 @@ export default function App() {
     } catch (e) {
       if (e instanceof ErroreLicenzaConflitti) {
         setIaConflittiErrore(
-          `${e.message} L'aiuto sui conflitti fa parte dell'abbonamento EduTime Pro AI: la chiave si incolla nel pannello dell'assistente, in fondo alla Guida.`
+          `${e.message} L'aiuto sui conflitti fa parte dell'abbonamento EduTime Pro AI: la chiave si incolla dal pulsante «🔑 Abbonamento IA», in alto a destra.`
         );
       } else {
         setIaConflittiErrore(
@@ -9676,6 +9685,30 @@ export default function App() {
             >
               📘 Guida
             </a>
+            {/*
+              La chiave dell'abbonamento aveva casa solo in fondo alla Guida,
+              dentro il pannello dell'assistente, e quel campo compare soltanto
+              se anche l'assistente e' a pagamento. Da quando le funzioni con
+              l'IA sono sette e l'assistente e' rimasto gratuito, chi comprava
+              la chiave non trovava piu' dove metterla: adesso il posto e'
+              questo, ed e' sempre visibile.
+            */}
+            <button
+              onClick={() => setMostraChiave(true)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                chiaveCollegata
+                  ? 'bg-salvia-500/20 text-salvia-100 border-salvia-400/50'
+                  : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+              }`}
+              title={
+                chiaveCollegata
+                  ? 'Abbonamento EduTime Pro AI attivo su questo dispositivo'
+                  : 'Incolla qui la chiave dell’abbonamento EduTime Pro AI'
+              }
+            >
+              🔑 Abbonamento IA
+              {chiaveCollegata && <span className="text-[10px]">attivo</span>}
+            </button>
             <button
               onClick={() => setReadOnlyMode(!readOnlyMode)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -15351,6 +15384,16 @@ export default function App() {
         <DomandeOrario
           dati={datiDomandeOrario}
           onChiudi={() => setMostraDomandeOrario(false)}
+        />
+      )}
+      {mostraChiave && (
+        <ChiaveAbbonamento
+          onChiudi={() => setMostraChiave(false)}
+          onCambiata={() =>
+            setChiaveCollegata(
+              Boolean(leggiLicenza()) && Boolean(leggiIstanza())
+            )
+          }
         />
       )}
       {editingCell && (

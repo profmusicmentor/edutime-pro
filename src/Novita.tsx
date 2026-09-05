@@ -140,10 +140,10 @@ function RiquadroAbbonamento() {
         Attiva l&apos;abbonamento · {PREZZO_ABBONAMENTO}
       </a>
       <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-        Hai già la chiave? Si incolla nel pannello dell&apos;assistente, in
-        fondo alla <b>Guida</b>. Senza abbonamento EduTime Pro continua a
-        funzionare tutto come prima: orario, sostituzioni, conflitti, stampe ed
-        Excel restano gratuiti e senza limiti.
+        Hai già la chiave? Si incolla dal pulsante{' '}
+        <b>«🔑 Abbonamento IA»</b>, in alto a destra. Senza abbonamento EduTime
+        Pro continua a funzionare tutto come prima: orario, sostituzioni,
+        conflitti, stampe ed Excel restano gratuiti e senza limiti.
       </p>
     </div>
   );

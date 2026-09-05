@@ -2062,10 +2062,13 @@ export const chapters: Chapter[] = [
             sostituzioni si assegnano a mano con i pulsanti dei candidati,
             l'orario si compila dalla griglia, i vincoli si mettono uno per uno
             nel Registro Cattedre, i conflitti si sistemano con «Vedi» e
-            «Rimuovi». La chiave si incolla nel pannello dell'assistente, in
-            fondo a questa guida. Ogni funzione ha anche un tetto di richieste al
-            giorno: quando finisce, l'app lo dice e il lavoro a mano resta senza
-            limiti.
+            «Rimuovi». La chiave si incolla dal pulsante{' '}
+            <B>«🔑 Abbonamento IA»</B>, in alto a destra nella barra
+            dell'applicazione: lì si vede anche se l'abbonamento è attivo su
+            questo dispositivo, e da lì si toglie la chiave per liberare il
+            posto e usarla su un altro computer. Ogni funzione ha anche un tetto
+            di richieste al giorno: quando finisce, l'app lo dice e il lavoro a
+            mano resta senza limiti.
           </>
         ),
       },

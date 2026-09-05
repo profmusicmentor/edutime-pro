@@ -155,7 +155,7 @@ export const rimettiNomi = (
  */
 export const messaggioErroreIa = (errore: unknown): string => {
   if (errore instanceof ErroreLicenzaIa) {
-    return `${errore.message} Le funzioni con l'intelligenza artificiale fanno parte dell'abbonamento EduTime Pro AI: la chiave si incolla nel pannello dell'assistente, in fondo alla Guida.`;
+    return `${errore.message} Le funzioni con l'intelligenza artificiale fanno parte dell'abbonamento EduTime Pro AI: la chiave si incolla dal pulsante «🔑 Abbonamento IA», in alto a destra.`;
   }
   if (errore instanceof ErroreLimiteIa) return errore.message;
   return errore instanceof Error ? errore.message : 'Non è riuscito.';

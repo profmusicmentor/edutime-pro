@@ -130,7 +130,7 @@ export default function ImportaDocenti({
     } catch (e) {
       if (e instanceof ErroreLicenzaImport) {
         setErrore(
-          `${e.message} La lettura assistita fa parte dell'abbonamento: la chiave si incolla nel pannello dell'assistente, in fondo alla Guida.`
+          `${e.message} La lettura assistita fa parte dell'abbonamento: la chiave si incolla dal pulsante «🔑 Abbonamento IA», in alto a destra.`
         );
       } else {
         setErrore(e instanceof Error ? e.message : 'Lettura non riuscita.');

@@ -48,6 +48,7 @@ export const NOVITA: VoceNovita[] = [
       'Nell’«Orario Generale» c’è «💬 Chiedi all’orario»: domande a parole sull’orario che hai adesso, del tipo «chi è libero giovedì alla terza ora?» o «quali docenti hanno più di tre ore buche?». I conti li fa l’app prima di chiedere, così le risposte sono quelle vere e non stime; i nomi restano nel computer e diventano sigle.',
       'C’è una scheda nuova, «📝 Documenti»: la relazione per il Dirigente sui criteri seguiti, la circolare ai docenti, l’avviso alle famiglie per entrate e uscite fuori orario, la comunicazione delle sostituzioni del giorno e la convocazione dei consigli. I numeri li mette l’app, le frasi le scrive l’IA, e il testo resta lì da correggere, copiare o scaricare: da EduTime Pro non parte niente verso nessuno.',
       'Tutte queste funzioni fanno parte dell’abbonamento EduTime Pro AI, come l’aiuto sui conflitti e la lettura del PDF dei consigli. Senza la chiave l’app continua a funzionare come sempre: le sostituzioni si assegnano a mano, l’orario si compila dalla griglia, i vincoli si mettono uno per uno.',
+      'La chiave dell’abbonamento ha finalmente un posto suo: il pulsante «🔑 Abbonamento IA» in alto a destra, accanto alla Guida. Prima si incollava dentro il pannello dell’assistente e si faceva fatica a trovarlo. Da lì vedi anche se l’abbonamento è attivo su questo dispositivo, e puoi togliere la chiave per liberare il posto e usarla su un altro computer.',
     ],
   },
   {
