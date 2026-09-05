@@ -370,7 +370,7 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
           rel="noopener noreferrer"
           className="underline hover:text-slate-700"
         >
-          Codice sorgente (AGPL-3.0)
+          Codice sorgente (consultabile)
         </a>{' '}
         •{' '}
         <SostieniProgetto />

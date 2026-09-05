@@ -215,19 +215,21 @@ quel documento: il codice è l'unica barriera.
 
 ## Licenza
 
-Copyright (C) 2026 Walter Vitale.
+Copyright (c) 2026 Walter Vitale. Tutti i diritti riservati.
 
-EduTime Pro è software libero rilasciato sotto la **GNU Affero General Public
-License versione 3** (o, a scelta, una versione successiva). Il testo completo è
-nel file [`LICENSE`](LICENSE).
+Il codice di EduTime Pro è **consultabile ma non libero**: si può leggere e
+studiare, non si può copiare, modificare, ridistribuire né ospitare altrove
+senza autorizzazione scritta. Le condizioni per intero sono nel file
+[`LICENSE`](LICENSE).
 
-In pratica: l'app si può usare, studiare, modificare e ridistribuire
-liberamente, ma chi ne mette online una versione modificata — anche solo come
-servizio, senza distribuire il programma — deve rendere disponibile il codice
-sorgente delle proprie modifiche con la stessa licenza.
+Fino al 5 settembre 2026 il progetto è stato distribuito sotto AGPL-3.0: quelle
+versioni restano disponibili a quelle condizioni a chi le ha già ricevute, e il
+testo della licenza è conservato in
+[`LICENSE-AGPL-3.0-storica.txt`](LICENSE-AGPL-3.0-storica.txt). Il codice
+pubblicato da quella data in poi segue la licenza attuale.
 
-Il nome «EduTime Pro» non è coperto dalla licenza del codice: una versione
-derivata va pubblicata con un nome diverso.
+Per un uso che questa licenza non consente si può chiedere una licenza
+commerciale separata all'autore: <walter@biscottodigitale.com>.
 
-Per un uso che la AGPL non consente, si può chiedere una licenza commerciale
-separata all'autore.
+Chi vuole proporre una modifica legga prima
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
