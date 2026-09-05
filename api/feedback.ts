@@ -17,7 +17,15 @@
  * Lo screenshot non può stare dentro un attributo Brevo, che tiene solo
  * testo: arriva già ridotto e in base64 dal browser e viene spedito come
  * allegato di una mail di avviso. Nel contatto resta scritto che c'è.
+ *
+ * Variabili d'ambiente:
+ *   BREVO_API_KEY           chiave dell'account Brevo
+ *   BREVO_FEEDBACK_LIST_ID  lista che raccoglie le segnalazioni
+ *   FEEDBACK_NOTIFY_EMAIL   destinatario della mail con lo screenshot
+ *   FEEDBACK_LIMITE_IP      segnalazioni al giorno per indirizzo (predefinito: 20)
  */
+
+import { segnaUso, limiteDa } from './_limite';
 
 export const config = { runtime: 'edge' };
 
@@ -87,6 +95,22 @@ export default async function handler(request: Request): Promise<Response> {
 
   if (!BREVO_API_KEY || !LIST_ID) {
     return new Response('Feedback non configurato', { status: 500 });
+  }
+
+  // Tetto giornaliero per indirizzo, come per le domande all'assistente.
+  // L'esca antispam ferma i bot ingenui, non uno script che ripete la stessa
+  // POST: senza questo freno ogni invio crea un contatto Brevo e una mail, e
+  // la lista dei feedback si riempirebbe di rumore. La soglia è alta: chi
+  // segnala davvero manda un paio di messaggi al giorno, non venti.
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'ignoto';
+  const invii = await segnaUso(`fb:ip:${ip}`);
+  if (invii > limiteDa('FEEDBACK_LIMITE_IP', 20)) {
+    return new Response('Troppe segnalazioni da questa connessione oggi', {
+      status: 429,
+    });
   }
 
   let body: {

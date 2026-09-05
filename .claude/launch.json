@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vite", "--port", "5177", "--strictPort"],
       "port": 5177
+    },
+    {
+      "name": "edutime-anteprima",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "preview", "--port", "5178", "--strictPort"],
+      "port": 5178
     }
   ]
 }
