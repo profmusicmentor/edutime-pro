@@ -1883,6 +1883,21 @@ export const chapters: Chapter[] = [
         ),
       },
       {
+        title: 'Le visite si contano, le persone no',
+        tag: 'statistiche',
+        body: (
+          <>
+            Per sapere se l'app viene usata è attivo <B>Vercel Web Analytics</B>
+            , che conta le pagine aperte e i visitatori. Non usa cookie, non
+            crea un profilo di chi naviga e non manda niente a servizi
+            pubblicitari: il conteggio resta dentro Vercel, che già ospita
+            l'app. Non vede l'orario, i nomi dei docenti o il codice scuola, e
+            non distingue una persona dall'altra: i numeri che arrivano sono
+            solo totali.
+          </>
+        ),
+      },
+      {
         title: 'Come sono protetti i dati',
         tag: 'sicurezza',
         body: "Le regole di sicurezza di Firestore permettono di leggere solo il documento di cui si conosce il codice scuola: non esiste un accesso libero al database, nessuno può sfogliare gli orari di scuole altrui.",

@@ -25,7 +25,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-06b';
+export const NOVITA_VERSIONE = '2026-09-06c';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -37,6 +37,13 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-06c',
+    data: '6 settembre 2026',
+    voci: [
+      'Nel capitolo «Trasparenza e privacy» della Guida c’è una scheda nuova. Da oggi l’app tiene il conto di quante pagine vengono aperte, con Vercel Web Analytics: serve soltanto a capire se l’app viene usata e quanto. Non usa cookie, non costruisce un profilo di chi naviga, non manda niente ai servizi pubblicitari e non distingue una persona dall’altra. L’orario, i nomi dei docenti e il codice scuola non c’entrano e restano dove sono. Nell’uso quotidiano non cambia nulla.',
+    ],
+  },
   {
     versione: '2026-09-06b',
     data: '6 settembre 2026',
@@ -85,15 +92,6 @@ export const NOVITA: VoceNovita[] = [
     voci: [
       'Nella scheda «Conflitti» c\u2019è un riquadro nuovo: «✨ Fatti aiutare dall\u2019IA». L\u2019IA guarda i conflitti rimasti e propone degli spostamenti di lezione. Prima di mostrarteli, l\u2019app li prova uno per uno sull\u2019orario e tiene solo quelli che tolgono davvero un problema: vedi quanti conflitti restano, e l\u2019orario cambia solo quando premi «Applica». I nomi dei docenti non escono dal computer, al loro posto vanno delle sigle. Fino al 5 settembre 2026 si prova senza chiave; dopo fa parte dell\u2019abbonamento EduTime Pro AI.',
       'Anche la lettura del PDF con l\u2019IA nei «Consigli di classe» si prova senza chiave fino al 5 settembre 2026, e da quel giorno entra nell\u2019abbonamento insieme all\u2019aiuto sui conflitti. La lettura fatta dall\u2019app, quella che non manda niente a nessuno, resta gratuita e senza limiti.',
-    ],
-  },
-  {
-    versione: '2026-09-02b',
-    data: '2 settembre 2026',
-    voci: [
-      'Il «Monte ore» in «Gestione Sezioni» si riesce finalmente a cambiare. Prima, appena si cancellava il numero, la casella tornava da sola a 30 e non si riusciva più a scriverci dentro: alla primaria diventava impossibile impostare 24 o 27. Adesso la casella resta vuota mentre si scrive, accetta anche le mezze ore, e sotto ci sono i valori pronti 24, 27, 30, 36 e 40 da premere per impostarli in un colpo solo.',
-      'Il lucchetto «🔒 Sola Lettura» adesso si nota. Sotto l\'intestazione compare una fascia gialla che spiega perché i comandi sono grigi, con il pulsante «🔓 Torna a modificare». Il blocco riguarda solo il proprio browser: non dipende dal cloud né dal collega che ha passato il codice scuola, e chi ha il codice può sempre scrivere.',
-      'Nei «🧑\u200d🏫 Consigli di classe» il piano dice quante sale sta usando davvero, per esempio «Sale usate: 1 su 3», e spiega il perché: due consigli occupano due sale nello stesso momento solo se non hanno nessun docente in comune, altrimenti le riunioni vanno una dopo l\'altra e le altre sale restano vuote.',
     ],
   },
 ];
