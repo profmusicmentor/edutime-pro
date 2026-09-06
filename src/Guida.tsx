@@ -80,12 +80,12 @@ export default function Guida() {
           <h1 className="text-4xl font-bold mt-2">Guida a EduTime Pro</h1>
           <p className="text-brand-200 mt-3 max-w-2xl">
             Manuale d'uso per la costruzione dell'orario scolastico: come
-            muoversi fra le sei schede dell'app, assegnare le cattedre,
+            muoversi fra le nove schede dell'app, assegnare le cattedre,
             generare l'orario e risolvere i conflitti.
           </p>
           <div className="flex flex-wrap gap-2 mt-6">
             {[
-              '6 schede principali',
+              '9 schede principali',
               'Generazione automatica',
               'Conflitti in tempo reale',
               'Stampa A3 / Excel',

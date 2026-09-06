@@ -62,7 +62,7 @@ export const chapters: Chapter[] = [
     ),
     cards: [
       {
-        title: 'Le 6 schede principali',
+        title: 'Le 9 schede principali',
         tag: 'interfaccia',
         body: (
           <Ul
@@ -91,6 +91,18 @@ export const chapters: Chapter[] = [
                 <B>Sostituzioni</B>: assenze del giorno, supplenze proposte e
                 foglio da stampare.
               </>,
+              <>
+                <B>Assemblee</B>: assemblee sindacali, con l'elenco di chi
+                aderisce e le classi da coprire.
+              </>,
+              <>
+                <B>Consigli di classe</B>: composizione dei consigli e
+                calendario delle riunioni pomeridiane.
+              </>,
+              <>
+                <B>Documenti</B>: circolari e comunicazioni scritte con l'IA a
+                partire dai dati dell'orario. Richiede l'abbonamento IA.
+              </>,
             ]}
           />
         ),
@@ -102,7 +114,7 @@ export const chapters: Chapter[] = [
           <Ul
             items={[
               'Non gestisce valutazioni, assenze o pagelle.',
-              'Non importa orari da file esterni: i docenti si inseriscono a mano o si modificano quelli di esempio.',
+              "Non legge da sola i file gestionali della scuola: senza abbonamento IA i docenti si inseriscono a mano o si modificano quelli di esempio. Con l'abbonamento IA puoi far leggere all'app un orario che hai già e un elenco docenti in PDF, ma il risultato va sempre controllato.",
               'Non ha login con email e password.',
               'Non genera orari "ottimali" in assoluto: propone una soluzione che rispetta i vincoli, poi va affinata a mano.',
             ]}
@@ -234,8 +246,9 @@ export const chapters: Chapter[] = [
     intro: (
       <>
         L'intestazione blu-viola contiene le azioni globali: spazio di lavoro,
-        guida, sola lettura, larghezza pagina, generazione automatica,
-        allineamento del sostegno, stampa ed esportazione.
+        guida, abbonamento IA, sola lettura, colori chiari o notte, larghezza
+        pagina, generazione automatica, allineamento del sostegno, stampa ed
+        esportazione.
       </>
     ),
     cards: [
@@ -250,9 +263,19 @@ export const chapters: Chapter[] = [
         body: 'Apre questa guida in una nuova scheda.',
       },
       {
+        title: '🔑 Abbonamento IA',
+        tag: 'abbonamento',
+        body: "Qui si incolla la chiave dell'abbonamento EduTime Pro AI, quella che accende le funzioni con l'intelligenza artificiale. Se l'abbonamento è attivo su questo computer il pulsante diventa verde e scrive «attivo». Dalla stessa finestra puoi togliere la chiave per liberare il posto e usarla su un altro computer. Senza chiave l'app funziona lo stesso: si spengono solo le funzioni con l'IA.",
+      },
+      {
         title: 'Sola Lettura / Modifica',
         tag: 'sicurezza',
         body: 'Il pulsante mostra "Modifica" quando puoi scrivere e "Sola Lettura" quando i dati sono protetti. Lo stato è persistente tra le sessioni.',
+      },
+      {
+        title: '🌙 Notte / ☀️ Chiara',
+        tag: 'aspetto',
+        body: "Cambia i colori di tutta l'app: sfondo scuro per lavorare la sera, sfondo chiaro di giorno. La scelta resta salvata su questo browser e si ritrova alla riapertura. Chi non ha mai toccato il pulsante si prende l'impostazione del proprio computer: se Mac o Windows sono in scuro, l'app parte già scura. Stampa A3 ed esportazione Excel restano sempre su fondo bianco.",
       },
       {
         title: 'Centrata / Espandi',
@@ -479,7 +502,7 @@ export const chapters: Chapter[] = [
       {
         title: 'Stampa singola A4',
         tag: 'singolo elemento',
-        body: "Accanto al selettore c'è il pulsante 🖨️: apre una finestra con l'orario di quell'elemento in A4 verticale e avvia la stampa.",
+        body: "Accanto al selettore c'è il pulsante 🖨️: apre una finestra con l'orario di quell'elemento in A4 verticale e avvia la stampa. Nella vista «Sostegno» c'è in più il pulsante «🖨️ Tutti», che stampa un tabellone unico con l'orario di tutti i docenti di sostegno invece di un foglio per volta.",
       },
       {
         title: 'Modifica cella nella vista Classe',
@@ -498,8 +521,8 @@ export const chapters: Chapter[] = [
       },
     ],
     note: {
-      title: 'Modello A e Modello B nella vista Classe',
-      body: 'La vista Classe mostra i giorni e le ore della griglia del suo modello: con i valori di partenza il Modello A ha il sabato e 5 ore, il Modello B si ferma al venerdì con 6 ore. Se cambi la griglia in «Sezioni & Regole», la tabella si adegua.',
+      title: 'I modelli di settimana nella vista Classe',
+      body: 'La vista Classe mostra i giorni e le ore della griglia del suo modello: con i valori di partenza il Modello A ha il sabato e 5 ore, mentre i Modelli B, C e D si fermano al venerdì con 6 ore. Se cambi la griglia in «Sezioni & Regole», la tabella si adegua.',
     },
   },
   {
@@ -548,6 +571,19 @@ export const chapters: Chapter[] = [
               classe e compare in piccolo sotto le ore nel registro. Viste,
               stampe ed export mostrano la materia giusta, mentre il colore di
               dipartimento resta quello della materia principale.
+            </p>
+            <p className="mt-2">
+              <B>Due materie nella stessa classe.</B> Lo stesso docente può
+              fare italiano <em>e</em> storia in 1A. Dalla stessa finestra
+              scrivi in <B>Materia in questa classe</B> una materia che in
+              quella classe non ha ancora: invece di sostituire quella di
+              prima, si aggiunge una riga. Nella finestra vedi l'elenco di
+              quello che quel docente ha già in quella classe, con la <B>✕</B>{' '}
+              per togliere una riga. Nella griglia la casella di quella classe
+              diventa arancione e mostra il totale delle due materie: si preme
+              e si apre la finestra, perché una casella sola non basta più a
+              dire quale delle due stai cambiando. Chi ha una materia per
+              classe non vede nessuna differenza.
             </p>
           </>
         ),
@@ -652,12 +688,12 @@ export const chapters: Chapter[] = [
       {
         title: '📆 Massimo ore al giorno',
         tag: 'distribuzione',
-        body: "Quante ore può fare un docente in una giornata: 4, 5 (predefinito), 6 oppure nessun limite. Oltre a questo tetto l'algoritmo ne applica uno suo, più stretto: le ore di cattedra divise per i giorni in cui il docente è a scuola. È quello che evita le giornate da sei ore e la settimana schiacciata su quattro giorni. Il compromesso c'è: distribuire di più significa qualche ora buca in più e, con le cattedre pesanti, qualche ora che resta fuori. Se il tetto rende la cattedra impossibile da piazzare, la scheda Conflitti lo dice.",
+        body: "Quante ore può fare un docente in una giornata: da 4 a 8, oppure nessun limite. Il predefinito è 5. I valori alti servono ai laboratori lunghi degli istituti professionali e dei corsi serali, che tengono lo stesso docente in classe per quattro, cinque o più ore di fila; è anche il tetto che decide quanto può durare un blocco consecutivo. Oltre a questo tetto l'algoritmo ne applica uno suo, più stretto: le ore di cattedra divise per i giorni in cui il docente è a scuola. È quello che evita le giornate da sei ore e la settimana schiacciata su quattro giorni. Il compromesso c'è: distribuire di più significa qualche ora buca in più e, con le cattedre pesanti, qualche ora che resta fuori. Se il tetto rende la cattedra impossibile da piazzare, la scheda Conflitti lo dice.",
       },
       {
         title: '🧮 Massimo ore al giorno nella stessa classe',
         tag: 'primaria',
-        body: "Quante ore lo stesso docente può fare nella stessa classe in un giorno: da 2 a 6, oppure nessun limite. Il predefinito è 3, il valore storico, e alla secondaria va bene così. Alla primaria no: il docente prevalente ha ventidue ore su una classe sola e ne fa quattro o cinque al giorno, quindi con il tetto a 3 il generatore non riesce a piazzare la cattedra e la scheda Conflitti si riempie di errori che errori non sono. In quel caso porta il tetto a 5 o a 6.",
+        body: "Quante ore lo stesso docente può fare nella stessa classe in un giorno: da 2 a 8, oppure nessun limite. Il predefinito è 3, il valore storico, e alla secondaria va bene così. Alla primaria no: il docente prevalente ha ventidue ore su una classe sola e ne fa quattro o cinque al giorno, quindi con il tetto a 3 il generatore non riesce a piazzare la cattedra e la scheda Conflitti si riempie di errori che errori non sono. In quel caso porta il tetto a 5 o a 6.",
       },
       {
         title: "🚪 Minimo ore al giorno",
@@ -726,9 +762,31 @@ export const chapters: Chapter[] = [
         ),
       },
       {
-        title: '🌍 Classi Miste (lingue straniere)',
+        title: '🌍 Classi Miste (classi articolate)',
         tag: 'accorpamenti',
-        body: "Scegli lingua (SPAGNOLO / FRANCESE / TEDESCO), Classe 1 e Classe 2, poi «Aggiungi Gruppo Misto». Se lo stesso docente insegna quella lingua in entrambe le classi, le ore verranno messe negli stessi slot.",
+        body: "Scegli la materia, Classe 1 e Classe 2, poi «Aggiungi Gruppo Misto». Se lo stesso docente insegna quella materia in entrambe le classi, le ore verranno messe negli stessi slot. La materia si sceglie fra tutte quelle della scuola: prima l'elenco era fermo alle tre lingue straniere, ma l'accorpamento vale per qualsiasi materia, e comunque esiste solo dove lo dichiari tu.",
+      },
+      {
+        title: '📚 Materie della scuola',
+        tag: 'pulizia',
+        body: (
+          <>
+            <p>
+              Elenca tutte le materie che l'app conosce, con quanti docenti le
+              insegnano, quante ore di cattedra hanno, quante ore sono già in
+              orario e quale laboratorio è collegato. È il posto per vedere
+              cosa c'è davvero, prima di generare.
+            </p>
+            <p className="mt-2">
+              Da qui una materia si <B>rinomina ovunque in un colpo solo</B>:
+              docenti, righe di cattedra, lezioni già in orario, elenco delle
+              materie del laboratorio, coppie da non affiancare e classi
+              articolate. Se il nome nuovo esiste già, le due materie diventano
+              una: è il modo di rimettere insieme «ED. FISICA» e «EDUCAZIONE
+              FISICA» scritte in due modi diversi.
+            </p>
+          </>
+        ),
       },
       {
         title: '🔗 Vincoli di accorpamento / co-presenza',
@@ -741,10 +799,14 @@ export const chapters: Chapter[] = [
         body: (
           <>
             <p>
-              I due modelli partono dalla configurazione classica della
-              secondaria di primo grado — <B>Modello A</B>: 6 giorni (Lun-Sab),
-              5 ore al giorno più il rientro; <B>Modello B</B>: 5 giorni
-              (Lun-Ven), 6 ore al giorno — ma la <B>griglia è modificabile</B>:
+              I modelli sono quattro e partono dalla configurazione classica
+              della secondaria di primo grado — <B>Modello A</B>: 6 giorni
+              (Lun-Sab), 5 ore al giorno più il rientro; <B>Modello B</B>: 5
+              giorni (Lun-Ven), 6 ore al giorno; <B>Modello C</B> e{' '}
+              <B>Modello D</B>: partono uguali al B e servono agli istituti con
+              più plessi, dove primaria, secondaria e un terzo edificio hanno
+              giornate diverse. Chi non li tocca non vede nessuna differenza.
+              La <B>griglia è modificabile</B>:
               in questa scheda imposti quanti giorni a settimana, quante ore al
               giorno, quante ore pomeridiane curricolari e se c'è il rientro
               pomeridiano. Le ore pomeridiane sono lezione normale che
@@ -1516,9 +1578,10 @@ export const chapters: Chapter[] = [
           <Ul
             items={[
               <>
-                <B>Modello A e Modello B</B> non sono il monte ore: dicono solo
+                I <B>modelli A, B, C e D</B> non sono il monte ore: dicono solo
                 come si distribuisce la settimana. Di partenza A = 6 giorni con
-                5 ore e B = 5 giorni con 6 ore, ma giorni e ore si cambiano in
+                5 ore, mentre B, C e D = 5 giorni con 6 ore, ma giorni e ore si
+                cambiano in
                 «Sezioni & Regole». Scegli il modello che somiglia alla vostra
                 settimana, adegua la griglia, poi regola le ore con la durata e
                 il monte ore.
@@ -1571,7 +1634,7 @@ export const chapters: Chapter[] = [
     intro: <>Il bignami da tenere sotto mano mentre lavori.</>,
     cards: [
       {
-        title: 'Modello A vs Modello B',
+        title: 'I quattro modelli di settimana',
         tag: 'sezioni',
         body: (
           <Ul
@@ -1586,10 +1649,16 @@ export const chapters: Chapter[] = [
                 giorno, sabato libero.
               </>,
               <>
-                Entrambi i modelli sono <B>modificabili</B> in «Sezioni &
-                Regole»: giorni a settimana, ore al giorno, ore pomeridiane
-                curricolari e rientro pomeridiano. Chi non li tocca continua a
-                lavorare come prima.
+                <B>Modello C</B> e <B>Modello D</B> partono uguali al B e
+                restano fermi finché non li assegni a una sezione. Servono agli
+                istituti con più plessi, dove primaria, secondaria e un terzo
+                edificio hanno giornate diverse.
+              </>,
+              <>
+                Tutti e quattro i modelli sono <B>modificabili</B> in «Sezioni
+                &amp; Regole»: giorni a settimana, ore al giorno, ore
+                pomeridiane curricolari e rientro pomeridiano. Chi non li tocca
+                continua a lavorare come prima.
               </>,
             ]}
           />
@@ -2089,6 +2158,60 @@ export const chapters: Chapter[] = [
       },
     ],
   },
+  {
+    id: 'assemblee',
+    num: '18',
+    title: 'Scheda: Assemblee sindacali',
+    intro: (
+      <>
+        La scheda <B>🗳️ Assemblee</B> tiene il registro delle assemblee
+        sindacali e di chi vi aderisce. Serve a rispondere a due domande che
+        tornano ogni anno: quante ore ha già usato questa persona, e quante
+        assemblee ci sono state in questo mese. Le ore non si contano a mano:
+        l'app guarda la fascia oraria dell'assemblea e la confronta con il
+        servizio di ciascuno.
+      </>
+    ),
+    cards: [
+      {
+        title: 'Registrare una nuova assemblea',
+        tag: 'base',
+        body: "Con «Nuova assemblea» si scrivono la data, l'ora di inizio e quella di fine, e il titolo (per esempio la sigla del sindacato). Poi, con «Gestisci adesioni», si spuntano le persone che partecipano. La casella di ricerca serve quando l'elenco è lungo.",
+      },
+      {
+        title: 'Le ore le conta l\'app',
+        tag: 'calcolo',
+        body: "Per chi è già nell'orario, l'app conta le ore di lezione che cadono dentro la fascia dell'assemblea: chi in quelle due ore aveva una classe consuma due ore, chi ne aveva una sola ne consuma una, chi era libero non consuma niente. Il numero calcolato resta comunque correggibile a mano, persona per persona, quando il caso reale non torna.",
+      },
+      {
+        title: 'Chi non sta nell\'orario: la scheda Personale',
+        tag: 'personale',
+        body: 'Docenti di infanzia e primaria e personale ATA non compaiono nella griglia dell\'orario, quindi le loro ore non si possono dedurre. Nella scheda "Personale" si aggiungono con nome e ruolo, e per ciascuno si scrive la fascia di servizio di ogni giorno della settimana. Il doppio clic su una fascia la copia da lunedì a venerdì.',
+      },
+      {
+        title: 'I due limiti di contratto',
+        tag: 'avvisi',
+        body: "In alto si impostano il tetto di ore nell'anno scolastico (di partenza 10) e il numero massimo di assemblee al mese (di partenza 2). Il riquadro «Avvisi» segnala chi ha superato il tetto di ore e i mesi in cui le assemblee sono troppe. Sono numeri modificabili: ogni contratto ha i suoi.",
+      },
+      {
+        title: 'Prospetto e dettaglio',
+        tag: 'output',
+        body: '«Esporta Excel 📊» scarica due fogli: "Prospetto", con una riga per persona, le ore totali dell\'anno, il limite e i mesi fuori regola, e "Dettaglio", con una riga per ogni adesione. È il documento da consegnare in segreteria.',
+      },
+    ],
+    note: {
+      title: 'Dove finiscono questi dati',
+      body: (
+        <>
+          Assemblee, adesioni e persone aggiunte a mano stanno nello stesso
+          posto degli altri dati della scuola: sul computer se lavori in locale,
+          nello spazio condiviso se hai scelto «Collabora online». Entrano nel
+          backup e ne escono col ripristino. Nomi e ruoli restano etichette
+          dentro l'app: da qui non parte niente verso nessuno.
+        </>
+      ),
+    },
+  },
 ];
 
 export const steps: { title: string; body: ReactNode }[] = [
@@ -2098,7 +2221,7 @@ export const steps: { title: string; body: ReactNode }[] = [
       <>
         In <B>Sezioni &amp; Regole → Gestione Sezioni</B> verifica le sezioni
         esistenti, aggiungi o elimina quelle che servono e scegli per ciascuna
-        Modello A o Modello B e gli anni attivi.
+        il modello di settimana (A, B, C o D) e gli anni attivi.
       </>
     ),
   },

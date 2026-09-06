@@ -25,7 +25,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-06c';
+export const NOVITA_VERSIONE = '2026-09-06d';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -37,6 +37,16 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-06d',
+    data: '6 settembre 2026',
+    voci: [
+      'La Guida è stata rimessa in pari con l’app. Le schede sono nove e non più sei: adesso ci sono anche «Assemblee», «Consigli di classe» e «Documenti». C’è un capitolo nuovo, «Scheda: Assemblee sindacali», che spiega come si registra un’assemblea, come l’app conta da sola le ore di chi aderisce, come si aggiungono infanzia, primaria e personale ATA, e come funzionano il tetto di ore dell’anno e il massimo di assemblee al mese.',
+      'Nel capitolo «La barra superiore» sono arrivati i due pulsanti che mancavano: «🔑 Abbonamento IA», dove si incolla e si toglie la chiave, e «🌙 Notte / ☀️ Chiara», che cambia i colori di tutta l’app e si ricorda la scelta.',
+      'Sono state corrette le parti che l’app aveva superato: i modelli di settimana sono quattro (A, B, C e D) e non più due, i tetti di ore al giorno arrivano a otto, le classi articolate valgono per qualsiasi materia e non solo per le tre lingue straniere, e la voce «Cosa NON fa l’app» non dice più che l’app non legge file esterni, visto che con l’abbonamento IA legge l’orario e gli elenchi docenti.',
+      'Il capitolo del Registro Cattedre spiega ora come si mettono due materie nella stessa classe, e quello di «Sezioni & Regole» descrive la scheda «📚 Materie della scuola», quella che rinomina o unisce una materia ovunque in un colpo solo.',
+    ],
+  },
   {
     versione: '2026-09-06c',
     data: '6 settembre 2026',
@@ -84,14 +94,6 @@ export const NOVITA: VoceNovita[] = [
     data: '4 settembre 2026',
     voci: [
       'Le aule adesso rispettano le sedi. Se la scuola ha più plessi, l’Auto-Generazione non manda più una classe in un laboratorio che sta in un altro edificio: cerca il laboratorio di quella materia nella sede della classe e, se lì non c’è, la lezione resta in aula. I laboratori a cui non è stata assegnata nessuna sede continuano a valere per tutti, quindi per le scuole a plesso unico non cambia niente. La stessa regola vale quando si cambia un’ora a mano.',
-    ],
-  },
-  {
-    versione: '2026-09-03',
-    data: '3 settembre 2026',
-    voci: [
-      'Nella scheda «Conflitti» c\u2019è un riquadro nuovo: «✨ Fatti aiutare dall\u2019IA». L\u2019IA guarda i conflitti rimasti e propone degli spostamenti di lezione. Prima di mostrarteli, l\u2019app li prova uno per uno sull\u2019orario e tiene solo quelli che tolgono davvero un problema: vedi quanti conflitti restano, e l\u2019orario cambia solo quando premi «Applica». I nomi dei docenti non escono dal computer, al loro posto vanno delle sigle. Fino al 5 settembre 2026 si prova senza chiave; dopo fa parte dell\u2019abbonamento EduTime Pro AI.',
-      'Anche la lettura del PDF con l\u2019IA nei «Consigli di classe» si prova senza chiave fino al 5 settembre 2026, e da quel giorno entra nell\u2019abbonamento insieme all\u2019aiuto sui conflitti. La lettura fatta dall\u2019app, quella che non manda niente a nessuno, resta gratuita e senza limiti.',
     ],
   },
 ];
