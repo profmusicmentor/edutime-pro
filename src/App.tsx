@@ -952,6 +952,13 @@ const DEFAULT_MODEL_GRIDS: Record<
 > = {
   modelloA: { days: 6, hours: 5, pomeridiane: 0, rientro: true },
   modelloB: { days: 5, hours: 6, pomeridiane: 0, rientro: false },
+  // Due modelli in piu' per gli istituti comprensivi con piu' plessi: due
+  // griglie non bastavano a chi ha primaria, secondaria e un plesso con la
+  // giornata diversa. Partono uguali al modello B e nessuna scuola li usa
+  // finche' non li assegna a una sezione, quindi chi non tocca niente non
+  // vede nessuna differenza.
+  modelloC: { days: 5, hours: 6, pomeridiane: 0, rientro: false },
+  modelloD: { days: 5, hours: 6, pomeridiane: 0, rientro: false },
 };
 
 /**
@@ -1143,9 +1150,25 @@ const minHoursPerDayFor = (rules: any) => {
   return v === undefined || v === null ? 2 : v;
 };
 
-/** Ore già assegnate a un docente in un giorno, sostegno compreso. */
-const hoursOfTeacherOnDay = (tt: any[], teacherId: string, day: number) =>
-  tt.filter((s) => s.teacherId === teacherId && s.day === day).length;
+/**
+ * Ore già assegnate a un docente in un giorno, sostegno compreso.
+ *
+ * Con `weightOf` il conto è in ore di servizio invece che in caselle: una
+ * lezione da 30 minuti pesa mezz'ora, non un'ora. Serve alle scuole che
+ * accorciano un'ora della giornata (la primaria, di solito l'ultima), dove
+ * contare le caselle faceva sforare il tetto giornaliero prima del tempo e
+ * lasciava l'ultima ora vuota tutti i giorni. Senza `weightOf` ogni casella
+ * vale un'ora, cioè esattamente il conteggio di prima.
+ */
+const hoursOfTeacherOnDay = (
+  tt: any[],
+  teacherId: string,
+  day: number,
+  weightOf?: (hour: number) => number
+) =>
+  tt
+    .filter((s) => s.teacherId === teacherId && s.day === day)
+    .reduce((tot, s) => tot + (weightOf ? weightOf(s.hour) : 1), 0);
 
 /**
  * L'ordine con cui un docente di sostegno prova le ore di una classe.
@@ -1315,13 +1338,54 @@ const isRoomFull = (
  * soluzione: per l'app diventerebbero due persone, ciascuna col suo giorno
  * libero e il suo tetto di ore.
  */
-const subjectForClass = (staff: any, classId: string) => {
-  const assignment = (staff?.assignments || []).find(
+const subjectForClass = (staff: any, classId: string, tt?: any[]) => {
+  const righe = righeDiClasse(staff, classId);
+  if (righe.length === 0) return staff?.subject || 'Lezione';
+  if (righe.length === 1 || !tt) return materiaDellaRiga(righe[0], staff);
+  /*
+   * Più materie nella stessa classe: si sceglie la prima che ha ancora ore
+   * libere. Così, mettendo le celle a mano, si riempie prima italiano e poi
+   * storia invece di ripetere sempre la materia della prima riga. Quando sono
+   * tutte piene si torna alla prima, che è il comportamento di sempre.
+   */
+  const libera = righe.find((riga: any) => {
+    const materia = materiaDellaRiga(riga, staff);
+    const gia = (tt || []).filter(
+      (s: any) =>
+        s.teacherId === staff?.id &&
+        s.classId === classId &&
+        s.subject === materia
+    ).length;
+    return gia < (Number(riga.hours) || 0);
+  });
+  return materiaDellaRiga(libera || righe[0], staff);
+};
+
+/**
+ * Le righe di cattedra di un docente in una classe. Di norma è una sola, ma
+ * dalla primaria in su capita che la stessa persona faccia due materie nella
+ * stessa classe (italiano e storia, matematica e scienze): in quel caso le
+ * righe sono due, con ore e materia proprie.
+ */
+const righeDiClasse = (staff: any, classId: string) =>
+  ((staff?.assignments || []) as any[]).filter(
     (a: any) => a.classId === classId
   );
-  const scritta = assignment?.subject;
-  return scritta ? String(scritta) : staff?.subject || 'Lezione';
-};
+
+/**
+ * Il nome della materia di una riga di cattedra: quella scritta sulla riga,
+ * oppure, se manca, la materia principale del docente. È esattamente il nome
+ * che finisce nella cella dell'orario, quindi decide anche l'aula speciale e
+ * il colore del dipartimento.
+ */
+const materiaDellaRiga = (riga: any, staff: any) =>
+  riga?.subject ? String(riga.subject) : staff?.subject || 'Lezione';
+
+/** Lo stesso nome, ripulito, per confrontare due righe fra loro. */
+const chiaveMateria = (nome: string) =>
+  String(nome || '')
+    .trim()
+    .toUpperCase();
 
 /**
  * La sede di una classe, cioè quella della sua sezione. Non guarda l'aula:
@@ -1494,7 +1558,8 @@ const placeCoTeaching = (
   tt: any[],
   teachersList: any[],
   rules: any,
-  maxPerDayRule: number
+  maxPerDayRule: number,
+  weightOf?: (hour: number) => number
 ) => {
   let requested = 0;
   let assigned = 0;
@@ -1547,7 +1612,12 @@ const placeCoTeaching = (
           )
         )
           continue;
-        const hToday = hoursOfTeacherOnDay(tt, teacher.id, slot.day);
+        const hToday = hoursOfTeacherOnDay(
+          tt,
+          teacher.id,
+          slot.day,
+          weightOf
+        );
         if (maxPerDayRule > 0 && hToday >= maxPerDayRule) continue;
         // Lo stesso freno delle altre fasi: mai piu' di dieci ore in due
         // giorni di fila.
@@ -1618,7 +1688,8 @@ const canPlaceMateriaHard = (
   const maxPerDay = dailyCapFor(rules, ctx.idealPerDay, lesson.teacherId);
   if (
     maxPerDay > 0 &&
-    hoursOfTeacherOnDay(tt, lesson.teacherId, day) >= maxPerDay
+    hoursOfTeacherOnDay(tt, lesson.teacherId, day, ctx.hourWeight) >=
+      maxPerDay
   )
     return false;
 
@@ -2919,8 +2990,11 @@ const calcolaConflitti = (ctx: any) => {
     const oreRichiestePerMateria: Record<string, number> = {};
     teachers.forEach((t) => {
       (t.assignments || []).forEach((a: any) => {
-        oreRichiestePerMateria[t.subject] =
-          (oreRichiestePerMateria[t.subject] || 0) + a.hours;
+        // La materia della riga, non quella principale del docente: chi in una
+        // classe fa un'altra materia pesa sull'aula di quella, non della sua.
+        const nomeMateria = materiaDellaRiga(a, t);
+        oreRichiestePerMateria[nomeMateria] =
+          (oreRichiestePerMateria[nomeMateria] || 0) + a.hours;
       });
     });
     const celleSettimanali = maxGridDays * gridHourRows.length;
@@ -3178,6 +3252,9 @@ export default function App() {
   const [assignSubject, setAssignSubject] = useState('');
   const [newSepA, setNewSepA] = useState('');
   const [newSepB, setNewSepB] = useState('');
+  /** La materia che si sta rinominando nell'elenco delle materie, e il nome nuovo. */
+  const [materiaInRinomina, setMateriaInRinomina] = useState('');
+  const [nuovoNomeMateria, setNuovoNomeMateria] = useState('');
   const [assignClass, setAssignClass] = useState('');
   const [assignHours, setAssignHours] = useState(1);
   /** Campi del riquadro "Compresenze" nel Registro Cattedre. */
@@ -3193,7 +3270,7 @@ export default function App() {
   const [mixedClasses, setMixedClasses] = useState<any[]>(
     DEFAULT_MIXED_CLASSES
   );
-  const [newMixSubj, setNewMixSubj] = useState('SPAGNOLO');
+  const [newMixSubj, setNewMixSubj] = useState('');
   const [newMixC1, setNewMixC1] = useState('');
   const [newMixC2, setNewMixC2] = useState('');
 
@@ -3870,9 +3947,58 @@ export default function App() {
       ),
     [afternoonHours, timetable]
   );
+  /**
+   * Le materie della scuola, con quello che ognuna si porta dietro.
+   *
+   * Non è un'anagrafica: la materia resta il suo nome, ed è il nome a
+   * collegare l'aula speciale, il colore del dipartimento e i vincoli. Questo
+   * elenco lo mette solo in chiaro, raccolto da dove il nome compare davvero:
+   * la materia principale dei docenti, le materie scritte sulle singole righe
+   * di cattedra e le lezioni già in orario. Serve a vederle tutte insieme e a
+   * rinominarne una ovunque in un colpo solo.
+   */
+  const materieInUso = useMemo(() => {
+    const mappa: Record<
+      string,
+      { nome: string; docenti: Set<string>; ore: number; inOrario: number }
+    > = {};
+    const voce = (nome: string) => {
+      const pulito = String(nome || '').trim();
+      if (!pulito) return null;
+      if (!mappa[pulito])
+        mappa[pulito] = {
+          nome: pulito,
+          docenti: new Set(),
+          ore: 0,
+          inOrario: 0,
+        };
+      return mappa[pulito];
+    };
+    allStaff.forEach((staff: any) => {
+      // Solo i docenti di materia: il sostegno non ha una materia sua e lo
+      // strumento musicale è un'altra cosa, sta nel suo prospetto.
+      if (staff.staffType !== 'materia') return;
+      const righe = (staff.assignments || []) as any[];
+      const principale = voce(staff.subject);
+      if (principale) principale.docenti.add(staff.id);
+      righe.forEach((riga: any) => {
+        const v = voce(materiaDellaRiga(riga, staff));
+        if (!v) return;
+        v.docenti.add(staff.id);
+        v.ore += Number(riga.hours) || 0;
+      });
+    });
+    timetable.forEach((slot: any) => {
+      if (slot.type !== 'materia') return;
+      const v = voce(slot.subject);
+      if (v) v.inOrario += 1;
+    });
+    return Object.values(mappa).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [allStaff, timetable]);
+
   const allDepartments = useMemo(
-    () => Array.from(new Set(teachers.map((t) => t.subject))).sort(),
-    [teachers]
+    () => materieInUso.map((m) => m.nome),
+    [materieInUso]
   );
 
   /**
@@ -4025,9 +4151,20 @@ export default function App() {
     const summary: any = {};
     allStaff.forEach((staff) => {
       const assigns = staff.assignments || [];
+      // Quando in una classe ci sono due righe, il solo «1A(6) - 1A(2)» non
+      // dice niente: si aggiunge la materia, così nelle stampe si capisce.
+      const doppia = (a: any) =>
+        assigns.filter((x: any) => x.classId === a.classId).length > 1;
       summary[staff.id] =
         assigns.length > 0
-          ? assigns.map((a: any) => `${a.classId}(${a.hours})`).join(' - ')
+          ? assigns
+              .map(
+                (a: any) =>
+                  `${a.classId}(${a.hours}${
+                    doppia(a) ? ` ${materiaDellaRiga(a, staff)}` : ''
+                  })`
+              )
+              .join(' - ')
           : staff.subject;
     });
     return summary;
@@ -4417,20 +4554,45 @@ export default function App() {
         const pool: any[] = [];
 
         teachers.forEach((t) => {
-          const assignment = t.assignments.find(
-            (a: any) => a.classId === cls.id
-          );
-          if (assignment) {
+          // Le righe di cattedra di questo docente in questa classe: di norma
+          // una, due quando la stessa persona ci fa due materie (italiano e
+          // storia). Ogni riga porta le sue ore e la sua materia, quindi
+          // entrano nel mucchio una per una.
+          const righeClasse = righeDiClasse(t, cls.id);
+          const piuMaterie = righeClasse.length > 1;
+          righeClasse.forEach((assignment: any) => {
             report.materie.requested += assignment.hours;
-            const materiaInClasse = subjectForClass(t, cls.id);
-            for (let i = 0; i < assignment.hours; i++)
+            const materiaInClasse = materiaDellaRiga(assignment, t);
+            /*
+             * Le ore che la scuola ha gia' messo a mano e chiuso col
+             * lucchetto sono ore di questa cattedra: restano in orario e
+             * vanno scalate. Senza questo conto il generatore ne aggiungeva
+             * altrettante, il docente si ritrovava il doppio delle ore in
+             * quella classe e le ore in piu' finivano anche fuori dalla
+             * griglia del modello, perche' nella griglia non ci stavano.
+             *
+             * Con una riga sola si contano tutte le sue ore in quella classe,
+             * comunque siano scritte: e' il conteggio di sempre e regge anche
+             * le celle bloccate prima che la materia venisse cambiata. Con due
+             * righe invece serve distinguerle, quindi si guarda la materia.
+             */
+            const giaInOrario = newTimetable.filter(
+              (s: any) =>
+                s.teacherId === t.id &&
+                s.classId === cls.id &&
+                s.type === 'materia' &&
+                (!piuMaterie || s.subject === materiaInClasse)
+            ).length;
+            report.materie.assigned += Math.min(giaInOrario, assignment.hours);
+            const daPiazzare = Math.max(0, assignment.hours - giaInOrario);
+            for (let i = 0; i < daPiazzare; i++)
               pool.push({
                 teacherId: t.id,
                 subject: materiaInClasse,
                 teacherName: t.name,
                 preferConsecutive: !!t.preferConsecutive,
               });
-          }
+          });
         });
         pool.sort(() => Math.random() - 0.5);
 
@@ -4460,27 +4622,32 @@ export default function App() {
               if (isTeacherOff(newRules, candidate.teacherId, day, hour))
                 continue;
 
+              /*
+               * Classi articolate: le due classi fanno quell'ora insieme, con
+               * lo stesso docente, quindi la cella deve essere libera in
+               * tutte e due. Prima qui c'era l'elenco delle tre lingue scritto
+               * a mano, ma era inutile: l'accorpamento esiste solo se la
+               * scuola lo ha dichiarato, e quel controllo lo fa già la riga
+               * sotto. Toglierlo apre l'articolata a qualsiasi materia, senza
+               * cambiare niente per chi la usa sulle lingue.
+               */
               let mixPairClassId = null;
-              if (
-                ['SPAGNOLO', 'FRANCESE', 'TEDESCO'].includes(candidate.subject)
-              ) {
-                const mix = mixedClasses.find(
-                  (m: any) =>
-                    m.subject === candidate.subject &&
-                    (m.c1 === cls.id || m.c2 === cls.id)
-                );
-                if (mix) {
-                  mixPairClassId = mix.c1 === cls.id ? mix.c2 : mix.c1;
-                  if (
-                    newTimetable.some(
-                      (s) =>
-                        s.classId === mixPairClassId &&
-                        s.day === day &&
-                        s.hour === hour
-                    )
+              const mix = mixedClasses.find(
+                (m: any) =>
+                  m.subject === candidate.subject &&
+                  (m.c1 === cls.id || m.c2 === cls.id)
+              );
+              if (mix) {
+                mixPairClassId = mix.c1 === cls.id ? mix.c2 : mix.c1;
+                if (
+                  newTimetable.some(
+                    (s) =>
+                      s.classId === mixPairClassId &&
+                      s.day === day &&
+                      s.hour === hour
                   )
-                    continue;
-                }
+                )
+                  continue;
               }
 
               const isTeacherBusy = newTimetable.some(
@@ -4496,7 +4663,8 @@ export default function App() {
               const hoursTodayForCandidate = hoursOfTeacherOnDay(
                 newTimetable,
                 candidate.teacherId,
-                day
+                day,
+                hourWeight
               );
               const capForCandidate = dailyCapFor(
                 newRules,
@@ -4708,6 +4876,7 @@ export default function App() {
         teachers,
         idealPerDay,
         getGrid: getClassGrid,
+        hourWeight,
       };
       const repair = repairUnplacedLessons(
         newTimetable,
@@ -4746,7 +4915,8 @@ export default function App() {
         newTimetable,
         teachers,
         newRules,
-        maxPerDayRule
+        maxPerDayRule,
+        hourWeight
       );
       report.compresenze.requested = esito.requested;
       report.compresenze.assigned = esito.assigned;
@@ -4927,7 +5097,8 @@ export default function App() {
       newTimetable,
       teachers,
       generationRules,
-      maxHoursPerDayFor(generationRules)
+      maxHoursPerDayFor(generationRules),
+      hourWeight
     );
     setTimetable(newTimetable);
     pushDataToCloud(
@@ -5066,7 +5237,8 @@ export default function App() {
         type = isRientroHour(newClassId, hour) ? 'pomeriggio_musica' : 'materia';
         subject = subjectForClass(
           teachers.find((t) => t.id === teacherId),
-          newClassId
+          newClassId,
+          timetable
         );
         room = roomTouched
           ? tempRoom
@@ -5932,7 +6104,7 @@ export default function App() {
       day,
       hour,
       teacherId,
-      subject: tDoc ? subjectForClass(tDoc, classId) : 'Lezione',
+      subject: tDoc ? subjectForClass(tDoc, classId, filtered) : 'Lezione',
       type,
       room,
     });
@@ -6156,7 +6328,7 @@ export default function App() {
             hour,
             teacherId,
             subject: teacherDoc
-              ? subjectForClass(teacherDoc, classId)
+              ? subjectForClass(teacherDoc, classId, newTimetable)
               : 'Materia',
             type: type1,
             room: tempRoom,
@@ -6288,7 +6460,28 @@ export default function App() {
       list.map((t) => {
         if (t.id === staffId) {
           let assigns = [...(t.assignments || [])];
-          const idx = assigns.findIndex((a) => a.classId === classId);
+          /*
+           * Quale riga si tocca. Dalla griglia del registro (materia non
+           * indicata) si tocca l'unica riga di quella classe: se le righe sono
+           * due, la griglia non basta a dire quale, quindi non si tocca niente
+           * e si passa dal modale (la casella lì è disattivata apposta).
+           * Dal modale invece la riga è identificata da classe più materia,
+           * così una materia nuova nella stessa classe aggiunge una riga
+           * invece di sovrascrivere quella che c'era.
+           */
+          const righeClasse = assigns.filter((a) => a.classId === classId);
+          let idx;
+          if (materia === undefined) {
+            if (righeClasse.length > 1) return t;
+            idx = assigns.findIndex((a) => a.classId === classId);
+          } else {
+            const cercata = chiaveMateria(materia || t.subject || '');
+            idx = assigns.findIndex(
+              (a) =>
+                a.classId === classId &&
+                chiaveMateria(materiaDellaRiga(a, t)) === cercata
+            );
+          }
           if (hours <= 0) {
             if (idx !== -1) assigns.splice(idx, 1);
           } else if (idx !== -1) {
@@ -6377,6 +6570,91 @@ export default function App() {
     setAssignClass('');
     setAssignHours(1);
     setAssignSubject('');
+  };
+
+  /**
+   * Rinomina una materia ovunque compaia.
+   *
+   * Il nome della materia non è scritto in un posto solo: è la materia
+   * principale dei docenti, quella di certe righe di cattedra, quella delle
+   * lezioni già in orario, l'elenco delle materie di un laboratorio, le coppie
+   * da non affiancare, i vincoli di gruppo e le classi articolate. Cambiarlo a
+   * mano in un punto solo scollegava il laboratorio o il vincolo senza dire
+   * niente. Qui si cambiano tutti insieme.
+   *
+   * Se il nome nuovo esiste già, le due materie diventano una sola: è voluto,
+   * ed è il modo di rimettere insieme «ED. FISICA» e «EDUCAZIONE FISICA».
+   */
+  const handleRenameSubject = (vecchio: string, nuovo: string) => {
+    if (readOnlyMode) return;
+    const da = String(vecchio || '').trim();
+    const a = String(nuovo || '')
+      .trim()
+      .toUpperCase();
+    if (!da || !a || da === a) return;
+    const cambia = (nome: any) => (nome === da ? a : nome);
+
+    const rinominaStaff = (list: any[]) =>
+      list.map((s: any) => ({
+        ...s,
+        subject: cambia(s.subject),
+        assignments: (s.assignments || []).map((riga: any) =>
+          riga.subject === da ? { ...riga, subject: a } : riga
+        ),
+        coTeaching: (s.coTeaching || []).map((riga: any) =>
+          riga.subject === da ? { ...riga, subject: a } : riga
+        ),
+      }));
+
+    const nuoviTeachers = rinominaStaff(teachers);
+    const nuoviSostegno = rinominaStaff(sostegno);
+    const nuovoStrumento = rinominaStaff(strumento);
+    const nuovoTimetable = timetable.map((s: any) =>
+      s.subject === da ? { ...s, subject: a } : s
+    );
+    const nuoveRooms = (rooms || []).map((r: any) => ({
+      ...r,
+      subjects: Array.from(
+        new Set(((r.subjects || []) as any[]).map((m: any) => cambia(m)))
+      ),
+    }));
+    const nuoviGroupConstraints = (groupConstraints || []).map((gc: any) =>
+      gc.subject === da ? { ...gc, subject: a } : gc
+    );
+    const nuoveMixedClasses = (mixedClasses || []).map((m: any) =>
+      m.subject === da ? { ...m, subject: a } : m
+    );
+    const nuoveRegole = {
+      ...generationRules,
+      subjectSeparation: separationGroupsFor(generationRules).map(
+        (gruppo: string[]) =>
+          Array.from(new Set(gruppo.map((m: string) => cambia(m))))
+      ),
+    };
+
+    setTeachers(nuoviTeachers);
+    setSostegno(nuoviSostegno);
+    setStrumento(nuovoStrumento);
+    setTimetable(nuovoTimetable);
+    setRooms(nuoveRooms);
+    setGroupConstraints(nuoviGroupConstraints);
+    setMixedClasses(nuoveMixedClasses);
+    setGenerationRules(nuoveRegole);
+    pushDataToCloud(
+      nuovoTimetable,
+      nuoviTeachers,
+      nuoviSostegno,
+      sectionsConfig,
+      nuovoStrumento,
+      diurnalHours,
+      afternoonHours,
+      nuoveRegole,
+      generateOptions,
+      cellNotes,
+      nuoviGroupConstraints,
+      nuoveMixedClasses,
+      nuoveRooms
+    );
   };
 
   const handleResetAllAssignments = () => {
@@ -8177,7 +8455,9 @@ export default function App() {
   };
 
   const addMixedClass = () => {
-    if (!newMixC1 || !newMixC2 || newMixC1 === newMixC2) return;
+    // La materia adesso si sceglie da tutte quelle della scuola, quindi puo'
+    // essere ancora vuota: senza materia l'accorpamento non aggancia niente.
+    if (!newMixSubj || !newMixC1 || !newMixC2 || newMixC1 === newMixC2) return;
     const newMix = [
       ...mixedClasses,
       { subject: newMixSubj, c1: newMixC1, c2: newMixC2 },
@@ -8450,17 +8730,30 @@ export default function App() {
     }
     let css = `@page { size: A3 landscape; margin: 6mm; } * { box-sizing: border-box; } body { background-color: white; color: black; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 6mm; font-size: 7.5pt; } h1 { font-size: 14pt; font-weight: bold; margin: 0 0 4mm 0; color: #13233c; text-align: center; } h2 { font-size: 9pt; margin: 0 0 2mm 0; color: #13233c; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #13233c; padding-bottom: 1mm; } table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 3mm; } tr { page-break-inside: auto; } td, th { border: 0.5pt solid #64748b; padding: 1.5pt 2pt; text-align: center; font-size: 6.5pt; line-height: 1.15; overflow: hidden; vertical-align: middle; } th { background-color: #13233c !important; color: white !important; font-weight: bold; font-size: 6.5pt; border: 1pt solid #13233c; } th.sub { background-color: #e5e7eb !important; color: #374151 !important; font-size: 6pt; } td.staff-cell { text-align: left; font-weight: bold; font-size: 7pt; padding: 2pt 3pt; } td.staff-cell .subj { font-size: 5.5pt; font-weight: normal; color: #374151; text-transform: uppercase; display: block; } td.hours-cell { font-weight: bold; color: #13233c; background-color: #f2f7fa !important; } td.class-cell { text-align: left; color: #195275; font-weight: bold; font-size: 6pt; } td.day-off { background-color: ${DAY_OFF_COLOR} !important; color: #911a40 !important; font-style: italic; font-weight: bold; font-size: 6pt; } td.lesson-active { background-color: #e3eef5 !important; color: #13233c !important; font-weight: bold; font-size: 7.5pt; line-height: 1.05; } td.lesson-active .room { display: block; font-size: 4.2pt; font-weight: normal; color: #14425f; letter-spacing: -0.15pt; white-space: nowrap; } td.empty { background-color: #fafafa; } tr.dept-separator td { background-color: #13233c !important; height: 3pt; padding: 0; } .page-break { page-break-before: always; } .day-sep { border-right: 2pt solid #13233c !important; }`;
     let contentHtml = `<html><head><title>Orario - EduTime Pro</title><style>${css}</style></head><body>`;
-    if (printType === 'master') {
+    if (printType === 'master' || printType === 'master_sostegno') {
       // Un tabellone solo, con le ore del mattino e quelle del pomeriggio
       // davvero usate: chi insegna in tutte e due le fasce sta su una riga
       // sola. Il prospetto dell'indirizzo musicale resta in coda, ma solo se
       // la scuola ha docenti di strumento.
+      //
+      // Con 'master_sostegno' lo stesso tabellone tiene i soli docenti di
+      // sostegno: chi coordina il sostegno vuole il quadro di tutti insieme,
+      // non un foglio per docente.
+      const soloSostegno = printType === 'master_sostegno';
       const printHours = [...diurnalHours, ...afternoonHoursInUse];
-      const staffTutti = filteredStaff;
-      const staffPomeridiano = filteredStaff.filter(
-        (s) => s.staffType === 'strumento'
-      );
-      contentHtml += `<h1>📋 ORARIO SCOLASTICO</h1><h2>☀️ Tutti i Docenti - Mattino e Pomeriggio</h2><table><thead><tr><th style="width: 130pt;" rowspan="2">Docente</th><th style="width: 25pt;" rowspan="2">Ore</th><th style="width: 130pt;" rowspan="2">Classi Assegnate</th>${DAYS_IN_USE.map(
+      const staffTutti = soloSostegno
+        ? filteredStaff.filter((s) => s.staffType === 'sostegno')
+        : filteredStaff;
+      const staffPomeridiano = soloSostegno
+        ? []
+        : filteredStaff.filter((s) => s.staffType === 'strumento');
+      contentHtml += `<h1>📋 ${
+        soloSostegno ? 'ORARIO DEI DOCENTI DI SOSTEGNO' : 'ORARIO SCOLASTICO'
+      }</h1><h2>${
+        soloSostegno
+          ? '🤝 Solo Sostegno - Mattino e Pomeriggio'
+          : '☀️ Tutti i Docenti - Mattino e Pomeriggio'
+      }</h2><table><thead><tr><th style="width: 130pt;" rowspan="2">Docente</th><th style="width: 25pt;" rowspan="2">Ore</th><th style="width: 130pt;" rowspan="2">Classi Assegnate</th>${DAYS_IN_USE.map(
         (day, idx) =>
           `<th colspan="${printHours.length}" class="${
             idx < DAYS_IN_USE.length - 1 ? 'day-sep' : ''
@@ -8793,7 +9086,7 @@ export default function App() {
     }
     printWindow.document.write(contentHtml);
     printWindow.document.close();
-    if (printType !== 'master') {
+    if (printType !== 'master' && printType !== 'master_sostegno') {
       const script = printWindow.document.createElement('script');
       script.innerHTML =
         'window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); }';
@@ -10226,7 +10519,7 @@ export default function App() {
                                   {staff.preferConsecutive && (
                                     <div
                                       className="text-[9px] text-brand-700 font-bold bg-brand-100 rounded px-1.5 py-0.5 mt-0.5 truncate flex items-center gap-1"
-                                      title="Preferenza 2 ore consecutive attive"
+                                      title="Preferenza ore consecutive attiva"
                                     >
                                       <span>🔗</span> 2h Consecutive
                                     </div>
@@ -10650,9 +10943,17 @@ export default function App() {
                       onClick={() =>
                         handlePrintBypass('single_teacher', selectedSostegnoId)
                       }
+                      title="Stampa l'orario di questo docente"
                       className="ml-2 bg-brand-50 text-brand-600 hover:bg-brand-100 p-2 rounded-lg"
                     >
                       🖨️
+                    </button>
+                    <button
+                      onClick={() => handlePrintBypass('master_sostegno')}
+                      title="Stampa un tabellone con tutti i docenti di sostegno"
+                      className="bg-brand-50 text-brand-600 hover:bg-brand-100 px-2 py-2 rounded-lg text-xs font-bold"
+                    >
+                      🖨️ Tutti
                     </button>
                   </>
                 )}
@@ -12034,7 +12335,7 @@ export default function App() {
                         </th>
                         <th
                           className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20"
-                          title="Preferenza 2 ore consecutive"
+                          title="Preferenza ore consecutive"
                         >
                           2h
                         </th>
@@ -12121,7 +12422,7 @@ export default function App() {
                                     }
                                     disabled={readOnlyMode}
                                     className="w-5 h-5 text-brand-600 rounded focus:ring-brand-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Richiedi 2 ore consecutive"
+                                    title="Richiedi ore consecutive"
                                   />
                                 </td>
                                 <td className="p-2 w-20 border-r border-slate-200 text-center font-bold text-brand-700 bg-brand-50/30">
@@ -12142,49 +12443,94 @@ export default function App() {
                                   />
                                 </td>
                                 {classes.map((cls) => {
-                                  const currentAssignment =
-                                    teacher.assignments.find(
-                                      (a: any) => a.classId === cls.id
+                                  // Di norma una riga per classe. Quando sono
+                                  // due (stessa persona, due materie nella
+                                  // stessa classe) la casella non basta più a
+                                  // dire quale riga si sta cambiando: mostra
+                                  // il totale e manda al modale.
+                                  const righeClasse = righeDiClasse(
+                                    teacher,
+                                    cls.id
+                                  );
+                                  const piuMaterie = righeClasse.length > 1;
+                                  const val = righeClasse.reduce(
+                                    (s: number, a: any) =>
+                                      s + (Number(a.hours) || 0),
+                                    0
+                                  );
+                                  const materieRiga = righeClasse
+                                    .map((a: any) =>
+                                      materiaDellaRiga(a, teacher)
+                                    )
+                                    .filter(
+                                      (m: string) =>
+                                        piuMaterie || m !== teacher.subject
                                     );
-                                  const val = currentAssignment
-                                    ? currentAssignment.hours
-                                    : 0;
-                                  const materiaDiversa =
-                                    currentAssignment?.subject &&
-                                    currentAssignment.subject !==
-                                      teacher.subject
-                                      ? currentAssignment.subject
-                                      : '';
+                                  const etichettaMaterie =
+                                    materieRiga.join(' + ');
+                                  const apriModale = () => {
+                                    setAssignModal({
+                                      staffId: teacher.id,
+                                      staffType: 'materia',
+                                    });
+                                    setAssignClass(cls.id);
+                                    setAssignHours(
+                                      Number(righeClasse[0]?.hours) || 1
+                                    );
+                                    setAssignSubject(
+                                      righeClasse[0]?.subject || ''
+                                    );
+                                  };
                                   return (
                                     <td
                                       key={cls.id}
                                       className="p-1 border-r border-slate-200 align-middle"
                                       title={
-                                        materiaDiversa
-                                          ? `In ${cls.id} insegna ${materiaDiversa}`
-                                          : undefined
+                                        piuMaterie
+                                          ? `In ${cls.id} insegna ${righeClasse
+                                              .map(
+                                                (a: any) =>
+                                                  `${materiaDellaRiga(
+                                                    a,
+                                                    teacher
+                                                  )} (${a.hours} ore)`
+                                              )
+                                              .join(' e ')}. Premi per cambiare.`
+                                          : etichettaMaterie
+                                            ? `In ${cls.id} insegna ${etichettaMaterie}`
+                                            : undefined
                                       }
                                     >
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        max="30"
-                                        value={val || ''}
-                                        placeholder="-"
-                                        onChange={(e) =>
-                                          handleUpdateAssignment(
-                                            teacher.id,
-                                            cls.id,
-                                            parseInt(e.target.value) || 0,
-                                            'materia'
-                                          )
-                                        }
-                                        disabled={readOnlyMode}
-                                        className="w-full text-center text-xs font-bold rounded p-1.5 border border-transparent hover:border-slate-300 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all bg-transparent focus:bg-white text-slate-700 placeholder-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                                      />
-                                      {materiaDiversa && (
+                                      {piuMaterie ? (
+                                        <button
+                                          onClick={apriModale}
+                                          disabled={readOnlyMode}
+                                          className="w-full text-center text-xs font-bold rounded p-1.5 border border-bruciato-300 bg-bruciato-50 text-bruciato-800 hover:bg-bruciato-100 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          {val}
+                                        </button>
+                                      ) : (
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          max="30"
+                                          value={val || ''}
+                                          placeholder="-"
+                                          onChange={(e) =>
+                                            handleUpdateAssignment(
+                                              teacher.id,
+                                              cls.id,
+                                              parseInt(e.target.value) || 0,
+                                              'materia'
+                                            )
+                                          }
+                                          disabled={readOnlyMode}
+                                          className="w-full text-center text-xs font-bold rounded p-1.5 border border-transparent hover:border-slate-300 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all bg-transparent focus:bg-white text-slate-700 placeholder-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        />
+                                      )}
+                                      {etichettaMaterie && (
                                         <span className="block text-[8px] font-bold text-bruciato-700 text-center truncate leading-tight">
-                                          {materiaDiversa}
+                                          {etichettaMaterie}
                                         </span>
                                       )}
                                     </td>
@@ -12229,7 +12575,7 @@ export default function App() {
                         </th>
                         <th
                           className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20"
-                          title="Preferenza 2 ore consecutive"
+                          title="Preferenza ore consecutive"
                         >
                           2h
                         </th>
@@ -12301,7 +12647,7 @@ export default function App() {
                                 }
                                 disabled={readOnlyMode}
                                 className="w-5 h-5 text-brand-600 rounded focus:ring-brand-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Richiedi 2 ore consecutive"
+                                title="Richiedi ore consecutive"
                               />
                             </td>
                             <td className="p-2 w-20 border-r border-slate-200 text-center font-bold text-brand-700 bg-brand-50/30">
@@ -12375,7 +12721,7 @@ export default function App() {
                         </th>
                         <th
                           className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20"
-                          title="Preferenza 2 ore consecutive"
+                          title="Preferenza ore consecutive"
                         >
                           2h
                         </th>
@@ -12457,7 +12803,7 @@ export default function App() {
                                     }
                                     disabled={readOnlyMode}
                                     className="w-5 h-5 text-brand-600 rounded focus:ring-brand-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Richiedi 2 ore consecutive"
+                                    title="Richiedi ore consecutive"
                                   />
                                 </td>
                                 <td className="p-2 w-20 border-r border-slate-200 text-center font-bold text-brand-700 bg-brand-50/30">
@@ -12668,8 +13014,11 @@ export default function App() {
                   (selezione automatica della migliore posizione).
                 </li>
                 <li>
-                  Rispetterà la preferenza "2h consecutive" per i docenti che
-                  l'hanno attivata.
+                  Rispetterà la preferenza "ore consecutive" per i docenti che
+                  l'hanno attivata: le ore di quel docente in quella classe si
+                  attaccano fra loro fin dove arriva il tetto di ore al giorno
+                  nella stessa classe, quindi anche in blocchi da quattro o
+                  cinque ore per i laboratori.
                 </li>
                 <li>
                   Terrà conto della <strong>preferenza oraria</strong> di ogni
@@ -12799,11 +13148,14 @@ export default function App() {
                       <option value={4}>4 ore</option>
                       <option value={5}>5 ore</option>
                       <option value={6}>6 ore</option>
+                      <option value={7}>7 ore</option>
+                      <option value={8}>8 ore</option>
                       <option value={0}>Nessun limite</option>
                     </select>
                     <div className="text-xs font-medium text-slate-600">
                       Per docente, così la settimana non si schiaccia su pochi
-                      giorni
+                      giorni. Nei laboratori lunghi (professionali, corsi
+                      serali) serve alzarlo
                     </div>
                   </div>
                   <h3 className="font-bold text-slate-800 mt-5 mb-3 flex items-center gap-2">
@@ -12826,12 +13178,15 @@ export default function App() {
                       <option value={4}>4 ore</option>
                       <option value={5}>5 ore</option>
                       <option value={6}>6 ore</option>
+                      <option value={7}>7 ore</option>
+                      <option value={8}>8 ore</option>
                       <option value={0}>Nessun limite</option>
                     </select>
                     <div className="text-xs font-medium text-slate-600">
                       Alla primaria il docente prevalente ne fa quattro o
                       cinque: con il tetto a 3 risultano errori che errori non
-                      sono
+                      sono. È anche il tetto che decide quanto può durare un
+                      laboratorio di fila nella stessa classe
                     </div>
                   </div>
                   <h3 className="font-bold text-slate-800 mt-5 mb-3 flex items-center gap-2">
@@ -13170,6 +13525,143 @@ export default function App() {
               </div>
             </div>
 
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-200 border-l-4 border-l-brand-600">
+              <h2 className="text-xl font-bold text-brand-900 mb-2">
+                📚 Materie della scuola
+              </h2>
+              <p className="text-sm text-slate-500 mb-6">
+                Tutte le materie che l'app conosce, raccolte da dove il nome
+                compare davvero: la materia dei docenti, quelle scritte sulle
+                singole righe di cattedra e le lezioni già in orario. Il nome
+                della materia è anche quello che collega il laboratorio, il
+                colore del dipartimento e i vincoli, quindi scriverlo in due
+                modi diversi («ED. FISICA» e «EDUCAZIONE FISICA») li scollega
+                senza dire niente. Da qui si rinomina una materia ovunque in un
+                colpo solo, e se il nome nuovo esiste già le due diventano una.
+              </p>
+              {materieInUso.length === 0 ? (
+                <p className="text-sm text-slate-400 italic">
+                  Nessuna materia ancora: compaiono da sole appena aggiungi i
+                  docenti nel Registro Cattedre.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead className="bg-slate-100 border-b border-slate-200">
+                      <tr>
+                        <th className="p-2 font-bold text-slate-700">Materia</th>
+                        <th className="p-2 font-bold text-slate-700 text-center w-24">
+                          Docenti
+                        </th>
+                        <th className="p-2 font-bold text-slate-700 text-center w-28">
+                          Ore in cattedra
+                        </th>
+                        <th className="p-2 font-bold text-slate-700 text-center w-28">
+                          Ore in orario
+                        </th>
+                        <th className="p-2 font-bold text-slate-700 w-48">
+                          Aula collegata
+                        </th>
+                        <th className="p-2 w-28"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {materieInUso.map((m) => {
+                        const aula = getRoomForSubject(m.nome, rooms);
+                        const inRinomina = materiaInRinomina === m.nome;
+                        return (
+                          <tr key={m.nome} className="hover:bg-slate-50">
+                            <td className="p-2 font-bold text-slate-800">
+                              <span
+                                className="inline-block w-3 h-3 rounded-sm mr-2 align-middle border border-slate-300"
+                                style={{
+                                  backgroundColor: getDeptColor(m.nome),
+                                }}
+                              />
+                              {m.nome}
+                            </td>
+                            <td className="p-2 text-center text-slate-600">
+                              {m.docenti.size}
+                            </td>
+                            <td className="p-2 text-center text-slate-600">
+                              {m.ore}
+                            </td>
+                            <td className="p-2 text-center text-slate-600">
+                              {m.inOrario}
+                            </td>
+                            <td className="p-2 text-slate-600">
+                              {isNamedRoom(aula) ? (
+                                aula
+                              ) : (
+                                <span className="text-slate-400 italic">
+                                  aula della classe
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-2 text-right">
+                              {inRinomina ? (
+                                <div className="flex items-center gap-1 justify-end">
+                                  <input
+                                    type="text"
+                                    value={nuovoNomeMateria}
+                                    autoFocus
+                                    onChange={(e) =>
+                                      setNuovoNomeMateria(e.target.value)
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        handleRenameSubject(
+                                          m.nome,
+                                          nuovoNomeMateria
+                                        );
+                                        setMateriaInRinomina('');
+                                      }
+                                      if (e.key === 'Escape')
+                                        setMateriaInRinomina('');
+                                    }}
+                                    className="w-32 border border-slate-300 rounded px-2 py-1 text-xs uppercase focus:ring-2 focus:ring-brand-500"
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      handleRenameSubject(
+                                        m.nome,
+                                        nuovoNomeMateria
+                                      );
+                                      setMateriaInRinomina('');
+                                    }}
+                                    className="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-2 py-1 rounded cursor-pointer"
+                                  >
+                                    OK
+                                  </button>
+                                  <button
+                                    onClick={() => setMateriaInRinomina('')}
+                                    className="text-slate-400 hover:text-slate-600 text-xs px-1 cursor-pointer"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setMateriaInRinomina(m.nome);
+                                    setNuovoNomeMateria(m.nome);
+                                  }}
+                                  disabled={readOnlyMode}
+                                  className="text-xs text-brand-500 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-2 py-1 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  ✏️ Rinomina
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-bruciato-200 border-l-4 border-l-bruciato-500">
               <h2 className="text-xl font-bold text-bruciato-900 mb-2">
                 🚫 Materie da non affiancare
@@ -13267,7 +13759,7 @@ export default function App() {
                 </select>
                 <div className="text-xs font-medium text-slate-600">
                   Con «Distanziale» il generatore evita di mettere la stessa
-                  materia in due giorni di fila, senza toccare le due ore
+                  materia in due giorni di fila, senza toccare le ore
                   consecutive nello stesso giorno
                 </div>
               </div>
@@ -13278,9 +13770,11 @@ export default function App() {
                 🌍 Classi Miste (Lingue Straniere)
               </h2>
               <p className="text-sm text-slate-500 mb-6">
-                Configura accorpamenti per Spagnolo, Francese e Tedesco.
-                L'algoritmo metterà le lezioni nelle due classi
-                contemporaneamente se lo stesso docente è assegnato ad entrambe.
+                Due classi che fanno quell'ora insieme, con lo stesso docente:
+                di solito la seconda lingua straniera, ma vale per qualsiasi
+                materia dell'elenco. L'algoritmo mette le lezioni nelle due
+                classi contemporaneamente se lo stesso docente è assegnato a
+                entrambe.
               </p>
               <div className="flex flex-wrap gap-2 mb-4 p-4 bg-salvia-50 rounded-lg border border-salvia-100">
                 <select
@@ -13289,9 +13783,12 @@ export default function App() {
                   disabled={readOnlyMode}
                   className="text-sm border border-slate-300 rounded-lg px-2 py-1.5 bg-white disabled:opacity-50"
                 >
-                  <option value="SPAGNOLO">SPAGNOLO</option>
-                  <option value="FRANCESE">FRANCESE</option>
-                  <option value="TEDESCO">TEDESCO</option>
+                  <option value="">— Materia —</option>
+                  {allDepartments.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
                 </select>
                 <select
                   value={newMixC1}
@@ -13443,8 +13940,8 @@ export default function App() {
                 Aggiungi, rinomina o rimuovi le sezioni dell'istituto.
               </p>
               <p className="text-sm text-slate-500 mb-4">
-                La griglia oraria dei due modelli è modificabile: giorni della
-                settimana, ore al giorno, ore pomeridiane curricolari ed
+                La griglia oraria dei quattro modelli è modificabile: giorni
+                della settimana, ore al giorno, ore pomeridiane curricolari ed
                 eventuale rientro pomeridiano. Le ore pomeridiane sono lezione
                 normale che prosegue dopo il mattino (l'educazione motoria
                 delle quarte e quinte della primaria, il tempo prolungato);
@@ -13465,6 +13962,18 @@ export default function App() {
                     nome: 'Modello B',
                     box: 'bg-bruciato-50 border-bruciato-100',
                     tag: 'bg-bruciato-100 text-bruciato-800',
+                  },
+                  {
+                    model: 'modelloC',
+                    nome: 'Modello C',
+                    box: 'bg-salvia-50 border-salvia-100',
+                    tag: 'bg-salvia-100 text-salvia-800',
+                  },
+                  {
+                    model: 'modelloD',
+                    nome: 'Modello D',
+                    box: 'bg-lime-50 border-lime-100',
+                    tag: 'bg-lime-100 text-lime-800',
                   },
                 ].map(({ model, nome, box, tag }) => {
                   const grid =
@@ -13694,6 +14203,16 @@ export default function App() {
                             <option value="modelloB">
                               Modello B ({(modelGrids?.modelloB ||
                                 DEFAULT_MODEL_GRIDS.modelloB).days}{' '}
+                              giorni)
+                            </option>
+                            <option value="modelloC">
+                              Modello C ({(modelGrids?.modelloC ||
+                                DEFAULT_MODEL_GRIDS.modelloC).days}{' '}
+                              giorni)
+                            </option>
+                            <option value="modelloD">
+                              Modello D ({(modelGrids?.modelloD ||
+                                DEFAULT_MODEL_GRIDS.modelloD).days}{' '}
                               giorni)
                             </option>
                           </select>
@@ -15870,8 +16389,65 @@ export default function App() {
                   <p className="mt-1.5 text-[11px] text-slate-500">
                     Lascia vuoto per la materia del docente. Compilalo quando
                     in questa classe insegna altro: stessa persona, materia
-                    diversa.
+                    diversa. Scrivendo una materia che in questa classe non ha
+                    ancora, si aggiunge una seconda riga invece di cambiare
+                    quella che c'è: è il modo di dargli, per dire, italiano e
+                    storia nella stessa classe.
                   </p>
+                  {(() => {
+                    /*
+                     * Le righe che questo docente ha gia' in questa classe.
+                     * Servono a vedere subito se si sta aggiungendo una materia
+                     * o cambiando quella di prima, e a togliere una riga senza
+                     * dover azzerare le ore nella griglia.
+                     */
+                    const staffModale = allStaff.find(
+                      (x) => x.id === assignModal.staffId
+                    );
+                    const righeClasse = righeDiClasse(staffModale, assignClass);
+                    if (righeClasse.length === 0) return null;
+                    return (
+                      <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                          Già in {assignClass}
+                        </p>
+                        <ul className="space-y-1">
+                          {righeClasse.map((riga: any, i: number) => {
+                            const nome = materiaDellaRiga(riga, staffModale);
+                            return (
+                              <li
+                                key={`${nome}-${i}`}
+                                className="flex items-center justify-between gap-2 text-xs text-slate-700"
+                              >
+                                <span className="font-semibold truncate">
+                                  {nome}{' '}
+                                  <span className="font-normal text-slate-500">
+                                    · {riga.hours} ore
+                                  </span>
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    handleUpdateAssignment(
+                                      assignModal.staffId,
+                                      assignClass,
+                                      0,
+                                      assignModal.staffType,
+                                      nome
+                                    )
+                                  }
+                                  disabled={readOnlyMode}
+                                  title={`Togli ${nome} da ${assignClass}`}
+                                  className="text-fucsia-600 hover:text-fucsia-800 font-bold px-1.5 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  ✕
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
               <div className="flex gap-2">
