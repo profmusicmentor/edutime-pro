@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { Analytics } from '@vercel/analytics/react';
 import App from './App.jsx';
 import Guida from './Guida';
 import './index.css';
@@ -16,5 +17,10 @@ if (isGuida && window.location.hash) {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>{isGuida ? <Guida /> : <App />}</React.StrictMode>
+  <React.StrictMode>
+    {isGuida ? <Guida /> : <App />}
+    {/* Conteggio anonimo di visite e visitatori (Vercel Web Analytics):
+        nessun cookie, nessun dato dell'orario, solo la pagina aperta. */}
+    <Analytics />
+  </React.StrictMode>
 );

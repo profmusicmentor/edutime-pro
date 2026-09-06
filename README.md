@@ -201,6 +201,26 @@ Firebase. In sintesi:
 Resta il fatto che chiunque conosca un codice scuola può leggere e modificare
 quel documento: il codice è l'unica barriera.
 
+### Quante scuole usano l'app
+
+Il divieto di `list` vale anche per chi amministra il progetto: dal browser il
+numero delle scuole non è ricavabile. Lo script `scripts/conta-scuole.mjs` lo
+legge con un account di servizio, che le regole non lo riguardano.
+
+```bash
+npm run conta-scuole -- /percorso/della/chiave.json
+```
+
+La chiave si scarica dalla console Firebase, in Impostazioni progetto > Account
+di servizio > "Genera nuova chiave privata", e non va messa nel repository:
+vale come accesso completo al database. Lo script chiede a Firestore il solo
+campo `lastUpdatedAt`, non scarica gli orari e non stampa mai l'id dei
+documenti, che è il codice scuola. In uscita dà il totale delle scuole con un
+orario in cloud e quante hanno salvato negli ultimi 7, 30, 90 e 365 giorni.
+
+Chi lavora in modalità locale non compare in questo conteggio: per il traffico
+complessivo c'è Vercel Web Analytics, attivo sul progetto e senza cookie.
+
 ## Struttura
 
 - `src/App.tsx` — tutta l'applicazione (tabelle, algoritmo di generazione,

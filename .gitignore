@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Chiave dell'account di servizio Firebase (accesso completo al database)
+service-account*.json
+*-firebase-adminsdk-*.json

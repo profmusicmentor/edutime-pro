@@ -8,9 +8,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "conta-scuole": "node scripts/conta-scuole.mjs"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "firebase": "^12.15.0",
     "pdfjs-dist": "^6.3.289",
     "react": "^19.2.7",
