@@ -25,7 +25,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-06d';
+export const NOVITA_VERSIONE = '2026-09-06e';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -37,6 +37,14 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-06e',
+    data: '6 settembre 2026',
+    voci: [
+      'La lettura delle richieste dei docenti non manda più fuori i nomi. Prima il testo che incollavi partiva così com’era, cognomi compresi. Adesso ogni docente che è già in archivio diventa una sigla (D1, D2, D3…) prima che il testo esca dal computer, e il nome vero torna al suo posto qui sull’app, insieme alla frase da cui il vincolo è stato ricavato. Chi in archivio non c’è resta scritto com’era, perché è anche l’unico a cui l’app non saprebbe abbinare niente. Nell’uso non cambia nulla: leggi lo stesso elenco di prima, con gli stessi nomi.',
+      'Attenzione, una cosa non è cambiata: il motivo personale della richiesta («ho il rientro all’altra scuola», «per motivi di salute») sta dentro la frase e non dentro il nome, quindi esce lo stesso. La spunta prima di partire lo dice, e il consiglio resta quello: incolla solo la parte utile.',
+    ],
+  },
   {
     versione: '2026-09-06d',
     data: '6 settembre 2026',
@@ -87,13 +95,6 @@ export const NOVITA: VoceNovita[] = [
       'C’è una scheda nuova, «📝 Documenti»: la relazione per il Dirigente sui criteri seguiti, la circolare ai docenti, l’avviso alle famiglie per entrate e uscite fuori orario, la comunicazione delle sostituzioni del giorno e la convocazione dei consigli. I numeri li mette l’app, le frasi le scrive l’IA, e il testo resta lì da correggere, copiare o scaricare: da EduTime Pro non parte niente verso nessuno.',
       'Tutte queste funzioni fanno parte dell’abbonamento EduTime Pro AI, come l’aiuto sui conflitti e la lettura del PDF dei consigli. Senza la chiave l’app continua a funzionare come sempre: le sostituzioni si assegnano a mano, l’orario si compila dalla griglia, i vincoli si mettono uno per uno.',
       'La chiave dell’abbonamento ha finalmente un posto suo: il pulsante «🔑 Abbonamento IA» in alto a destra, accanto alla Guida. Prima si incollava dentro il pannello dell’assistente e si faceva fatica a trovarlo. Da lì vedi anche se l’abbonamento è attivo su questo dispositivo, e puoi togliere la chiave per liberare il posto e usarla su un altro computer.',
-    ],
-  },
-  {
-    versione: '2026-09-04',
-    data: '4 settembre 2026',
-    voci: [
-      'Le aule adesso rispettano le sedi. Se la scuola ha più plessi, l’Auto-Generazione non manda più una classe in un laboratorio che sta in un altro edificio: cerca il laboratorio di quella materia nella sede della classe e, se lì non c’è, la lezione resta in aula. I laboratori a cui non è stata assegnata nessuna sede continuano a valere per tutti, quindi per le scuole a plesso unico non cambia niente. La stessa regola vale quando si cambia un’ora a mano.',
     ],
   },
 ];

@@ -12,9 +12,10 @@
  * la spunta spenta: vanno lette da una persona. Le regole cambiano solo
  * quando si preme «Applica», e i vincoli già presenti non vengono toccati.
  *
- * Nel testo delle richieste ci sono i nomi dei docenti e, spesso, il motivo
- * personale: per questo la spunta di consenso è scritta chiara, e il
- * pannello consiglia di incollare solo la parte utile.
+ * I nomi dei docenti in archivio non escono: diventano sigle prima di
+ * partire e tornano nomi qui (vedi `richiesteIA.ts`). Resta fuori il motivo
+ * personale, che sta nella frase: per questo la spunta di consenso è scritta
+ * chiara, e il pannello consiglia di incollare solo la parte utile.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -174,11 +175,13 @@ export default function RichiesteDocenti({
               className="mt-0.5"
             />
             <span>
-              Ho capito che questo testo, <b>nomi compresi</b>, viene mandato
-              alla società che gestisce il modello linguistico per essere letto.
-              Non viene conservato da EduTime Pro. Incolla solo le richieste:
-              se una mail contiene certificati, motivi di salute o altri fatti
-              personali, toglili prima.
+              Ho capito che questo testo viene mandato alla società che
+              gestisce il modello linguistico per essere letto. I{' '}
+              <b>nomi dei docenti in archivio non partono</b>: al loro posto
+              vanno delle sigle, e i nomi tornano al ritorno. Parte invece
+              tutto il resto della frase. Incolla solo le richieste: se una
+              mail contiene certificati, motivi di salute o altri fatti
+              personali, toglili prima. Niente viene conservato da EduTime Pro.
             </span>
           </label>
 

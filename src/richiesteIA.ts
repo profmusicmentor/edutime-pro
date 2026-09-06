@@ -8,16 +8,23 @@
  * docenti è mezza giornata da copista, ed è il lavoro in cui si sbaglia di
  * più, perché a metà pomeriggio si comincia a leggere in diagonale.
  *
- * Il testo esce dal computer, con i nomi dentro: per questo il pannello mette
- * una spunta esplicita prima di partire, come per la lettura dei PDF.
+ * Sui nomi: non escono. Prima di mandare il testo, ogni docente in archivio
+ * diventa una sigla (D1, D2, D3…), come già succede per le sostituzioni e per
+ * le domande sull'orario. Il modello legge «D7 il mercoledì non può» e
+ * risponde con la sigla; i nomi veri li rimette qui il browser, al ritorno.
+ * Chi nell'archivio non c'è resta scritto come nel testo: quel nome esce, ma
+ * è anche l'unico caso in cui non c'è niente a cui abbinarlo. Il pannello
+ * tiene la spunta esplicita prima di partire, perché il motivo personale
+ * della richiesta («ho il rientro all'altra scuola») sta nella frase e non
+ * nel nome, e quello esce lo stesso.
  *
- * Il modello propone, non applica. Ogni richiesta torna con il nome, il
- * vincolo e la frase originale da cui l'ha ricavata; qui il nome si abbina ai
- * docenti in archivio e la riga finisce in un elenco con le caselle da
- * spuntare. Le regole cambiano solo quando la persona preme «Applica».
+ * Il modello propone, non applica. Ogni richiesta torna con la sigla, il
+ * vincolo e la frase originale da cui l'ha ricavata; qui la sigla ritorna
+ * docente e la riga finisce in un elenco con le caselle da spuntare. Le
+ * regole cambiano solo quando la persona preme «Applica».
  */
 
-import { chiediAlServer, funzioneIaDisponibile } from './iaComune';
+import { chiediAlServer, funzioneIaDisponibile, rimettiNomi } from './iaComune';
 import { nomePulito } from './letturaElenchi';
 
 const INDIRIZZO = '/api/richieste-docenti';
@@ -91,6 +98,164 @@ const abbina = (nomeLetto: string, noti: PersonaNota[]): string | null => {
 /** La chiave con cui l'app segna un'ora bloccata dentro le regole. */
 const chiaveOra = (giorno: number, ora: number) => `${giorno}_${ora}`;
 
+/* --- I nomi diventano sigle prima di uscire ------------------------- */
+
+/**
+ * Pezzi di cognome composto che da soli non indicano nessuno. Sostituirli
+ * vorrebbe dire riempire il testo di sigle a caso: «di» compare in mezza
+ * mail.
+ */
+const PARTICELLE = new Set([
+  'di', 'de', 'del', 'della', 'dello', 'dei', 'degli', 'da', 'dal', 'dalla',
+  'la', 'lo', 'le', 'li', 'van', 'von', 'mac', 'san', 'santa', 'santo', 'sant',
+]);
+
+/**
+ * La forma con cui si confrontano due parole di un nome: senza accenti, senza
+ * apostrofi, minuscola. «Nicolò» e «D'Amico» diventano «nicolo» e «damico»,
+ * così l'archivio e la mail si riconoscono anche se sono scritti diversi.
+ */
+const perChiave = (testo: string): string =>
+  testo
+    .normalize('NFD')
+    .replace(/[^A-Za-z]/g, '')
+    .toLowerCase();
+
+const perRegola = (testo: string): string =>
+  testo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * «D'AMICO» scritto come lo scrive chi manda una mail: «D'Amico». La
+ * maiuscola torna dopo ogni apostrofo e ogni trattino, non solo all'inizio,
+ * altrimenti il cognome più comune del sud Italia resterebbe fuori dalla
+ * mascheratura senza che nessuno se ne accorga.
+ */
+const conIniziali = (parola: string): string =>
+  parola
+    .toLowerCase()
+    .replace(/(^|['’-])(\p{L})/gu, (_intero, prima: string, lettera: string) =>
+      `${prima}${lettera.toUpperCase()}`
+    );
+
+interface Mascheratura {
+  /** Il testo con le sigle al posto dei nomi riconosciuti. */
+  testo: string;
+  /** L'elenco da mandare al modello al posto dei nomi veri. */
+  elenco: string[];
+  /** sigla → identificativo del docente in archivio. */
+  perSigla: Map<string, string>;
+  /** sigla → nome vero, per rimetterlo nelle citazioni al ritorno. */
+  nomiPerSigla: Map<string, string>;
+}
+
+/**
+ * Sostituisce nel testo i nomi dei docenti in archivio con le loro sigle.
+ *
+ * Si lavora parola per parola e non sul nome intero, perché nelle mail il
+ * nome completo quasi non c'è mai: si scrive «la prof.ssa Rossi», non «Rossi
+ * Maria». Una parola si sostituisce solo se appartiene a un docente solo: due
+ * colleghe con lo stesso cognome la lasciano stare, esattamente come fa
+ * `abbina` al ritorno, e per lo stesso motivo.
+ *
+ * Si sostituisce solo la forma con l'iniziale maiuscola. È il freno contro i
+ * cognomi che sono anche parole comuni: un docente Franco non deve
+ * trasformare ogni «franco» della mail in una sigla.
+ */
+const mascheraNomi = (testo: string, noti: PersonaNota[]): Mascheratura => {
+  const siglaDiId = new Map<string, string>();
+  const perSigla = new Map<string, string>();
+  const nomiPerSigla = new Map<string, string>();
+
+  noti.forEach((persona, indice) => {
+    const sigla = `D${indice + 1}`;
+    siglaDiId.set(persona.id, sigla);
+    perSigla.set(sigla, persona.id);
+    nomiPerSigla.set(sigla, persona.name);
+  });
+
+  // Per ogni parola: di chi è, e come è scritta nell'archivio.
+  const proprietari = new Map<string, Set<string>>();
+  const forme = new Map<string, Set<string>>();
+
+  noti.forEach((persona) => {
+    nomePulito(persona.name)
+      .split(/\s+/)
+      .filter(Boolean)
+      .forEach((parola) => {
+        const chiave = perChiave(parola);
+        if (chiave.length < 3 || PARTICELLE.has(chiave)) return;
+        if (!proprietari.has(chiave)) {
+          proprietari.set(chiave, new Set());
+          forme.set(chiave, new Set());
+        }
+        proprietari.get(chiave)!.add(persona.id);
+        forme.get(chiave)!.add(parola);
+      });
+  });
+
+  let risultato = testo;
+
+  Array.from(proprietari.entries())
+    .filter(([, chi]) => chi.size === 1)
+    .sort((a, b) => b[0].length - a[0].length)
+    .forEach(([chiave, chi]) => {
+      const sigla = siglaDiId.get(Array.from(chi)[0]);
+      if (!sigla) return;
+
+      const varianti = new Set<string>();
+      forme.get(chiave)!.forEach((parola) => {
+        varianti.add(parola);
+        varianti.add(parola.toUpperCase());
+        varianti.add(conIniziali(parola));
+      });
+
+      varianti.forEach((variante) => {
+        // Solo iniziale maiuscola: vedi il commento sopra.
+        if (variante === variante.toLowerCase()) return;
+        // Niente `\b`: in JavaScript non conosce le lettere accentate, e
+        // «Nicolò» resterebbe fuori. Il confine si scrive a mano.
+        risultato = risultato.replace(
+          new RegExp(
+            `([^\\p{L}\\p{N}'’]|^)${perRegola(variante)}(?=[^\\p{L}\\p{N}'’]|$)`,
+            'gu'
+          ),
+          `$1${sigla}`
+        );
+      });
+    });
+
+  // «Rossi Maria» è diventato «D3 D3»: se ne tiene una sola.
+  perSigla.forEach((_id, sigla) => {
+    risultato = risultato.replace(
+      new RegExp(`${sigla}(?:[\\s,]+${sigla})+`, 'g'),
+      sigla
+    );
+  });
+
+  // «De Luca» è diventato «De D6»: la particella rimasta davanti alla sigla
+  // non indica più nessuno e fa solo confusione.
+  const particelle = Array.from(PARTICELLE)
+    .map((p) => conIniziali(p))
+    .join('|');
+  risultato = risultato.replace(
+    new RegExp(`(^|[^\\p{L}\\p{N}])(?:${particelle})\\s+(D\\d+)`, 'gu'),
+    '$1$2'
+  );
+
+  return {
+    testo: risultato,
+    elenco: Array.from(perSigla.keys()),
+    perSigla,
+    nomiPerSigla,
+  };
+};
+
+/** La sigla dentro quello che il modello ha scritto nel campo «docente». */
+const siglaScritta = (testo: string): string | null => {
+  const trovata = /(^|[^A-Za-z0-9])D(\d{1,4})(?![A-Za-z0-9])/.exec(testo);
+  return trovata ? `D${trovata[2]}` : null;
+};
+
 interface RispostaRichieste {
   richieste?: {
     docente?: string;
@@ -125,9 +290,11 @@ export async function leggiRichieste(
     };
   }
 ): Promise<EsitoRichieste> {
+  const maschera = mascheraNomi(testo, opzioni.docentiNoti);
+
   const dati = await chiediAlServer<RispostaRichieste>(INDIRIZZO, {
-    testo,
-    nomiNoti: opzioni.docentiNoti.map((d) => d.name).filter(Boolean),
+    testo: maschera.testo,
+    nomiNoti: maschera.elenco,
     giorni: opzioni.giorni,
     ore: opzioni.ore,
   });
@@ -137,9 +304,19 @@ export async function leggiRichieste(
 
   (dati.richieste || []).forEach((r, indice) => {
     const tipo = String(r?.tipo || '') as TipoRichiesta;
-    const nomeLetto = String(r?.docente || '').trim();
-    const teacherId = abbina(nomeLetto, opzioni.docentiNoti);
-    if (!teacherId && nomeLetto) nomiSconosciuti.add(nomeLetto);
+    const scritto = String(r?.docente || '').trim();
+
+    // Il modello ha lavorato con le sigle: quasi sempre torna una sigla, e
+    // allora il docente è già deciso senza doverlo indovinare. Un nome vero
+    // qui dentro vuol dire che nel testo c'era qualcuno che in archivio non
+    // c'è: si prova ad abbinarlo come si è sempre fatto.
+    const sigla = siglaScritta(scritto);
+    const daSigla = sigla ? maschera.perSigla.get(sigla) ?? null : null;
+    const nomeLetto = sigla
+      ? maschera.nomiPerSigla.get(sigla) ?? scritto
+      : scritto;
+    const teacherId = daSigla ?? (sigla ? null : abbina(scritto, opzioni.docentiNoti));
+    if (!teacherId && !sigla && nomeLetto) nomiSconosciuti.add(nomeLetto);
 
     const giorno =
       typeof r?.giorno === 'number' && r.giorno >= 0 && r.giorno < opzioni.giorni.length
@@ -174,7 +351,7 @@ export async function leggiRichieste(
       giorno,
       ora,
       preferenza,
-      citazione: String(r?.citazione || ''),
+      citazione: rimettiNomi(String(r?.citazione || ''), maschera.nomiPerSigla),
       sicuro: r?.sicuro !== false,
       giaPresente,
     });
@@ -183,7 +360,7 @@ export async function leggiRichieste(
   return {
     richieste,
     nomiSconosciuti: Array.from(nomiSconosciuti).slice(0, 60),
-    nota: String(dati.nota || ''),
+    nota: rimettiNomi(String(dati.nota || ''), maschera.nomiPerSigla),
   };
 }
 

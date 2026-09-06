@@ -10,19 +10,25 @@
  * docenti, è mezza giornata di lavoro da copista. Qui il testo si incolla
  * tutto insieme e torna indietro già in forma di spunte.
  *
- * Come per la lettura dei PDF, e per lo stesso motivo, questa strada si
- * sceglie con una spunta e non parte da sola: nel testo delle richieste ci
- * sono i nomi dei docenti, e spesso il motivo personale della richiesta. Il
- * testo esce dal computer e arriva alla società che gestisce il modello. Il
- * browser lo dice a chiare lettere prima di mandare qualsiasi cosa, e
- * consiglia di incollare solo la parte utile.
+ * Sui nomi: qui non arrivano. Il browser sostituisce i docenti in archivio
+ * con delle sigle (D1, D2, D3…) prima di chiamare questo endpoint, e rimette
+ * i nomi veri al ritorno (vedi `src/richiesteIA.ts`). Quindi «Docenti in
+ * archivio» è un elenco di sigle, e il testo delle richieste le contiene al
+ * posto dei cognomi. Chi in archivio non c'è resta scritto com'era: quel nome
+ * passa di qui, ma è anche l'unico a cui il programma non saprebbe dare un
+ * volto.
+ *
+ * Resta il motivo per cui la funzione si sceglie con una spunta e non parte
+ * da sola: nelle richieste c'è spesso il perché personale («ho il rientro
+ * all'altra scuola», «per motivi di salute»), che sta nella frase e non nel
+ * nome. Il testo esce comunque dal computer. Il browser lo dice a chiare
+ * lettere e consiglia di incollare solo la parte utile.
  *
  * Il modello legge e propone: non cambia niente. Ogni richiesta torna
- * indietro con il nome del docente, il vincolo e la frase originale da cui
- * l'ha ricavata. Il browser abbina il nome ai docenti in archivio, mostra
- * l'elenco con le spunte, e le regole cambiano solo quando la persona preme
- * «Applica». Chi ha scritto una frase ambigua se ne accorge lì, non a orario
- * generato.
+ * indietro con la sigla del docente, il vincolo e la frase originale da cui
+ * l'ha ricavata. Il browser rimette il nome, mostra l'elenco con le spunte, e
+ * le regole cambiano solo quando la persona preme «Applica». Chi ha scritto
+ * una frase ambigua se ne accorge lì, non a orario generato.
  *
  * Variabili d'ambiente (oltre a quelle dei motori, vedi `_motori.ts`):
  *   FUNZIONI_IA_RICHIEDONO_LICENZA  '1' per pretendere la chiave
@@ -53,7 +59,7 @@ const SISTEMA = [
   '',
   'Rispondi SOLO con un oggetto JSON, senza nessun testo prima o dopo, senza',
   'blocchi di codice, in questa forma esatta:',
-  '{"richieste":[{"docente":"Rossi Maria","tipo":"giorno-libero","giorno":2,',
+  '{"richieste":[{"docente":"D7","tipo":"giorno-libero","giorno":2,',
   '"ora":null,"preferenza":null,"citazione":"la frase originale",',
   '"sicuro":true}],"nota":"una frase"}',
   '',
@@ -71,9 +77,12 @@ const SISTEMA = [
   '  ora a null.',
   '',
   'Regole:',
-  '- «docente» va scritto come nell\'elenco «Docenti in archivio», quando la',
-  '  persona è riconoscibile lì dentro. Se non la riconosci, scrivi il nome',
-  '  come appare nel testo.',
+  '- I docenti dell\'istituto sono già scritti come sigle (D1, D2, D3…) sia',
+  '  nell\'elenco «Docenti in archivio» sia dentro il testo delle richieste.',
+  '  In «docente» scrivi la sigla, da sola, esattamente come la leggi. Non',
+  '  inventare sigle che nell\'elenco non ci sono.',
+  '- Se una richiesta è di qualcuno che nel testo compare col nome e non con',
+  '  una sigla, vuol dire che in archivio non c\'è: scrivi il nome come appare.',
   '- «citazione» è il pezzo di frase originale da cui hai ricavato il',
   '  vincolo, al massimo venti parole. Serve a chi controlla.',
   '- «sicuro» è false quando la frase è ambigua, quando non capisci di quale',
