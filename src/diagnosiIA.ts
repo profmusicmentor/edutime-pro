@@ -17,7 +17,7 @@
  * il browser tiene solo i campi che sa applicare e li mostra come pulsanti.
  */
 
-import { chiediAlServer, funzioneIaDisponibile } from './iaComune';
+import { chiediAlServer, funzioneIaDisponibile, rimettiNomi } from './iaComune';
 
 const INDIRIZZO = '/api/diagnosi';
 
@@ -68,6 +68,8 @@ export interface DatiDiagnosi {
   griglia: string;
   /** Le regole come stanno adesso, per confrontarle con le proposte. */
   regoleAttuali: Record<string, unknown>;
+  /** Sigla → nome vero, per rimettere i nomi nella risposta. */
+  perSigla: Map<string, string>;
 }
 
 interface RispostaDiagnosi {
@@ -84,10 +86,16 @@ export async function chiediDiagnosi(dati: DatiDiagnosi): Promise<Diagnosi> {
     griglia: dati.griglia,
   });
 
+  // Al modello sono andate le sigle, e con le sigle risponde. Qui tornano i
+  // nomi: «D3 ha diciotto ore in tre giorni» non dice a nessuno di chi si
+  // tratta, e la persona davanti allo schermo i nomi li conosce già.
+  const conNomi = (testo: unknown) =>
+    rimettiNomi(String(testo || ''), dati.perSigla);
+
   const cause = (risposta.cause || [])
     .map((c) => ({
-      titolo: String(c?.titolo || ''),
-      spiegazione: String(c?.spiegazione || ''),
+      titolo: conNomi(c?.titolo),
+      spiegazione: conNomi(c?.spiegazione),
     }))
     .filter((c) => c.titolo || c.spiegazione);
 
@@ -97,7 +105,7 @@ export async function chiediDiagnosi(dati: DatiDiagnosi): Promise<Diagnosi> {
       return {
         campo,
         valore: r?.valore as number | boolean,
-        perche: String(r?.perche || ''),
+        perche: conNomi(r?.perche),
         etichetta: ETICHETTE[campo] || campo,
         valoreAttuale: dati.regoleAttuali?.[campo] as number | boolean | undefined,
       };
@@ -111,5 +119,5 @@ export async function chiediDiagnosi(dati: DatiDiagnosi): Promise<Diagnosi> {
         r.valore !== r.valoreAttuale
     );
 
-  return { cause, regole, nota: String(risposta.nota || '') };
+  return { cause, regole, nota: conNomi(risposta.nota) };
 }

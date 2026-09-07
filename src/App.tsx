@@ -5657,6 +5657,74 @@ export default function App() {
     );
   };
 
+  /**
+   * Accende o spegne la preferenza «ore consecutive» per tutta la tabella in
+   * un colpo solo.
+   *
+   * Nei dati di partenza la spunta è accesa per tutti, e chi quelle ore
+   * appaiate non le vuole doveva togliere una spunta per docente: con
+   * quaranta cattedre è mezz'ora di clic. Il pulsante sta nell'intestazione
+   * della colonna e vale solo per la tabella che ha sotto, perché sostegno e
+   * strumento quasi sempre vogliono l'opposto dei docenti di materia.
+   */
+  const handleToggleConsecutiveTutti = (staffType: string, value: boolean) => {
+    if (readOnlyMode) return;
+    let updatedTeachers = [...teachers],
+      updatedSostegno = [...sostegno],
+      updatedStrumento = [...strumento];
+    if (staffType === 'materia') {
+      updatedTeachers = teachers.map((t) => ({
+        ...t,
+        preferConsecutive: value,
+      }));
+      setTeachers(updatedTeachers);
+    } else if (staffType === 'sostegno') {
+      updatedSostegno = sostegno.map((s) => ({
+        ...s,
+        preferConsecutive: value,
+      }));
+      setSostegno(updatedSostegno);
+    } else if (staffType === 'strumento') {
+      updatedStrumento = strumento.map((m) => ({
+        ...m,
+        preferConsecutive: value,
+      }));
+      setStrumento(updatedStrumento);
+    }
+    pushDataToCloud(
+      timetable,
+      updatedTeachers,
+      updatedSostegno,
+      sectionsConfig,
+      updatedStrumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses
+    );
+  };
+
+  /**
+   * Dice, tabella per tabella, se la preferenza è accesa per qualcuno: è
+   * quello che decide se il pulsante dell'intestazione spegne o accende.
+   *
+   * La domanda è «qualcuno» e non «tutti» di proposito. Con «tutti» una
+   * tabella mezza spuntata avrebbe offerto solo di accendere, e chi vuole
+   * ripulire sarebbe rimasto a togliere spunte a mano, che è esattamente il
+   * lavoro da cui questo pulsante nasce.
+   */
+  const consecutiviAccesi = useMemo(
+    () => ({
+      materia: teachers.some((t) => !!t.preferConsecutive),
+      sostegno: sostegno.some((s) => !!s.preferConsecutive),
+      strumento: strumento.some((m) => !!m.preferConsecutive),
+    }),
+    [teachers, sostegno, strumento]
+  );
+
   /** Coppia di materie da non mettere nello stesso giorno nella stessa classe. */
   const handleAddSubjectSeparation = () => {
     if (readOnlyMode) return;
@@ -8171,6 +8239,17 @@ export default function App() {
     return perId;
   }, [allStaff]);
 
+  /** La strada di ritorno: nella risposta le sigle ridiventano nomi. */
+  const nomiPerSiglaDocenti = useMemo(() => {
+    const perSigla = new Map<string, string>();
+    allStaff.forEach((s: any) => {
+      const sigla = sigleDocenti.get(String(s.id));
+      const nome = String(s?.name || '');
+      if (sigla && nome.length > 2) perSigla.set(sigla, nome);
+    });
+    return perSigla;
+  }, [allStaff, sigleDocenti]);
+
   /**
    * La fotografia che accompagna la domanda «perché non ci riesce?»: i numeri
    * del report, le ore rimaste fuori e i vincoli accesi, con le sigle al
@@ -8243,12 +8322,14 @@ export default function App() {
       vincoli,
       griglia: `${maxGridDays} giorni, fino a ${gridHourRows.length} ore al giorno`,
       regoleAttuali: generationRules as Record<string, unknown>,
+      perSigla: nomiPerSiglaDocenti,
     };
   }, [
     generationReport,
     generationRules,
     allStaff,
     sigleDocenti,
+    nomiPerSiglaDocenti,
     DAYS_IN_USE,
     maxGridDays,
     gridHourRows.length,
@@ -12338,6 +12419,24 @@ export default function App() {
                           title="Preferenza ore consecutive"
                         >
                           2h
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleToggleConsecutiveTutti(
+                                'materia',
+                                !consecutiviAccesi.materia
+                              )
+                            }
+                            disabled={readOnlyMode || teachers.length === 0}
+                            className="block mx-auto mt-1 text-[10px] font-semibold text-brand-600 hover:text-brand-800 underline disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                            title={
+                              consecutiviAccesi.materia
+                                ? 'Togli la preferenza a tutti i docenti di materia'
+                                : 'Metti la preferenza a tutti i docenti di materia'
+                            }
+                          >
+                            {consecutiviAccesi.materia ? 'spegni' : 'accendi'}
+                          </button>
                         </th>
                         <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20">
                           Totale
@@ -12578,6 +12677,24 @@ export default function App() {
                           title="Preferenza ore consecutive"
                         >
                           2h
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleToggleConsecutiveTutti(
+                                'sostegno',
+                                !consecutiviAccesi.sostegno
+                              )
+                            }
+                            disabled={readOnlyMode || sostegno.length === 0}
+                            className="block mx-auto mt-1 text-[10px] font-semibold text-brand-600 hover:text-brand-800 underline disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                            title={
+                              consecutiviAccesi.sostegno
+                                ? 'Togli la preferenza a tutti i docenti di sostegno'
+                                : 'Metti la preferenza a tutti i docenti di sostegno'
+                            }
+                          >
+                            {consecutiviAccesi.sostegno ? 'spegni' : 'accendi'}
+                          </button>
                         </th>
                         <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20">
                           Totale
@@ -12724,6 +12841,24 @@ export default function App() {
                           title="Preferenza ore consecutive"
                         >
                           2h
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleToggleConsecutiveTutti(
+                                'strumento',
+                                !consecutiviAccesi.strumento
+                              )
+                            }
+                            disabled={readOnlyMode || strumento.length === 0}
+                            className="block mx-auto mt-1 text-[10px] font-semibold text-brand-600 hover:text-brand-800 underline disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                            title={
+                              consecutiviAccesi.strumento
+                                ? 'Togli la preferenza a tutti i docenti di strumento'
+                                : 'Metti la preferenza a tutti i docenti di strumento'
+                            }
+                          >
+                            {consecutiviAccesi.strumento ? 'spegni' : 'accendi'}
+                          </button>
                         </th>
                         <th className="p-3 w-20 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20">
                           Totale

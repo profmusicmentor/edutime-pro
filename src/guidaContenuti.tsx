@@ -545,7 +545,7 @@ export const chapters: Chapter[] = [
       {
         title: 'Colonna 2h',
         tag: 'algoritmo',
-        body: "Spunta la casella per i docenti che vogliono le ore raggruppate in blocchi di due consecutive nella stessa classe: l'auto-generazione cercherà di rispettarlo.",
+        body: "Spunta la casella per i docenti che vogliono le ore raggruppate in blocchi di due consecutive nella stessa classe: l'auto-generazione cercherà di rispettarlo. Nell'intestazione della colonna c'è «spegni», che toglie la preferenza a tutti i docenti di quella tabella in un colpo solo, e diventa «accendi» quando nessuno ce l'ha: Materie, Sostegno e Strumento si comandano separatamente.",
       },
       {
         title: 'Colonna delle supplenze',
@@ -896,7 +896,7 @@ export const chapters: Chapter[] = [
       {
         title: "✨ Fatti aiutare dall'IA",
         tag: 'abbonamento',
-        body: "Sopra l'elenco dei conflitti c'è un riquadro che chiede all'IA come sistemarli. L'IA propone degli spostamenti; prima di mostrarteli l'app li prova uno per uno e tiene solo quelli che tolgono davvero un problema, buttando gli altri. Vedi l'anteprima con quanti conflitti restano, e l'orario cambia solo quando premi «Applica». Ai docenti l'IA non arriva per nome: al loro posto escono delle sigle (D1, D2, D3). Fino al 5 settembre 2026 si prova senza chiave; dopo fa parte dell'abbonamento EduTime Pro AI, e senza chiave i conflitti si sistemano a mano come sempre.",
+        body: "Sopra l'elenco dei conflitti c'è un riquadro che chiede all'IA come sistemarli. L'IA propone degli spostamenti; prima di mostrarteli l'app li prova uno per uno e tiene solo quelli che tolgono davvero un problema, buttando gli altri. Vedi l'anteprima con quanti conflitti restano, e l'orario cambia solo quando premi «Applica». Ai docenti l'IA non arriva per nome: al loro posto escono delle sigle (D1, D2, D3), e nell'anteprima che leggi tu i nomi tornano al loro posto. Fino al 5 settembre 2026 si prova senza chiave; dopo fa parte dell'abbonamento EduTime Pro AI, e senza chiave i conflitti si sistemano a mano come sempre.",
       },
       {
         title: 'Controlli eseguiti',
@@ -2081,8 +2081,9 @@ export const chapters: Chapter[] = [
             al giorno troppo basso, un giorno libero che non ci sta, due materie
             che non vogliono stare nello stesso giorno. Dove può, propone la
             modifica come pulsante: la regola cambia quando lo premi, una per
-            volta, così puoi rigenerare e vedere l'effetto. I docenti compaiono
-            come sigle.
+            volta, così puoi rigenerare e vedere l'effetto. Fuori dal computer i
+            docenti vanno come sigle, ma nella risposta che leggi tu i nomi
+            tornano al loro posto.
           </>
         ),
       },

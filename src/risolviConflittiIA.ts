@@ -13,7 +13,9 @@
  *    della chiamata, e la tabella delle sigle resta qui. Al modello servono
  *    le classi e le ore, non chi ci insegna. Per questo l'aiuto sui conflitti
  *    non chiede nessuna spunta, a differenza della lettura del PDF: là i nomi
- *    sono il dato da estrarre, qui non servono.
+ *    sono il dato da estrarre, qui non servono. Le sigle però sono un fatto
+ *    interno: quando la risposta torna, i nomi si rimettono al loro posto,
+ *    perché «sposta l'ora di D3» non dice niente a chi legge.
  *
  * 2. La parola definitiva non è del modello. Ogni mossa che torna indietro
  *    viene provata sull'orario e pesata con lo stesso calcolo dei conflitti
@@ -22,6 +24,8 @@
  *    uno spostamento sensato, non sa contare le sovrapposizioni che quello
  *    spostamento crea.
  */
+
+import { rimettiNomi } from './iaComune';
 
 /* --------------------------------------------------------------- tipi */
 
@@ -131,8 +135,10 @@ export interface Fotografia {
   problemi: string[];
   lezioni: string[];
   libere: string[];
-  /** Sigla → id vero del docente. Non esce dal browser. */
+  /** Id vero del docente → sigla. Non esce dal browser. */
   sigle: Map<string, string>;
+  /** Sigla → nome vero, per rimettere i nomi in quello che torna indietro. */
+  perSigla: Map<string, string>;
 }
 
 const etichettaOra = (ora: number) => `${ora + 1}`;
@@ -250,12 +256,21 @@ export function costruisciFotografia(dati: DatiPerIa): Fotografia {
     return testo;
   });
 
+  // La strada di ritorno. Si costruisce adesso, quando le sigle sono tutte
+  // assegnate: serve a rimettere i nomi in quello che il modello scrive.
+  const nomiPerSigla = new Map<string, string>();
+  nomi.forEach((s) => {
+    const sigla = perId.get(s.id);
+    if (sigla) nomiPerSigla.set(sigla, s.nome);
+  });
+
   return {
     giorni,
     problemi: senzaNomi,
     lezioni,
     libere,
     sigle: perId,
+    perSigla: nomiPerSigla,
   };
 }
 
@@ -277,6 +292,10 @@ export function aiutoConflittiDisponibile(): Promise<boolean> {
 /**
  * Manda la fotografia e riporta le mosse proposte. Le mosse non sono ancora
  * buone: sono solo proposte, e vanno passate a `provaMosse`.
+ *
+ * Il testo che torna indietro parla per sigle, perché per sigle gli abbiamo
+ * chiesto: qui le sigle ridiventano nomi, sia nella nota sia nel perché di
+ * ogni mossa, che sono le due cose che la persona legge.
  */
 export async function chiediProposta(
   foto: Fotografia,
@@ -320,9 +339,14 @@ export async function chiediProposta(
     throw new Error(dati.errore || 'Proposta non riuscita. Riprova fra poco.');
   }
 
+  const mosse = Array.isArray(dati.mosse) ? dati.mosse : [];
+
   return {
-    mosse: Array.isArray(dati.mosse) ? dati.mosse : [],
-    nota: String(dati.nota || ''),
+    mosse: mosse.map((m) => ({
+      ...m,
+      perche: rimettiNomi(String(m?.perche || ''), foto.perSigla),
+    })),
+    nota: rimettiNomi(String(dati.nota || ''), foto.perSigla),
   };
 }
 
