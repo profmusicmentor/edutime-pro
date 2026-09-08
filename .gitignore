@@ -27,3 +27,10 @@ dist-ssr
 # Chiave dell'account di servizio Firebase (accesso completo al database)
 service-account*.json
 *-firebase-adminsdk-*.json
+
+# Documentazione scaricata per gli assistenti (skill di Upstash e simili):
+# è materiale di consultazione preso da altri repo, non codice dell'app, e
+# ognuno se la riscarica quando le serve.
+.agents/
+.claude/skills/
+skills-lock.json
