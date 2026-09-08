@@ -25,7 +25,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-08b';
+export const NOVITA_VERSIONE = '2026-09-08c';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -37,6 +37,13 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-08c',
+    data: '8 settembre 2026',
+    voci: [
+      'La chiave dell’abbonamento si può incollare anche senza trattini. La mail dell’acquisto stampa la chiave tutta attaccata, ma il negozio la riconosce solo scritta come «xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx»: chi copiava dalla ricevuta si sentiva rispondere «Chiave non valida» pur avendo pagato, e non c’era modo di indovinare che mancavano cinque trattini. Adesso li rimette l’app, e sotto il campo c’è scritto dove trovare la chiave. Segnalazione arrivata dal pulsante dei feedback.',
+    ],
+  },
   {
     versione: '2026-09-08b',
     data: '8 settembre 2026',
@@ -76,13 +83,6 @@ export const NOVITA: VoceNovita[] = [
       'Nel capitolo «La barra superiore» sono arrivati i due pulsanti che mancavano: «🔑 Abbonamento IA», dove si incolla e si toglie la chiave, e «🌙 Notte / ☀️ Chiara», che cambia i colori di tutta l’app e si ricorda la scelta.',
       'Sono state corrette le parti che l’app aveva superato: i modelli di settimana sono quattro (A, B, C e D) e non più due, i tetti di ore al giorno arrivano a otto, le classi articolate valgono per qualsiasi materia e non solo per le tre lingue straniere, e la voce «Cosa NON fa l’app» non dice più che l’app non legge file esterni, visto che con l’abbonamento IA legge l’orario e gli elenchi docenti.',
       'Il capitolo del Registro Cattedre spiega ora come si mettono due materie nella stessa classe, e quello di «Sezioni & Regole» descrive la scheda «📚 Materie della scuola», quella che rinomina o unisce una materia ovunque in un colpo solo.',
-    ],
-  },
-  {
-    versione: '2026-09-06c',
-    data: '6 settembre 2026',
-    voci: [
-      'Nel capitolo «Trasparenza e privacy» della Guida c’è una scheda nuova. Da oggi l’app tiene il conto di quante pagine vengono aperte, con Vercel Web Analytics: serve soltanto a capire se l’app viene usata e quanto. Non usa cookie, non costruisce un profilo di chi naviga, non manda niente ai servizi pubblicitari e non distingue una persona dall’altra. L’orario, i nomi dei docenti e il codice scuola non c’entrano e restano dove sono. Nell’uso quotidiano non cambia nulla.',
     ],
   },
 ];

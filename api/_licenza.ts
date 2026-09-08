@@ -43,6 +43,12 @@ const ENDPOINT_LIBERA = 'https://api.lemonsqueezy.com/v1/licenses/deactivate';
  * Forma di una chiave LemonSqueezy: un UUID, gruppi esadecimali con trattini.
  * L'identificativo dell'istanza restituito dall'attivazione ha la stessa
  * forma, quindi il controllo vale per tutti e due.
+ *
+ * La ricevuta che LemonSqueezy manda al cliente stampa però la chiave tutta
+ * attaccata, senza trattini, e il negozio in quella forma non la riconosce:
+ * chi copiava dalla ricevuta si sentiva rispondere che la chiave non è valida,
+ * pur avendo pagato. Per questo `uuid` qui sotto rimette i trattini al posto
+ * giusto invece di scartare la chiave.
  */
 const FORMA_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -134,7 +140,16 @@ const uuid = (grezzo: unknown): string => {
   const pulito = String(grezzo ?? '')
     .trim()
     .toLowerCase();
-  return FORMA_UUID.test(pulito) ? pulito : '';
+  if (FORMA_UUID.test(pulito)) return pulito;
+  const nudo = pulito.replace(/[\s-]/g, '');
+  if (!/^[0-9a-f]{32}$/.test(nudo)) return '';
+  return [
+    nudo.slice(0, 8),
+    nudo.slice(8, 12),
+    nudo.slice(12, 16),
+    nudo.slice(16, 20),
+    nudo.slice(20),
+  ].join('-');
 };
 
 /**

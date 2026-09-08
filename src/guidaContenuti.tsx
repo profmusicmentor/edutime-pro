@@ -265,7 +265,7 @@ export const chapters: Chapter[] = [
       {
         title: '🔑 Abbonamento IA',
         tag: 'abbonamento',
-        body: "Qui si incolla la chiave dell'abbonamento EduTime Pro AI, quella che accende le funzioni con l'intelligenza artificiale. Se l'abbonamento è attivo su questo computer il pulsante diventa verde e scrive «attivo». Dalla stessa finestra puoi togliere la chiave per liberare il posto e usarla su un altro computer. Senza chiave l'app funziona lo stesso: si spengono solo le funzioni con l'IA.",
+        body: "Qui si incolla la chiave dell'abbonamento EduTime Pro AI, quella che accende le funzioni con l'intelligenza artificiale. La chiave arriva nella mail dell'acquisto, sotto la voce «License key»: puoi copiarla com'è, anche tutta attaccata senza trattini, perché a rimetterli ci pensa l'app. Se l'abbonamento è attivo su questo computer il pulsante diventa verde e scrive «attivo». Dalla stessa finestra puoi togliere la chiave per liberare il posto e usarla su un altro computer. Senza chiave l'app funziona lo stesso: si spengono solo le funzioni con l'IA.",
       },
       {
         title: 'Sola Lettura / Modifica',

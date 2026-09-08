@@ -30,6 +30,27 @@ interface Props {
   onCambiata?: () => void;
 }
 
+/**
+ * Rimette in forma la chiave incollata. La ricevuta di LemonSqueezy la stampa
+ * tutta attaccata, senza i trattini, e in quella forma il negozio non la
+ * riconosce: si toglie ogni spazio e trattino e, se restano trentadue cifre
+ * esadecimali, i trattini si rimettono al posto giusto. Quello che non ha
+ * questa forma passa com'è, e a dire di no sarà il negozio.
+ */
+const chiaveInOrdine = (scritta: string): string => {
+  const pulita = scritta.trim();
+  const nuda = pulita.replace(/[\s-]/g, '');
+  if (!/^[0-9a-fA-F]{32}$/.test(nuda)) return pulita;
+  const b = nuda.toLowerCase();
+  return [
+    b.slice(0, 8),
+    b.slice(8, 12),
+    b.slice(12, 16),
+    b.slice(16, 20),
+    b.slice(20),
+  ].join('-');
+};
+
 export default function ChiaveAbbonamento({ onChiudi, onCambiata }: Props) {
   const [licenza, setLicenza] = useState(() => leggiLicenza());
   const [bozza, setBozza] = useState('');
@@ -52,7 +73,7 @@ export default function ChiaveAbbonamento({ onChiudi, onCambiata }: Props) {
    * il negozio deve registrarla, ed è lì che si scopre se è buona.
    */
   const attiva = async () => {
-    const pulita = bozza.trim();
+    const pulita = chiaveInOrdine(bozza);
     if (!pulita || inCorso) return;
     setInCorso(true);
     setAvviso('');
@@ -153,6 +174,10 @@ export default function ChiaveAbbonamento({ onChiudi, onCambiata }: Props) {
               autoComplete="off"
               className="mt-1 w-full text-sm font-mono border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-200"
             />
+            <span className="mt-1 block text-[11px] text-slate-500">
+              È nella mail dell’acquisto, sotto «License key». Va bene anche
+              copiata tutta attaccata: i trattini li rimetto io.
+            </span>
           </label>
 
           {avviso && (
