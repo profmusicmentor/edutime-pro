@@ -28,14 +28,15 @@ import {
  */
 const MAX_DISPOSITIVI = 3;
 
-/**
- * Fino a questa data la chat è aperta a tutti: il server ha
- * ASSISTENTE_RICHIEDE_LICENZA spento e chiunque può provarla. La striscia qui
- * sotto lo dice, perché una prova che non si sa di avere non fa comprare
- * niente. Quando l'interruttore si accende, `serveLicenza` diventa vero, la
- * striscia sparisce da sola e al suo posto arriva il pannello della chiave.
+/*
+ * Finché il server ha ASSISTENTE_RICHIEDE_LICENZA spento la chat è aperta a
+ * tutti, e la striscia qui sotto lo dice: una prova che non si sa di avere non
+ * fa comprare niente. La striscia non porta una data di scadenza, perché una
+ * data scritta a mano nel codice resta lì anche dopo essere passata e la prima
+ * cosa che l'utente legge diventa una bugia. Quando l'interruttore si accende,
+ * `serveLicenza` diventa vero, la striscia sparisce da sola e al suo posto
+ * arriva il pannello della chiave.
  */
-const FINE_PROVA = '5 settembre';
 
 /**
  * Assistente della guida: pannello di aiuto in basso a destra.
@@ -248,10 +249,10 @@ export default function Assistente({ inGuida = false }: Props) {
           {!serveLicenza && (
             <div className="shrink-0 bg-brand-50 border-b border-brand-200 px-3 py-2 flex items-center gap-2">
               <p className="text-[11px] text-slate-700 leading-snug flex-1">
-                ✨ <strong className="text-brand-800">Prova gratuita</strong>{' '}
-                fino al {FINE_PROVA}. Poi la chat con l'assistente è per gli
-                abbonati: {PREZZO_ABBONAMENTO}. La ricerca nei capitoli resta
-                gratis per sempre.
+                ✨ <strong className="text-brand-800">Prova gratuita</strong>:
+                per ora la chat con l'assistente è aperta a tutti. Presto sarà
+                per gli abbonati: {PREZZO_ABBONAMENTO}. La ricerca nei capitoli
+                resta gratis per sempre.
               </p>
               <a
                 href={LINK_ABBONAMENTO}

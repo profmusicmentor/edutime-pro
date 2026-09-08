@@ -1388,6 +1388,58 @@ const chiaveMateria = (nome: string) =>
     .toUpperCase();
 
 /**
+ * La preferenza «2h consecutive» che vale per una riga di cattedra: quella
+ * scritta sulla riga, se c'è, altrimenti quella generale del docente.
+ *
+ * Serve a chi insegna più materie. Italiano a blocchi di due ore e storia
+ * un'ora al giorno sono esigenze diverse della stessa persona, e la casella
+ * unica sul docente non sapeva distinguerle: o blocchi ovunque, o mai.
+ */
+const consecutiveDellaRiga = (riga: any, staff: any) =>
+  riga &&
+  riga.preferConsecutive !== undefined &&
+  riga.preferConsecutive !== null
+    ? !!riga.preferConsecutive
+    : !!staff?.preferConsecutive;
+
+/**
+ * Toglie la preferenza scritta sulle singole righe di cattedra. La usa il
+ * pulsante «spegni»/«accendi» dell'intestazione: se restassero, direbbe di
+ * aver spento tutto e qualche materia resterebbe accesa lo stesso.
+ */
+const senzaPreferenzeDiRiga = (assignments: any[]) =>
+  (assignments || []).map((a: any) => {
+    if (!a || a.preferConsecutive === undefined) return a;
+    const pulita = { ...a };
+    delete pulita.preferConsecutive;
+    return pulita;
+  });
+
+/**
+ * La stessa preferenza, ma partendo da una lezione già in orario: si risale
+ * alla riga di cattedra dal docente, dalla classe e dalla materia scritta
+ * nella cella. Se la materia non aggancia nessuna riga si usa la prima di
+ * quella classe, che è il caso normale della cattedra con una riga sola.
+ */
+const consecutivePerLezione = (
+  staffList: any[],
+  teacherId: string,
+  classId: string,
+  subject?: string
+) => {
+  const staff = (staffList || []).find((s: any) => s.id === teacherId);
+  if (!staff) return false;
+  const righe = righeDiClasse(staff, classId);
+  const riga =
+    righe.find(
+      (r: any) =>
+        chiaveMateria(materiaDellaRiga(r, staff)) ===
+        chiaveMateria(subject || '')
+    ) || righe[0];
+  return consecutiveDellaRiga(riga, staff);
+};
+
+/**
  * La sede di una classe, cioè quella della sua sezione. Non guarda l'aula:
  * serve proprio a decidere quale aula si può usare, e prendere la sede
  * dall'aula sarebbe un ragionamento circolare.
@@ -1932,9 +1984,12 @@ const repairUnplacedLessons = (
     teacherId: slot.teacherId,
     subject: slot.subject,
     classId: slot.classId,
-    preferConsecutive: !!(ctx.teachers || []).find(
-      (t: any) => t.id === slot.teacherId
-    )?.preferConsecutive,
+    preferConsecutive: consecutivePerLezione(
+      ctx.teachers,
+      slot.teacherId,
+      slot.classId,
+      slot.subject
+    ),
   });
 
   const bestFreeCell = (lesson: any, cells: any[], skipCell?: any) => {
@@ -2243,9 +2298,12 @@ const consolidateShortDays = (tt: any[], ctx: any, budgetMs = 1500) => {
           teacherId: slot.teacherId,
           subject: slot.subject,
           classId: slot.classId,
-          preferConsecutive: !!(ctx.teachers || []).find(
-            (t: any) => t.id === slot.teacherId
-          )?.preferConsecutive,
+          preferConsecutive: consecutivePerLezione(
+            ctx.teachers,
+            slot.teacherId,
+            slot.classId,
+            slot.subject
+          ),
         };
 
         let best: any = null;
@@ -2364,9 +2422,12 @@ const separateSubjectPairs = (tt: any[], ctx: any, budgetMs = 1500) => {
     teacherId: slot.teacherId,
     subject: slot.subject,
     classId: slot.classId,
-    preferConsecutive: !!(ctx.teachers || []).find(
-      (t: any) => t.id === slot.teacherId
-    )?.preferConsecutive,
+    preferConsecutive: consecutivePerLezione(
+      ctx.teachers,
+      slot.teacherId,
+      slot.classId,
+      slot.subject
+    ),
   });
 
   const spostabile = (slot: any) =>
@@ -2753,6 +2814,10 @@ const calcolaConflitti = (ctx: any) => {
         if (corte.length > 0) {
           conflicts.push({
             type: 'warning',
+            // `kind` serve al riquadro dell'IA: questi avvisi non si tolgono
+            // spostando lezioni, quindi il pannello lo dice prima di far
+            // spendere una domanda al modello. Vedi `soloMinimoGiornaliero`.
+            kind: 'minimoGiornaliero',
             message: `Il docente ${staff.name} ha una giornata sotto il minimo di ${minPerDay} ore (${corte.join(', ')}).`,
             suggestion: `Sposta a mano quelle ore in un giorno in cui è già a scuola, oppure abbassa il minimo in "Sezioni & Regole".`,
             teacherId: staff.id,
@@ -4290,6 +4355,25 @@ export default function App() {
     null
   );
 
+  /**
+   * Vero quando quel che resta in lista sono soltanto avvisi «giornata sotto
+   * il minimo di ore». Sono l'unico caso in cui l'IA non può fare niente per
+   * costruzione: sa proporre spostamenti, e una giornata da un'ora sola si
+   * chiude solo se quell'ora ha dove andare. Con docenti divisi su più scuole
+   * quel posto non c'è, e il modello risponde «nessuna mossa migliora
+   * l'orario»: vero, ma sembra una resa e non dice dove sta l'uscita. Il
+   * riquadro allora la dice al posto suo, prima di far spendere una domanda.
+   */
+  const avvisiMinimoGiornaliero = useMemo(
+    () =>
+      validationResult.conflicts.filter((c) => c.kind === 'minimoGiornaliero')
+        .length,
+    [validationResult.conflicts]
+  );
+  const soloMinimoGiornaliero =
+    avvisiMinimoGiornaliero > 0 &&
+    avvisiMinimoGiornaliero === validationResult.conflicts.length;
+
   useEffect(() => {
     let vivo = true;
     aiutoConflittiDisponibile().then((ok) => {
@@ -4590,7 +4674,7 @@ export default function App() {
                 teacherId: t.id,
                 subject: materiaInClasse,
                 teacherName: t.name,
-                preferConsecutive: !!t.preferConsecutive,
+                preferConsecutive: consecutiveDellaRiga(assignment, t),
               });
           });
         });
@@ -4934,7 +5018,7 @@ export default function App() {
               (slot) =>
                 slot.classId === targetClassId && slot.type === 'materia'
             ),
-            !!sos.preferConsecutive
+            consecutiveDellaRiga(assign, sos)
           );
           let assignedHours = 0;
           for (let i = 0; i < occupiedSlots.length; i++) {
@@ -5145,7 +5229,7 @@ export default function App() {
         let placed = 0;
         const shuffled = orderSlotsForSostegno(
           classMaterie,
-          !!sos.preferConsecutive
+          consecutiveDellaRiga(assign, sos)
         );
         for (let slot of shuffled) {
           if (placed >= assign.hours) break;
@@ -5658,6 +5742,73 @@ export default function App() {
   };
 
   /**
+   * La preferenza «2h consecutive» di una singola riga di cattedra, cioè di
+   * una materia in una classe.
+   *
+   * `value` a true o false scrive un valore proprio sulla riga; `null` lo
+   * toglie e la riga torna a seguire la casella del docente. Serve a chi
+   * insegna due materie con esigenze diverse: italiano a blocchi di due ore,
+   * storia un'ora al giorno.
+   */
+  const handleToggleConsecutiveRiga = (
+    staffId: string,
+    classId: string,
+    materia: string,
+    value: boolean | null,
+    staffType: string
+  ) => {
+    if (readOnlyMode) return;
+    const cercata = chiaveMateria(materia);
+    const aggiorna = (list: any[]) =>
+      list.map((t) => {
+        if (t.id !== staffId) return t;
+        return {
+          ...t,
+          assignments: (t.assignments || []).map((a: any) => {
+            if (
+              a.classId !== classId ||
+              chiaveMateria(materiaDellaRiga(a, t)) !== cercata
+            )
+              return a;
+            if (value === null) {
+              const senzaPreferenza = { ...a };
+              delete senzaPreferenza.preferConsecutive;
+              return senzaPreferenza;
+            }
+            return { ...a, preferConsecutive: value };
+          }),
+        };
+      });
+    let updatedTeachers = [...teachers],
+      updatedSostegno = [...sostegno],
+      updatedStrumento = [...strumento];
+    if (staffType === 'materia') {
+      updatedTeachers = aggiorna(teachers);
+      setTeachers(updatedTeachers);
+    } else if (staffType === 'sostegno') {
+      updatedSostegno = aggiorna(sostegno);
+      setSostegno(updatedSostegno);
+    } else if (staffType === 'strumento') {
+      updatedStrumento = aggiorna(strumento);
+      setStrumento(updatedStrumento);
+    }
+    pushDataToCloud(
+      timetable,
+      updatedTeachers,
+      updatedSostegno,
+      sectionsConfig,
+      updatedStrumento,
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      cellNotes,
+      groupConstraints,
+      mixedClasses
+    );
+  };
+
+  /**
    * Accende o spegne la preferenza «ore consecutive» per tutta la tabella in
    * un colpo solo.
    *
@@ -5676,18 +5827,21 @@ export default function App() {
       updatedTeachers = teachers.map((t) => ({
         ...t,
         preferConsecutive: value,
+        assignments: senzaPreferenzeDiRiga(t.assignments),
       }));
       setTeachers(updatedTeachers);
     } else if (staffType === 'sostegno') {
       updatedSostegno = sostegno.map((s) => ({
         ...s,
         preferConsecutive: value,
+        assignments: senzaPreferenzeDiRiga(s.assignments),
       }));
       setSostegno(updatedSostegno);
     } else if (staffType === 'strumento') {
       updatedStrumento = strumento.map((m) => ({
         ...m,
         preferConsecutive: value,
+        assignments: senzaPreferenzeDiRiga(m.assignments),
       }));
       setStrumento(updatedStrumento);
     }
@@ -10597,14 +10751,55 @@ export default function App() {
                                   >
                                     Cls: {classSummary}
                                   </div>
-                                  {staff.preferConsecutive && (
-                                    <div
-                                      className="text-[9px] text-brand-700 font-bold bg-brand-100 rounded px-1.5 py-0.5 mt-0.5 truncate flex items-center gap-1"
-                                      title="Preferenza ore consecutive attiva"
-                                    >
-                                      <span>🔗</span> 2h Consecutive
-                                    </div>
-                                  )}
+                                  {(() => {
+                                    /*
+                                     * Da quando la preferenza si può scrivere
+                                     * anche sulla singola riga di cattedra, il
+                                     * docente può averla su una materia e non
+                                     * sull'altra: il cartellino lo dice, se no
+                                     * prometteva blocchi ovunque.
+                                     */
+                                    const righe = (staff.assignments ||
+                                      []) as any[];
+                                    if (righe.length === 0)
+                                      return staff.preferConsecutive ? (
+                                        <div
+                                          className="text-[9px] text-brand-700 font-bold bg-brand-100 rounded px-1.5 py-0.5 mt-0.5 truncate flex items-center gap-1"
+                                          title="Preferenza ore consecutive attiva"
+                                        >
+                                          <span>🔗</span> 2h Consecutive
+                                        </div>
+                                      ) : null;
+                                    const attive = righe.filter((a: any) =>
+                                      consecutiveDellaRiga(a, staff)
+                                    );
+                                    if (attive.length === 0) return null;
+                                    const tutte =
+                                      attive.length === righe.length;
+                                    return (
+                                      <div
+                                        className="text-[9px] text-brand-700 font-bold bg-brand-100 rounded px-1.5 py-0.5 mt-0.5 truncate flex items-center gap-1"
+                                        title={
+                                          tutte
+                                            ? 'Preferenza ore consecutive attiva'
+                                            : `Ore consecutive solo su: ${attive
+                                                .map(
+                                                  (a: any) =>
+                                                    `${materiaDellaRiga(
+                                                      a,
+                                                      staff
+                                                    )} in ${a.classId}`
+                                                )
+                                                .join(', ')}`
+                                        }
+                                      >
+                                        <span>🔗</span>{' '}
+                                        {tutte
+                                          ? '2h Consecutive'
+                                          : '2h su alcune materie'}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               </td>
                               <td className="p-2 w-16 border-r-4 border-slate-300 text-center font-bold text-brand-700 bg-brand-50/10 sticky left-80 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
@@ -12416,7 +12611,7 @@ export default function App() {
                         </th>
                         <th
                           className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20"
-                          title="Preferenza ore consecutive"
+                          title="Preferenza ore consecutive per tutta la cattedra. Per una singola materia in una singola classe si cambia dal riquadro delle assegnazioni (pulsante ➕ a fine riga)"
                         >
                           2h
                           <button
@@ -12592,7 +12787,14 @@ export default function App() {
                                                   `${materiaDellaRiga(
                                                     a,
                                                     teacher
-                                                  )} (${a.hours} ore)`
+                                                  )} (${a.hours} ore${
+                                                    consecutiveDellaRiga(
+                                                      a,
+                                                      teacher
+                                                    )
+                                                      ? ', 2h consecutive'
+                                                      : ''
+                                                  })`
                                               )
                                               .join(' e ')}. Premi per cambiare.`
                                           : etichettaMaterie
@@ -12674,7 +12876,7 @@ export default function App() {
                         </th>
                         <th
                           className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20"
-                          title="Preferenza ore consecutive"
+                          title="Preferenza ore consecutive per tutta la cattedra. Per una singola materia in una singola classe si cambia dal riquadro delle assegnazioni (pulsante ➕ a fine riga)"
                         >
                           2h
                           <button
@@ -12838,7 +13040,7 @@ export default function App() {
                         </th>
                         <th
                           className="p-3 w-16 bg-slate-100 font-bold text-center border-r border-slate-200 text-brand-700 sticky top-0 z-20"
-                          title="Preferenza ore consecutive"
+                          title="Preferenza ore consecutive per tutta la cattedra. Per una singola materia in una singola classe si cambia dal riquadro delle assegnazioni (pulsante ➕ a fine riga)"
                         >
                           2h
                           <button
@@ -14912,8 +15114,7 @@ export default function App() {
                         uno per uno e tiene solo quelli che tolgono davvero un
                         problema: l&apos;orario non si muove finché non premi
                         «Applica». I nomi dei docenti non escono dal
-                        computer, al loro posto vanno delle sigle. Fino al 5
-                        settembre 2026 si prova senza chiave; dopo fa parte
+                        computer, al loro posto vanno delle sigle. Fa parte
                         dell&apos;abbonamento EduTime Pro AI.
                       </p>
                     </div>
@@ -14927,6 +15128,22 @@ export default function App() {
                         : 'Proponi gli spostamenti'}
                     </button>
                   </div>
+
+                  {soloMinimoGiornaliero && (
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 text-xs text-slate-600">
+                      <strong className="text-slate-800">
+                        Qui l&apos;IA non serve.
+                      </strong>{' '}
+                      Quel che resta sono solo avvisi «giornata sotto il minimo
+                      di ore»: nessun errore, quindi l&apos;orario si può già
+                      usare. Non si tolgono spostando lezioni, perché
+                      quell&apos;ora isolata deve avere un altro giorno dove
+                      andare, e spesso non ce l&apos;ha. Se hai docenti divisi
+                      su più scuole quel minimo non è rispettabile: portalo su
+                      «Nessun minimo» in «Sezioni &amp; Regole» e spariscono
+                      tutti insieme.
+                    </div>
+                  )}
 
                   {iaConflittiErrore && (
                     <div className="bg-fucsia-50 border border-fucsia-200 rounded-lg p-3 text-xs text-fucsia-800">
@@ -14971,6 +15188,18 @@ export default function App() {
                       ) : (
                         <p className="text-xs text-slate-600">
                           Nessuna delle mosse proposte migliora l&apos;orario.
+                          {avvisiMinimoGiornaliero > 0 && (
+                            <>
+                              {' '}
+                              Di quel che resta, {avvisiMinimoGiornaliero}{' '}
+                              {avvisiMinimoGiornaliero === 1
+                                ? 'avviso riguarda una giornata'
+                                : 'avvisi riguardano giornate'}{' '}
+                              sotto il minimo di ore: quelli non si tolgono
+                              spostando lezioni. Si tolgono cambiando «Minimo
+                              ore al giorno» in «Sezioni &amp; Regole».
+                            </>
+                          )}
                         </p>
                       )}
 
@@ -16546,9 +16775,23 @@ export default function App() {
                         <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                           Già in {assignClass}
                         </p>
+                        <p className="text-[11px] text-slate-500 mb-2">
+                          La casella «2h» qui vale solo per quella materia in
+                          questa classe e batte quella della colonna 2h. Serve
+                          a chi insegna più materie: italiano a blocchi di due
+                          ore, storia un'ora al giorno. Con ↺ la materia torna
+                          a seguire il resto della cattedra.
+                        </p>
                         <ul className="space-y-1">
                           {righeClasse.map((riga: any, i: number) => {
                             const nome = materiaDellaRiga(riga, staffModale);
+                            const consecutiveQui = consecutiveDellaRiga(
+                              riga,
+                              staffModale
+                            );
+                            const preferenzaPropria =
+                              riga.preferConsecutive !== undefined &&
+                              riga.preferConsecutive !== null;
                             return (
                               <li
                                 key={`${nome}-${i}`}
@@ -16560,22 +16803,71 @@ export default function App() {
                                     · {riga.hours} ore
                                   </span>
                                 </span>
-                                <button
-                                  onClick={() =>
-                                    handleUpdateAssignment(
-                                      assignModal.staffId,
-                                      assignClass,
-                                      0,
-                                      assignModal.staffType,
-                                      nome
-                                    )
-                                  }
-                                  disabled={readOnlyMode}
-                                  title={`Togli ${nome} da ${assignClass}`}
-                                  className="text-fucsia-600 hover:text-fucsia-800 font-bold px-1.5 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  ✕
-                                </button>
+                                <span className="flex items-center gap-1 shrink-0">
+                                  <label
+                                    className="flex items-center gap-1 cursor-pointer"
+                                    title={`Ore consecutive per ${nome} in ${assignClass}`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={consecutiveQui}
+                                      onChange={(e) =>
+                                        handleToggleConsecutiveRiga(
+                                          assignModal.staffId,
+                                          assignClass,
+                                          nome,
+                                          e.target.checked,
+                                          assignModal.staffType
+                                        )
+                                      }
+                                      disabled={readOnlyMode}
+                                      className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    />
+                                    <span
+                                      className={
+                                        preferenzaPropria
+                                          ? 'font-bold text-brand-700'
+                                          : 'text-slate-400'
+                                      }
+                                    >
+                                      2h
+                                    </span>
+                                  </label>
+                                  {preferenzaPropria && (
+                                    <button
+                                      onClick={() =>
+                                        handleToggleConsecutiveRiga(
+                                          assignModal.staffId,
+                                          assignClass,
+                                          nome,
+                                          null,
+                                          assignModal.staffType
+                                        )
+                                      }
+                                      disabled={readOnlyMode}
+                                      title={`Rimetti ${nome} come il resto della cattedra`}
+                                      className="text-slate-400 hover:text-slate-700 font-bold px-1 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      ↺
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() =>
+                                      handleUpdateAssignment(
+                                        assignModal.staffId,
+                                        assignClass,
+                                        0,
+                                        assignModal.staffType,
+                                        nome
+                                      )
+                                    }
+                                    disabled={readOnlyMode}
+                                    title={`Togli ${nome} da ${assignClass}`}
+                                    className="text-fucsia-600 hover:text-fucsia-800 font-bold px-1.5 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    ✕
+                                  </button>
+                                </span>
                               </li>
                             );
                           })}

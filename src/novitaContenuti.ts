@@ -25,7 +25,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-07';
+export const NOVITA_VERSIONE = '2026-09-08b';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -37,6 +37,21 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-08b',
+    data: '8 settembre 2026',
+    voci: [
+      'Il riquadro «✨ Fatti aiutare dall’IA» dei Conflitti adesso ammette quando non può fare niente. Se quel che resta in lista sono solo avvisi «giornata sotto il minimo di ore», te lo dice prima che tu prema il pulsante: quegli avvisi non si tolgono spostando lezioni, perché l’ora isolata deve avere un altro giorno dove andare e con i docenti divisi su più scuole quel giorno non c’è. Prima l’IA ci provava lo stesso e rispondeva «nessuna mossa migliora l’orario», che è vero ma sembra una resa. Adesso la strada c’è: si porta «🚪 Minimo ore al giorno» su «Nessun minimo» in «⚙️ Sezioni & Regole» e spariscono tutti insieme. Vale la pena ricordare che quegli avvisi non sono errori: un orario con zero errori si può già usare. Segnalazione di un collega.',
+      'Tolte due date di scadenza rimaste scritte a mano nell’app: il riquadro dei conflitti e la striscia dell’assistente della guida promettevano una prova gratuita «fino al 5 settembre 2026», che è passato da un pezzo. Ora dicono semplicemente come stanno le cose oggi.',
+    ],
+  },
+  {
+    versione: '2026-09-08',
+    data: '8 settembre 2026',
+    voci: [
+      'Nel «Registro Cattedre» la preferenza delle ore consecutive si può dare materia per materia. Prima la casella «2h» valeva per tutta la cattedra: chi insegna italiano in una classe e storia in un’altra doveva scegliere fra blocchi di due ore ovunque e blocchi da nessuna parte, mentre le due materie hanno esigenze opposte. Adesso, nel riquadro delle assegnazioni (pulsante ➕ a fine riga, poi la classe), ogni materia ha la sua casella «2h»: quella scritta lì batte la colonna, e con ↺ la materia torna a seguire il resto della cattedra. Chi non tocca niente non vede cambiare nulla. Suggerimento di un collega arrivato dal pulsante dei feedback.',
+    ],
+  },
   {
     versione: '2026-09-07',
     data: '7 settembre 2026',
@@ -68,27 +83,6 @@ export const NOVITA: VoceNovita[] = [
     data: '6 settembre 2026',
     voci: [
       'Nel capitolo «Trasparenza e privacy» della Guida c’è una scheda nuova. Da oggi l’app tiene il conto di quante pagine vengono aperte, con Vercel Web Analytics: serve soltanto a capire se l’app viene usata e quanto. Non usa cookie, non costruisce un profilo di chi naviga, non manda niente ai servizi pubblicitari e non distingue una persona dall’altra. L’orario, i nomi dei docenti e il codice scuola non c’entrano e restano dove sono. Nell’uso quotidiano non cambia nulla.',
-    ],
-  },
-  {
-    versione: '2026-09-06b',
-    data: '6 settembre 2026',
-    voci: [
-      'Lo stesso docente può finalmente fare due materie nella stessa classe: italiano e storia in 1A, matematica e scienze in 2B. Si aggiungono dal pulsante ➕ del Registro Cattedre, scrivendo nel campo «Materia in questa classe» una materia che in quella classe non ha ancora: invece di cambiare quella di prima, si aggiunge una riga. Nella finestra vedi l’elenco di quello che quel docente ha già in quella classe, con la ✕ per togliere una riga. Nella griglia del Registro la casella di quella classe diventa arancione e mostra il totale delle due materie: si preme e si apre la finestra, perché una casella sola non basta più a dire quale delle due stai cambiando. Chi ha una materia per classe non vede nessuna differenza.',
-      'C’è una scheda nuova in «⚙️ Sezioni & Regole»: «📚 Materie della scuola». Elenca tutte le materie che l’app conosce, con quanti docenti le insegnano, quante ore di cattedra hanno, quante ore sono già in orario e quale laboratorio è collegato. Da lì si rinomina una materia ovunque in un colpo solo: docenti, righe di cattedra, lezioni già in orario, elenco delle materie del laboratorio, coppie da non affiancare e classi articolate. Se il nome nuovo esiste già le due materie diventano una, ed è il modo di rimettere insieme «ED. FISICA» e «EDUCAZIONE FISICA» scritte in due modi.',
-      'Le classi articolate non sono più solo per Spagnolo, Francese e Tedesco: la materia si sceglie fra tutte quelle della scuola. L’elenco delle tre lingue era scritto dentro al programma e non serviva a niente, perché l’accorpamento esiste comunque solo dove lo dichiari tu.',
-      'Gli elenchi delle materie sparsi per l’app (le coppie da non affiancare, le classi articolate, il filtro del tabellone) adesso vedono anche le materie scritte sulle singole righe di cattedra. Prima conoscevano solo la materia principale del docente, quindi una materia insegnata da una riga sola non compariva da nessuna parte.',
-    ],
-  },
-  {
-    versione: '2026-09-06',
-    data: '6 settembre 2026',
-    voci: [
-      'Le ore che metti a mano e chiudi col lucchetto non vengono più raddoppiate. Prima, se assegnavi tu due ore di un docente in una classe e le bloccavi, l’Auto-Generazione gliene aggiungeva altre due: il docente si ritrovava con il doppio delle ore in quella classe e, per farcele stare, le ore in più finivano anche oltre la fine della giornata prevista dal modello. Adesso il generatore parte contando quello che è già in orario e piazza solo le ore che mancano davvero.',
-      'Il tetto di ore al giorno adesso conta i minuti, non le caselle. Chi ha accorciato un’ora della giornata a 30 minuti (in «Impostazioni», colonna Durata) vedeva quella mezz’ora pesare come un’ora intera: il tetto si riempiva prima del tempo e l’ultima ora restava vuota tutti i giorni. Adesso una lezione da mezz’ora vale mezz’ora. Se la giornata piena supera comunque il tetto (cinque ore più una mezz’ora fanno 5,5 contro un tetto di 5), il tetto va alzato a 6 in «Sezioni & Regole».',
-      'I modelli di orario sono passati da due a quattro: A, B, C e D. Gli istituti con più plessi, dove la primaria, la secondaria e un terzo edificio hanno giornate diverse, non devono più far entrare tutto in due griglie sole. I modelli C e D partono uguali al B e restano fermi finché non li assegni a una sezione, quindi per chi non li tocca non cambia niente.',
-      'Il «Massimo ore al giorno» e il «Massimo ore al giorno nella stessa classe» arrivano fino a otto. Serve ai laboratori lunghi degli istituti professionali e dei corsi serali, che tengono lo stesso docente in classe per quattro, cinque o più ore di fila. È anche il tetto che decide quanto può durare un blocco consecutivo: la preferenza «ore consecutive» non è mai stata limitata a due ore, era l’etichetta a dirlo, e adesso è scritta giusta.',
-      'Nella scheda «Sostegno» c’è il pulsante «🖨️ Tutti»: stampa un tabellone unico con l’orario di tutti i docenti di sostegno, invece di un foglio per volta.',
     ],
   },
 ];
