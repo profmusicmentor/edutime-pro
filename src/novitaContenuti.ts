@@ -25,7 +25,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-09';
+export const NOVITA_VERSIONE = '2026-09-09b';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -37,6 +37,14 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-09b',
+    data: '9 settembre 2026',
+    voci: [
+      'La chat dell’assistente della Guida entra nell’abbonamento EduTime Pro AI, come le altre funzioni con l’intelligenza artificiale. Finora era rimasta aperta a tutti come prova: adesso, per farsi scrivere la risposta a parole tue, serve la chiave dell’abbonamento incollata in «🔑 Abbonamento IA».',
+      'La ricerca nei capitoli della guida resta gratis per sempre e senza limiti: gira tutta dentro il tuo browser, non passa da nessun modello e non manda niente in rete. È quella che vedi aprendo «💬 Serve aiuto?», e continua a funzionare uguale anche senza chiave.',
+    ],
+  },
   {
     versione: '2026-09-09',
     data: '9 settembre 2026',
@@ -74,14 +82,6 @@ export const NOVITA: VoceNovita[] = [
     voci: [
       'Le risposte dell’IA non parlano più per sigle. Quando chiedi aiuto sui conflitti, o premi «Perché non ci riesce?» nel report della generazione, il testo diceva «sposta l’ora di D3»: le sigle servono a non far uscire i nomi dal computer, ma erano rimaste anche nella risposta, e capire di chi si trattava era impossibile. Adesso i nomi tornano al loro posto prima che la risposta compaia sullo schermo. Fuori dal computer, come sempre, vanno solo le sigle.',
       'Nel «Registro Cattedre» la colonna «2h» ha un pulsantino nell’intestazione: «spegni» toglie la preferenza delle ore consecutive a tutti i docenti di quella tabella in un colpo solo, «accendi» la mette a tutti. Prima si poteva solo docente per docente, e siccome nei dati di partenza la spunta è accesa per tutti, chi quelle ore appaiate non le voleva doveva togliere una spunta per riga. Il pulsante vale solo per la tabella che ha sotto: Materie, Sostegno e Strumento restano indipendenti.',
-    ],
-  },
-  {
-    versione: '2026-09-06e',
-    data: '6 settembre 2026',
-    voci: [
-      'La lettura delle richieste dei docenti non manda più fuori i nomi. Prima il testo che incollavi partiva così com’era, cognomi compresi. Adesso ogni docente che è già in archivio diventa una sigla (D1, D2, D3…) prima che il testo esca dal computer, e il nome vero torna al suo posto qui sull’app, insieme alla frase da cui il vincolo è stato ricavato. Chi in archivio non c’è resta scritto com’era, perché è anche l’unico a cui l’app non saprebbe abbinare niente. Nell’uso non cambia nulla: leggi lo stesso elenco di prima, con gli stessi nomi.',
-      'Attenzione, una cosa non è cambiata: il motivo personale della richiesta («ho il rientro all’altra scuola», «per motivi di salute») sta dentro la frase e non dentro il nome, quindi esce lo stesso. La spunta prima di partire lo dice, e il consiglio resta quello: incolla solo la parte utile.',
     ],
   },
 ];
