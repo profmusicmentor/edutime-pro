@@ -3,9 +3,12 @@
  *
  * Gli orari che le scuole stampano hanno quasi tutti la stessa forma: una
  * riga per docente, e in cima una fascia di intestazioni con i giorni e, sotto
- * di essi, i numeri delle ore. È una tabella, e una tabella si legge contando
- * le colonne: non serve nessuna intelligenza, serve sapere dove cade ogni
- * cella.
+ * di essi, le ore. È una tabella, e una tabella si legge contando le colonne:
+ * non serve nessuna intelligenza, serve sapere dove cade ogni cella.
+ *
+ * Le ore in cima sono scritte in due modi. Numerate, «1 2 3 4 5 6», come fanno
+ * i programmi italiani. Oppure come orologio, «8h00 9h00 10h00», come fa EDT
+ * che è francese. Vanno bene tutte e due.
  *
  * È il motivo per cui questo file esiste. Provando con l'orario vero di un
  * istituto - trentacinque colonne fra lunedì e sabato, le ore libere stampate
@@ -67,16 +70,23 @@ const pezziDellaRiga = (riga: string): Pezzo[] => {
   return pezzi;
 };
 
+/** L'ora scritta come la legge un orologio: «8h00», «08:00», «8.00», «13h30». */
+const FORMA_OROLOGIO = /^([01]?\d|2[0-3])[h:.]([0-5]\d)$/i;
+
+/** Quanti minuti dopo la mezzanotte, se il pezzo è un'ora da orologio. */
+const minutiOrologio = (testo: string): number | null => {
+  const trovato = FORMA_OROLOGIO.exec(testo);
+  if (!trovato) return null;
+  return Number(trovato[1]) * 60 + Number(trovato[2]);
+};
+
 /**
- * Cerca la riga che porta i numeri delle ore e ne ricava le colonne.
+ * Le ore numerate: «1 2 3 4 5 6 1 2 3...».
  *
- * Si riconosce così: tanti pezzi fatti di un numero solo, e quei numeri che
- * ricominciano da capo a ogni giorno («1 2 3 4 5 6 1 2 3...»). Ogni volta che
- * il numero non cresce, comincia un giorno nuovo. Le colonne prima del primo
- * numero sono l'anagrafica del docente e non si toccano.
+ * Ogni volta che il numero non cresce comincia un giorno nuovo. È la forma
+ * che stampano quasi tutti i programmi italiani.
  */
-const colonneOrarie = (riga: string): ColonnaOraria[] | null => {
-  const pezzi = pezziDellaRiga(riga);
+const dallaNumerazione = (pezzi: Pezzo[]): ColonnaOraria[] | null => {
   const numeri = pezzi.filter((p) => /^\d{1,2}$/.test(p.testo));
   if (numeri.length < 8) return null;
 
@@ -96,6 +106,58 @@ const colonneOrarie = (riga: string): ColonnaOraria[] | null => {
   // esce un giorno solo, quei numeri erano altro: ore di cattedra, conteggi.
   if (giorno < 1) return null;
   return colonne;
+};
+
+/**
+ * Le ore scritte come orologio: «8h00 9h00 10h00 ... 8h00 9h00...».
+ *
+ * È la forma di EDT, che è francese e stampa l'ora invece del suo numero. Il
+ * giorno cambia quando l'ora torna indietro. Il numero dell'ora non si ricava
+ * dall'orologio: si prendono tutti gli orari diversi della riga, si mettono in
+ * fila dal primo all'ultimo, e la posizione in quella fila è l'ora. Così un
+ * giorno che comincia più tardi degli altri resta comunque incolonnato.
+ *
+ * Bastano sei orari invece degli otto chiesti ai numeri nudi: «8h00» non
+ * capita per caso in mezzo a un orario, un «5» sì.
+ */
+const dallOrologio = (pezzi: Pezzo[]): ColonnaOraria[] | null => {
+  const orologi: { colonna: number; minuti: number }[] = [];
+  for (const pezzo of pezzi) {
+    const minuti = minutiOrologio(pezzo.testo);
+    if (minuti !== null) orologi.push({ colonna: pezzo.colonna, minuti });
+  }
+  if (orologi.length < 6) return null;
+
+  const fila = [...new Set(orologi.map((o) => o.minuti))].sort((a, b) => a - b);
+
+  const colonne: ColonnaOraria[] = [];
+  let giorno = -1;
+  let precedente = Number.POSITIVE_INFINITY;
+  for (const orologio of orologi) {
+    if (orologio.minuti <= precedente) giorno++;
+    precedente = orologio.minuti;
+    colonne.push({
+      giorno,
+      ora: fila.indexOf(orologio.minuti),
+      colonna: orologio.colonna,
+    });
+  }
+
+  if (giorno < 1) return null;
+  return colonne;
+};
+
+/**
+ * Cerca la riga che porta le ore e ne ricava le colonne.
+ *
+ * Le ore possono essere numerate («1 2 3 4 5 6») oppure scritte come orologio
+ * («8h00 9h00 10h00»): si prova prima la forma numerata, poi l'altra. Le
+ * colonne prima della prima ora sono l'anagrafica del docente e non si
+ * toccano.
+ */
+const colonneOrarie = (riga: string): ColonnaOraria[] | null => {
+  const pezzi = pezziDellaRiga(riga);
+  return dallaNumerazione(pezzi) ?? dallOrologio(pezzi);
 };
 
 /**

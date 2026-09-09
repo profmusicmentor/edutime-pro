@@ -28,7 +28,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-09d';
+export const NOVITA_VERSIONE = '2026-09-09e';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -40,6 +40,14 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-09e',
+    data: '9 settembre 2026',
+    voci: [
+      '«📥 Importa orario» adesso legge da solo anche gli orari che al posto del numero dell’ora stampano l’ora dell’orologio: «8h00 9h00 10h00» invece di «1 2 3». È la forma di EDT, che è un programma francese e in parecchie scuole è quello con cui si fa l’orario. Prima la lettura veloce si fermava sulla prima riga, perché cercava i numeri, e restava solo la strada dell’assistente: l’abbonamento, e i nomi dei colleghi mandati fuori. Adesso quei PDF entrano contati dal browser, gratis e senza far uscire niente.',
+      'Il numero dell’ora, in quei documenti, si ricava mettendo in fila gli orari diversi che compaiono in cima: il primo è la prima ora, il secondo la seconda, e così via. Serve perché un giorno che comincia alle 9h00 mentre gli altri cominciano alle 8h00 va incolonnato con gli altri lo stesso, e non spostato di un’ora.',
+    ],
+  },
   {
     versione: '2026-09-09d',
     data: '9 settembre 2026',
@@ -116,23 +124,6 @@ export const NOVITA: VoceNovita[] = [
     voci: [
       'La lettura delle richieste dei docenti non manda più fuori i nomi. Prima il testo che incollavi partiva così com’era, cognomi compresi. Adesso ogni docente che è già in archivio diventa una sigla (D1, D2, D3…) prima che il testo esca dal computer, e il nome vero torna al suo posto qui sull’app, insieme alla frase da cui il vincolo è stato ricavato. Chi in archivio non c’è resta scritto com’era, perché è anche l’unico a cui l’app non saprebbe abbinare niente. Nell’uso non cambia nulla: leggi lo stesso elenco di prima, con gli stessi nomi.',
       'Attenzione, una cosa non è cambiata: il motivo personale della richiesta («ho il rientro all’altra scuola», «per motivi di salute») sta dentro la frase e non dentro il nome, quindi esce lo stesso. La spunta prima di partire lo dice, e il consiglio resta quello: incolla solo la parte utile.',
-    ],
-  },
-  {
-    versione: '2026-09-06d',
-    data: '6 settembre 2026',
-    voci: [
-      'La Guida è stata rimessa in pari con l’app. Le schede sono nove e non più sei: adesso ci sono anche «Assemblee», «Consigli di classe» e «Documenti». C’è un capitolo nuovo, «Scheda: Assemblee sindacali», che spiega come si registra un’assemblea, come l’app conta da sola le ore di chi aderisce, come si aggiungono infanzia, primaria e personale ATA, e come funzionano il tetto di ore dell’anno e il massimo di assemblee al mese.',
-      'Nel capitolo «La barra superiore» sono arrivati i due pulsanti che mancavano: «🔑 Abbonamento IA», dove si incolla e si toglie la chiave, e «🌙 Notte / ☀️ Chiara», che cambia i colori di tutta l’app e si ricorda la scelta.',
-      'Sono state corrette le parti che l’app aveva superato: i modelli di settimana sono quattro (A, B, C e D) e non più due, i tetti di ore al giorno arrivano a otto, le classi articolate valgono per qualsiasi materia e non solo per le tre lingue straniere, e la voce «Cosa NON fa l’app» non dice più che l’app non legge file esterni, visto che con l’abbonamento IA legge l’orario e gli elenchi docenti.',
-      'Il capitolo del Registro Cattedre spiega ora come si mettono due materie nella stessa classe, e quello di «Sezioni & Regole» descrive la scheda «📚 Materie della scuola», quella che rinomina o unisce una materia ovunque in un colpo solo.',
-    ],
-  },
-  {
-    versione: '2026-09-06c',
-    data: '6 settembre 2026',
-    voci: [
-      'Nel capitolo «Trasparenza e privacy» della Guida c’è una scheda nuova. Da oggi l’app tiene il conto di quante pagine vengono aperte, con Vercel Web Analytics: serve soltanto a capire se l’app viene usata e quanto. Non usa cookie, non costruisce un profilo di chi naviga, non manda niente ai servizi pubblicitari e non distingue una persona dall’altra. L’orario, i nomi dei docenti e il codice scuola non c’entrano e restano dove sono. Nell’uso quotidiano non cambia nulla.',
     ],
   },
 ];
