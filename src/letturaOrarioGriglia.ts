@@ -22,9 +22,10 @@
  * docente, fogli riempiti a modo proprio.
  *
  * Il testo che arriva qui è quello di `estraiTestoPdf`, che tiene le colonne
- * allineate a forza di spazi. Se le colonne non ci sono - un copia e incolla
- * da Excel, per dire, che separa con tabulazioni - questa lettura si ferma e
- * restituisce `null` senza fare danni.
+ * allineate a forza di spazi. Arriva però anche il copia e incolla da un
+ * foglio di calcolo, che le colonne le separa con tabulazioni e allineamento
+ * non ne ha: quello si allinea qui prima di leggerlo, che è meno lavoro che
+ * insegnare a contare in due modi diversi.
  */
 
 /** Una cella letta: dove sta e cosa c'è scritto. */
@@ -161,6 +162,48 @@ const colonneOrarie = (riga: string): ColonnaOraria[] | null => {
 };
 
 /**
+ * Rimette in colonna una tabella incollata da un foglio di calcolo.
+ *
+ * Excel, quando si copiano delle celle, separa le colonne con una tabulazione
+ * e basta: sullo schermo la tabella si vede, nel testo l'allineamento non
+ * esiste più. Qui ogni colonna prende la larghezza della sua cella più lunga e
+ * viene riscritta con gli spazi, come se fosse stampata su carta. Da lì in poi
+ * è un documento come gli altri.
+ *
+ * Il conto della larghezza si fa per posizione: la terza cella di ogni riga
+ * finisce nella terza colonna anche quando è vuota, e le caselle vuote restano
+ * vuote invece di far scivolare le altre di un posto.
+ */
+const allineaTabulazioni = (testo: string): string => {
+  if (!testo.includes('\t')) return testo;
+
+  const righe = testo.split('\n').map((riga) =>
+    riga
+      .replace(/\r$/, '')
+      .split('\t')
+      // Due spazi di fila dentro una cella aprirebbero un pezzo nuovo più
+      // avanti, quando la riga viene spezzata: qui ne resta uno solo.
+      .map((cella) => cella.trim().replace(/\s+/g, ' '))
+  );
+
+  const larghezze: number[] = [];
+  for (const riga of righe) {
+    riga.forEach((cella, i) => {
+      larghezze[i] = Math.max(larghezze[i] ?? 0, cella.length);
+    });
+  }
+
+  return righe
+    .map((riga) =>
+      riga
+        .map((cella, i) => cella.padEnd((larghezze[i] ?? 0) + 2, ' '))
+        .join('')
+        .trimEnd()
+    )
+    .join('\n');
+};
+
+/**
  * Legge l'orario da un testo con le colonne allineate.
  *
  * Torna `null` quando il documento non ha questa forma: allora tocca al
@@ -168,7 +211,7 @@ const colonneOrarie = (riga: string): ColonnaOraria[] | null => {
  * è magro, e sta a chi chiama decidere se basta.
  */
 export function leggiGrigliaOrario(testo: string): EsitoGriglia | null {
-  const righe = String(testo || '').split('\n');
+  const righe = allineaTabulazioni(String(testo || '')).split('\n');
 
   let indiceIntestazione = -1;
   let colonne: ColonnaOraria[] | null = null;
