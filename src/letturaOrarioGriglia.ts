@@ -22,10 +22,11 @@
  * docente, fogli riempiti a modo proprio.
  *
  * Il testo che arriva qui è quello di `estraiTestoPdf`, che tiene le colonne
- * allineate a forza di spazi. Arriva però anche il copia e incolla da un
- * foglio di calcolo, che le colonne le separa con tabulazioni e allineamento
- * non ne ha: quello si allinea qui prima di leggerlo, che è meno lavoro che
- * insegnare a contare in due modi diversi.
+ * allineate a forza di spazi. Arrivano però anche le tabulazioni: il copia e
+ * incolla da un foglio di calcolo e il file .xlsx letto da
+ * `letturaFoglioCalcolo`, che allineamento non ne hanno. Quelle si allineano
+ * qui prima di leggerle, che è meno lavoro che insegnare a contare in due modi
+ * diversi.
  */
 
 /** Una cella letta: dove sta e cosa c'è scritto. */
@@ -59,6 +60,28 @@ export interface EsitoGriglia {
 /** La forma di una classe: anno attaccato alla sezione. */
 const FORMA_CLASSE = /^\d{1,2}[A-Z]{1,3}$/;
 
+/**
+ * La classe scritta dentro una casella dell'orario.
+ *
+ * Di solito nella casella c'è la classe e basta, «3A». Quando però nell'ora
+ * ci sono due docenti, i programmi ci mettono dentro tutti e due i dati
+ * separati da una virgola: «Rossi,3A», cioè «in 3A insieme a Rossi». La
+ * casella va letta lo stesso, altrimenti sparisce l'ora intera, e con lei
+ * spariscono proprio le ore di sostegno e di compresenza.
+ *
+ * Il nome del collega qui non si prende: quell'ora sta scritta anche nella
+ * riga di chi è nominato, e da lì entra col suo nome per conto proprio. Chi
+ * legge la riga di Rossi trova «Bianchi,3A», e le due righe si ritrovano nella
+ * stessa casella senza che nessuno debba indovinare chi è il titolare.
+ */
+const classeDellaCella = (cella: string): string | null => {
+  for (const pezzo of cella.split(',')) {
+    const forse = pezzo.toUpperCase().replace(/\s+/g, '');
+    if (FORMA_CLASSE.test(forse)) return forse;
+  }
+  return null;
+};
+
 /** Spezza una riga di testo nei suoi pezzi, tenendosi la colonna di ognuno. */
 const pezziDellaRiga = (riga: string): Pezzo[] => {
   const pezzi: Pezzo[] = [];
@@ -71,8 +94,16 @@ const pezziDellaRiga = (riga: string): Pezzo[] => {
   return pezzi;
 };
 
-/** L'ora scritta come la legge un orologio: «8h00», «08:00», «8.00», «13h30». */
-const FORMA_OROLOGIO = /^([01]?\d|2[0-3])[h:.]([0-5]\d)$/i;
+/**
+ * L'ora scritta come la legge un orologio: «8h00», «08:00», «8.00», «13h30».
+ *
+ * Conta solo come comincia la casella, non come finisce: EDT nell'ultima
+ * colonna scrive «13h00» e sotto «14h00», dentro la stessa casella, e quella
+ * casella arriva qui come «13h00 14h00». Pretendere che l'orario finisca lì
+ * voleva dire perdere l'ultima ora di ogni giornata, che sono cinque colonne
+ * su trenta e le lezioni che ci stanno dentro.
+ */
+const FORMA_OROLOGIO = /^([01]?\d|2[0-3])[h:.]([0-5]\d)(?![\d.,:])/i;
 
 /** Quanti minuti dopo la mezzanotte, se il pezzo è un'ora da orologio. */
 const minutiOrologio = (testo: string): number | null => {
@@ -174,17 +205,66 @@ const colonneOrarie = (riga: string): ColonnaOraria[] | null => {
  * finisce nella terza colonna anche quando è vuota, e le caselle vuote restano
  * vuote invece di far scivolare le altre di un posto.
  */
+/**
+ * Rimette su una riga sola le caselle che ne occupano più d'una.
+ *
+ * Quando in una casella di Excel c'è un a capo, il copia e incolla la
+ * consegna fra virgolette e l'a capo se lo tiene. Una riga della tabella
+ * diventa così due o tre righe di testo, e le colonne non tornano più.
+ * Capita sempre con gli orari esportati da EDT, che scrive «13h00» e sotto
+ * «14h00» nella stessa casella dell'intestazione e un trattino sopra l'altro
+ * nelle ore libere: bastava quello per non fare leggere niente di tutto il
+ * documento, perché la riga delle ore arrivava qui spezzata in tre.
+ *
+ * Le virgolette contano solo a inizio casella, cioè dopo una tabulazione o a
+ * capo. Così un paio di virgolette in mezzo a un nome restano quello che sono.
+ */
+const spianaCelleVirgolettate = (testo: string): string => {
+  if (!testo.includes('"')) return testo;
+
+  let fuori = '';
+  let dentro = false;
+  let inizioCella = true;
+  for (let i = 0; i < testo.length; i++) {
+    const carattere = testo[i];
+    if (dentro) {
+      if (carattere === '"') {
+        if (testo[i + 1] === '"') {
+          fuori += '"';
+          i++;
+        } else {
+          dentro = false;
+          inizioCella = false;
+        }
+        continue;
+      }
+      fuori += carattere === '\n' || carattere === '\r' ? ' ' : carattere;
+      continue;
+    }
+    if (carattere === '"' && inizioCella) {
+      dentro = true;
+      continue;
+    }
+    fuori += carattere;
+    inizioCella =
+      carattere === '\t' || carattere === '\n' || carattere === '\r';
+  }
+  return fuori;
+};
+
 const allineaTabulazioni = (testo: string): string => {
   if (!testo.includes('\t')) return testo;
 
-  const righe = testo.split('\n').map((riga) =>
-    riga
-      .replace(/\r$/, '')
-      .split('\t')
-      // Due spazi di fila dentro una cella aprirebbero un pezzo nuovo più
-      // avanti, quando la riga viene spezzata: qui ne resta uno solo.
-      .map((cella) => cella.trim().replace(/\s+/g, ' '))
-  );
+  const righe = spianaCelleVirgolettate(testo)
+    .split('\n')
+    .map((riga) =>
+      riga
+        .replace(/\r$/, '')
+        .split('\t')
+        // Due spazi di fila dentro una cella aprirebbero un pezzo nuovo più
+        // avanti, quando la riga viene spezzata: qui ne resta uno solo.
+        .map((cella) => cella.trim().replace(/\s+/g, ' '))
+    );
 
   const larghezze: number[] = [];
   for (const riga of righe) {
@@ -268,8 +348,8 @@ export function leggiGrigliaOrario(testo: string): EsitoGriglia | null {
 
     for (const pezzo of pezzi) {
       if (pezzo.colonna < primaColonnaOraria - tolleranza) continue;
-      const classe = pezzo.testo.toUpperCase().replace(/\s+/g, '');
-      if (!FORMA_CLASSE.test(classe)) continue;
+      const classe = classeDellaCella(pezzo.testo);
+      if (!classe) continue;
 
       // La colonna oraria più vicina all'inizio della cella.
       let vicina: ColonnaOraria | null = null;

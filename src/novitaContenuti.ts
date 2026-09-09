@@ -28,7 +28,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-09f';
+export const NOVITA_VERSIONE = '2026-09-09g';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -40,6 +40,16 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-09g',
+    data: '9 settembre 2026',
+    voci: [
+      'Il file di Excel dell’orario adesso si carica com’è. Prima «📥 Importa orario» accettava solo PDF, TXT e CSV: chi l’orario ce l’aveva in un .xlsx si sentiva dire «formato non riconosciuto» e doveva passare per il copia e incolla. Ora si sceglie il file e basta. Si apre qui dentro, nel browser, senza mandare fuori niente e senza abbonamento, esattamente come il PDF.',
+      'Ed era proprio il copia e incolla a non bastare, con l’orario esportato da EDT. Quel foglio scrive «13h00» e sotto «14h00» dentro la stessa casella, e le ore libere come un trattino sopra l’altro: quando si copia una casella con un a capo dentro, il foglio di calcolo la consegna fra virgolette e l’a capo se lo tiene. Una riga della tabella arrivava spezzata in tre, le colonne non tornavano più e la lettura non trovava niente. Adesso quelle caselle vengono rimesse su una riga sola prima di leggere, quindi anche l’incolla funziona.',
+      'Due cose che si perdevano per strada nella stessa tabella. L’ultima ora del giorno, quando l’intestazione tiene due orari nella stessa casella («13h00 14h00»): erano cinque colonne su trenta, con dentro le loro lezioni. E le caselle dove ci sono due docenti nella stessa ora, che i programmi scrivono «Rossi,3A»: quelle sparivano intere, e con loro spariva l’orario di chi fa sostegno o compresenza tutta la settimana. Su un orario vero di undici classi si passa da 237 lezioni lette a 341, che sono tutte quelle che ci sono.',
+      'Anche le lezioni lunghe due ore, quelle che sul foglio sono una casella sola larga il doppio, adesso entrano su tutte e due le ore invece che solo sulla prima.',
+    ],
+  },
   {
     versione: '2026-09-09f',
     data: '9 settembre 2026',
@@ -116,14 +126,6 @@ export const NOVITA: VoceNovita[] = [
     data: '8 settembre 2026',
     voci: [
       'Nel «Registro Cattedre» la preferenza delle ore consecutive si può dare materia per materia. Prima la casella «2h» valeva per tutta la cattedra: chi insegna italiano in una classe e storia in un’altra doveva scegliere fra blocchi di due ore ovunque e blocchi da nessuna parte, mentre le due materie hanno esigenze opposte. Adesso, nel riquadro delle assegnazioni (pulsante ➕ a fine riga, poi la classe), ogni materia ha la sua casella «2h»: quella scritta lì batte la colonna, e con ↺ la materia torna a seguire il resto della cattedra. Chi non tocca niente non vede cambiare nulla. Suggerimento di un collega arrivato dal pulsante dei feedback.',
-    ],
-  },
-  {
-    versione: '2026-09-07',
-    data: '7 settembre 2026',
-    voci: [
-      'Le risposte dell’IA non parlano più per sigle. Quando chiedi aiuto sui conflitti, o premi «Perché non ci riesce?» nel report della generazione, il testo diceva «sposta l’ora di D3»: le sigle servono a non far uscire i nomi dal computer, ma erano rimaste anche nella risposta, e capire di chi si trattava era impossibile. Adesso i nomi tornano al loro posto prima che la risposta compaia sullo schermo. Fuori dal computer, come sempre, vanno solo le sigle.',
-      'Nel «Registro Cattedre» la colonna «2h» ha un pulsantino nell’intestazione: «spegni» toglie la preferenza delle ore consecutive a tutti i docenti di quella tabella in un colpo solo, «accendi» la mette a tutti. Prima si poteva solo docente per docente, e siccome nei dati di partenza la spunta è accesa per tutti, chi quelle ore appaiate non le voleva doveva togliere una spunta per riga. Il pulsante vale solo per la tabella che ha sotto: Materie, Sostegno e Strumento restano indipendenti.',
     ],
   },
 ];

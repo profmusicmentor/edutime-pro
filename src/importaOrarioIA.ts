@@ -4,7 +4,7 @@
  * È il muro del primo giorno: l'orario dell'anno scorso esiste, ma sta in un
  * PDF o in un foglio, e ribatterlo cella per cella dentro l'app vuol dire una
  * serata buttata prima ancora di aver capito se il programma serve. Qui il
- * documento si carica (PDF, TXT, CSV) oppure si incolla direttamente: da
+ * documento si carica (PDF, XLSX, TXT, CSV) oppure si incolla direttamente: da
  * Excel basta selezionare le celle e copiare, la tabella arriva come testo.
  *
  * Il testo va a un modello linguistico, che lo rimette in righe. A differenza

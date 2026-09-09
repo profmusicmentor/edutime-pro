@@ -180,8 +180,31 @@ export async function testoDelFile(file: File): Promise<string> {
     }
     return testo;
   }
+  /*
+   * Il file di Excel. Si apre qui dentro come il PDF, senza mandare niente
+   * fuori, e il lettore si carica solo adesso: chi non importa mai un foglio
+   * non se lo deve scaricare. Le colonne del foglio diventano colonne di
+   * testo separate da una tabulazione, cioè la stessa forma del copia e
+   * incolla, che il resto dell'app sa già leggere.
+   */
+  if (nome.endsWith('.xlsx')) {
+    const { testoDaFoglio } = await import('./letturaFoglioCalcolo');
+    return testoDaFoglio(file);
+  }
+  /*
+   * Il vecchio .xls di Excel 2003 non è un foglio compresso ma un file
+   * binario di un altro secolo: aprirlo qui non si può, e conviene dirlo
+   * chiaro insieme alla via d'uscita, che è un salvataggio e basta.
+   */
+  if (nome.endsWith('.xls')) {
+    throw new Error(
+      'Questo è un vecchio file .xls. Aprilo in Excel e salvalo con «Salva con nome» scegliendo «Cartella di lavoro di Excel (.xlsx)», poi ricaricalo qui.'
+    );
+  }
   if (/\.(txt|csv|tsv)$/.test(nome)) return leggiTesto(file);
-  throw new Error('Formato non riconosciuto: serve un PDF, un TXT o un CSV.');
+  throw new Error(
+    'Formato non riconosciuto: serve un PDF, un file Excel .xlsx, un TXT o un CSV.'
+  );
 }
 
 /* ------------------------------------------------- interprete locale */

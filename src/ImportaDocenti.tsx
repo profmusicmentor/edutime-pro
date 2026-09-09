@@ -263,7 +263,7 @@ export default function ImportaDocenti({
                 {inCorso === 'file' ? 'Apro il file…' : 'Scegli un PDF…'}
                 <input
                   type="file"
-                  accept=".pdf,.txt,.csv,.tsv"
+                  accept=".pdf,.xlsx,.txt,.csv,.tsv"
                   className="hidden"
                   onChange={(e) => scegliFile(e.target.files?.[0])}
                 />

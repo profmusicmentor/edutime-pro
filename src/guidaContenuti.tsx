@@ -2059,9 +2059,11 @@ export const chapters: Chapter[] = [
           <>
             Nell'<B>Orario Generale</B>, il pulsante <B>«📥 Importa orario»</B>{' '}
             legge l'orario dell'anno scorso invece di farlo ribattere cella per
-            cella. Si carica un PDF, un TXT o un CSV, oppure si apre il file in
-            Excel, si selezionano le celle, si copiano e si incollano nella
-            finestra. Prima di importare vedi quante lezioni sono pronte e quali
+            cella. Si carica un PDF, un foglio di Excel (.xlsx), un TXT o un
+            CSV, oppure si aprono le celle in Excel, si copiano e si incollano
+            nella finestra. Il file di Excel è la strada più sicura delle due:
+            l'esporto di EDT tiene dentro le caselle degli a capo che il copia e
+            incolla porta con sé, e che scompaginano le colonne. Prima di importare vedi quante lezioni sono pronte e quali
             righe sono state scartate. Se nel documento ci sono classi o docenti
             che nell'app non esistono, compare la spunta{' '}
             <B>«Crea quello che manca»</B>: con quella accesa nascono insieme

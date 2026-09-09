@@ -4,8 +4,8 @@
  * Serve il primo giorno, ed è la ragione per cui tanti si fermano prima di
  * cominciare: l'orario dell'anno scorso c'è, ma è in un PDF, e ribatterlo
  * cella per cella prima ancora di sapere se il programma serve non lo fa
- * nessuno. Qui si carica il documento (PDF, TXT, CSV) oppure si incolla la
- * tabella copiata da Excel, e un modello linguistico la rimette in righe.
+ * nessuno. Qui si carica il documento (PDF, XLSX, TXT, CSV) oppure si incolla
+ * la tabella copiata da Excel, e un modello linguistico la rimette in righe.
  *
  * A differenza dell'aiuto sui conflitti, qui i nomi dei docenti escono
  * davvero: sono il dato da estrarre. Per questo la spunta è scritta chiara e
@@ -339,9 +339,10 @@ export default function ImportaOrario({
               📥 Importa l&apos;orario che hai già
             </h3>
             <p className="text-xs text-slate-500 mt-1 max-w-xl">
-              Carica il PDF dell&apos;orario, oppure aprilo in Excel, seleziona
-              le celle, copia e incolla qui sotto. L&apos;orario dell&apos;app
-              non cambia finché non premi «Importa».
+              Carica il file dell&apos;orario, che sia il PDF o il foglio di
+              Excel (.xlsx), oppure copia le celle e incollale qui sotto.
+              L&apos;orario dell&apos;app non cambia finché non premi
+              «Importa».
             </p>
           </div>
           <button
@@ -380,7 +381,7 @@ export default function ImportaOrario({
               {inCorso === 'file' ? 'Apro il file…' : 'Scegli un file'}
               <input
                 type="file"
-                accept=".pdf,.txt,.csv"
+                accept=".pdf,.xlsx,.txt,.csv"
                 className="hidden"
                 onChange={(e) => scegliFile(e.target.files?.[0])}
               />
