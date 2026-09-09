@@ -2061,12 +2061,18 @@ export const chapters: Chapter[] = [
             legge l'orario dell'anno scorso invece di farlo ribattere cella per
             cella. Si carica un PDF, un TXT o un CSV, oppure si apre il file in
             Excel, si selezionano le celle, si copiano e si incollano nella
-            finestra. Prima di importare vedi quante lezioni sono pronte, quali
-            righe sono state scartate e quali docenti non risultano ancora nel
-            Registro Cattedre: quelli vanno creati prima, altrimenti le loro ore
-            non si importano. Attenzione: le caselle importate sostituiscono
-            quello che c'era. Qui i nomi escono davvero dal computer, quindi
-            serve la spunta.
+            finestra. Prima di importare vedi quante lezioni sono pronte e quali
+            righe sono state scartate. Se nel documento ci sono classi o docenti
+            che nell'app non esistono, compare la spunta{' '}
+            <B>«Crea quello che manca»</B>: con quella accesa nascono insieme
+            all'orario, e i docenti nuovi arrivano già con la cattedra contata
+            dalle ore importate e con la materia più ricorrente nel documento.
+            Puoi anche toglierla, e allora si importano solo le righe con classe
+            e docente già presenti. Due cose non si creano mai: un cognome che in
+            archivio corrisponde già a due persone, e una sigla che non ha la
+            forma di una classe (anno più sezione, tipo 1A). Attenzione: le
+            caselle importate sostituiscono quello che c'era. Qui i nomi escono
+            davvero dal computer, quindi serve la spunta del consenso.
           </>
         ),
       },

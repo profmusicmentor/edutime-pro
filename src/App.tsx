@@ -8310,15 +8310,95 @@ export default function App() {
   /* ------------------------------- l'orario letto da un documento */
 
   /**
-   * Mette nell'orario le lezioni lette dal documento.
+   * Mette nell'orario le lezioni lette dal documento, e con loro le classi e i
+   * docenti che nell'app non c'erano ancora.
    *
    * Le caselle importate sostituiscono quello che c'era: se la 1A aveva già
    * qualcosa il lunedì alla prima ora, quella lezione se ne va. È scritto
    * nella finestra prima di premere, perché è il tipo di cosa che non si vuole
    * scoprire dopo.
+   *
+   * Tre scritture in un colpo solo, e devono restare insieme: le sezioni, il
+   * registro dei docenti e l'orario. Se andassero separate, l'orario finirebbe
+   * a puntare a un docente o a una classe che ancora non esistono.
+   *
+   * I docenti nati qui non arrivano vuoti come quelli dei consigli di classe:
+   * dall'orario appena letto si ricava anche la loro cattedra, contando le ore
+   * per classe, e la materia più ricorrente fra quelle scritte nel documento.
+   * È il motivo per cui questa strada esiste: chi carica l'orario completo
+   * dell'istituto si aspetta di trovarsi l'istituto dentro l'app, non una
+   * griglia piena di caselle orfane.
    */
-  const applicaOrarioImportato = (righe: RigaOrarioLetta[]) => {
+  const applicaOrarioImportato = (
+    righe: RigaOrarioLetta[],
+    nuoviDocenti: { id: string; name: string }[] = [],
+    nuoveClassi: string[] = []
+  ) => {
     if (readOnlyMode || !righe.length) return;
+
+    /* --- le sezioni che mancano, ricavate dalle classi da creare --- */
+
+    const nuovaConfig: any = { ...sectionsConfig };
+    nuoveClassi.forEach((classe) => {
+      const pezzi = /^(\d{1,2})([A-Z]{1,3})$/.exec(classe);
+      if (!pezzi) return;
+      const anno = Number(pezzi[1]);
+      const sezione = pezzi[2];
+      const gia = nuovaConfig[sezione];
+      if (!gia) {
+        nuovaConfig[sezione] = { model: 'modelloA', years: [anno] };
+        return;
+      }
+      // Una sezione scritta come stringa è nel formato vecchio: si lascia
+      // stare, lì gli anni sono impliciti e sono già tutti.
+      if (typeof gia === 'string') return;
+      if (!(gia.years || []).includes(anno)) {
+        nuovaConfig[sezione] = {
+          ...gia,
+          years: [...(gia.years || []), anno].sort((a, b) => a - b),
+        };
+      }
+    });
+
+    /* --- i docenti che mancano, con la cattedra contata dalle righe --- */
+
+    const oreDi = new Map<string, Map<string, number>>();
+    const materieDi = new Map<string, Map<string, number>>();
+    righe.forEach((r) => {
+      if (!r.teacherId) return;
+      const perClasse = oreDi.get(r.teacherId) || new Map<string, number>();
+      perClasse.set(r.classId, (perClasse.get(r.classId) || 0) + 1);
+      oreDi.set(r.teacherId, perClasse);
+
+      const materia = (r.subject || '').trim().toUpperCase();
+      if (!materia) return;
+      const perMateria = materieDi.get(r.teacherId) || new Map<string, number>();
+      perMateria.set(materia, (perMateria.get(materia) || 0) + 1);
+      materieDi.set(r.teacherId, perMateria);
+    });
+
+    /** La materia scritta più volte per quel docente nel documento. */
+    const materiaPrevalente = (id: string): string => {
+      const conteggio = materieDi.get(id);
+      if (!conteggio || !conteggio.size) return MATERIA_DA_COMPLETARE;
+      return Array.from(conteggio.entries()).sort((a, b) => b[1] - a[1])[0][0];
+    };
+
+    const aggiunti = nuoviDocenti.map((d) => ({
+      id: d.id,
+      name: d.name.toUpperCase(),
+      subject: materiaPrevalente(d.id),
+      color: '#195275',
+      preferConsecutive: true,
+      assignments: Array.from(oreDi.get(d.id) || new Map()).map(
+        ([classId, hours]) => ({ classId, hours })
+      ),
+    }));
+    const teachersAggiornati = aggiunti.length
+      ? [...teachers, ...aggiunti]
+      : teachers;
+
+    /* --- l'orario --- */
 
     const occupate = new Set(
       righe.map((r) => `${r.classId}_${r.day}_${r.hour}`)
@@ -8337,17 +8417,20 @@ export default function App() {
       room: getRoomForSubject(
         r.subject,
         rooms,
-        getSedeForClass(r.classId, classes, sectionsConfig)
+        getSedeForClass(r.classId, classes, nuovaConfig)
       ),
     }));
 
     const nuovo = [...restanti, ...importate];
+
+    if (nuoveClassi.length) setSectionsConfig(nuovaConfig);
+    if (aggiunti.length) setTeachers(teachersAggiornati);
     setTimetable(nuovo);
     pushDataToCloud(
       nuovo,
-      teachers,
+      teachersAggiornati,
       sostegno,
-      sectionsConfig,
+      nuovaConfig,
       strumento,
       diurnalHours,
       afternoonHours,

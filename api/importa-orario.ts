@@ -29,6 +29,11 @@
  * Niente di tutto questo viene conservato: si legge, si gira al modello, si
  * risponde. Nessun archivio, nessun registro.
  *
+ * Le classi e i docenti in archivio possono anche non esserci: chi arriva con
+ * l'orario completo dell'istituto e l'app ancora vuota è il caso normale, non
+ * l'eccezione. Quando l'elenco è vuoto il modello legge classi e nomi come
+ * stanno scritti nel documento, e sarà il browser a proporne la creazione.
+ *
  * Variabili d'ambiente (oltre a quelle dei motori, vedi `_motori.ts`):
  *   FUNZIONI_IA_RICHIEDONO_LICENZA  '1' per pretendere la chiave
  *   ORARIO_LIMITE_GIORNO     letture al giorno per persona (predefinito: 10)
@@ -74,11 +79,13 @@ const ISTRUZIONI = [
   '- «ora» è un numero che parte da 0: 0 è la prima ora di lezione della',
   '  giornata. Se il documento numera le ore da 1, togli 1.',
   '- «classe» va scritta come nell\'elenco «Classi» che ricevi: stessa forma,',
-  '  stesse maiuscole. Se una classe del documento non è in quell\'elenco,',
-  '  salta le sue righe.',
+  '  stesse maiuscole. Una classe del documento che in quell\'elenco non c\'è',
+  '  la riporti lo stesso, scritta come anno seguito dalla sezione, senza',
+  '  spazi e in maiuscolo: «1A», «2B», «3C». Vale anche quando l\'elenco è',
+  '  vuoto, cioè quando nell\'app le classi non sono ancora state create.',
   '- «docente» va scritto come nell\'elenco «Docenti già in archivio», quando',
   '  la persona è riconoscibile lì dentro: stessa forma del nome. Se non c\'è,',
-  '  scrivi il nome come appare nel documento.',
+  '  o se quell\'elenco è vuoto, scrivi il nome come appare nel documento.',
   '- Se una cella non ha docente (ora buca, mensa, intervallo) salta la riga.',
   '- Non inventare lezioni per riempire la griglia: riporta solo quello che',
   '  nel documento c\'è scritto davvero.',
@@ -186,16 +193,15 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ errore: 'Il documento sembra vuoto.' }, 400);
   }
 
+  /**
+   * L'elenco può essere vuoto: è il caso di chi apre l'app e carica subito
+   * l'orario dell'istituto, senza aver creato niente. Il modello legge allora
+   * le classi dal documento e il browser propone di crearle.
+   */
   const classi = (Array.isArray(body.classi) ? body.classi : [])
     .map((c) => pulisci(c, 12))
     .filter(Boolean)
     .slice(0, MAX_CLASSI);
-  if (!classi.length) {
-    return json(
-      { errore: "Prima di leggere l'orario servono le classi dell'istituto." },
-      400
-    );
-  }
 
   const nomiNoti = (Array.isArray(body.nomiNoti) ? body.nomiNoti : [])
     .map((n) => pulisci(n, 60))
@@ -253,7 +259,9 @@ export default async function handler(request: Request): Promise<Response> {
     }`,
     `Ore di lezione al giorno: ${ore}`,
     '',
-    `Classi dell'istituto: ${classi.join(', ')}`,
+    classi.length
+      ? `Classi dell'istituto: ${classi.join(', ')}`
+      : "(nell'app non ci sono ancora classi: prendi le classi dal documento)",
     '',
     nomiNoti.length
       ? `Docenti già in archivio: ${nomiNoti.join(', ')}`

@@ -25,7 +25,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-08c';
+export const NOVITA_VERSIONE = '2026-09-09';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -37,6 +37,15 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-09',
+    data: '9 settembre 2026',
+    voci: [
+      '«📥 Importa orario» adesso crea anche le classi e i docenti che nell’app non ci sono. Prima leggeva il PDF o il foglio dell’anno scorso, ma teneva solo le righe in cui il docente era già in archivio: chi arrivava con l’orario completo dell’istituto e l’app ancora vuota si vedeva scartare tutto, e per usare la funzione doveva prima ribattere a mano settanta nomi e tutte le sezioni. Era il contrario di quello che serviva. Adesso, dopo la lettura, compare la spunta «Crea quello che manca» con il conto di quante classi e quanti docenti nascerebbero: con la spunta entrano insieme all’orario, senza la spunta si importano solo le righe che stanno in piedi da sole, come prima.',
+      'I docenti creati così non arrivano vuoti: la cattedra viene contata dalle ore che hai importato, classe per classe, e la materia è quella scritta più volte accanto al loro nome nel documento. Restano da controllare, ma il registro non è più da riempire da zero.',
+      'Due cose l’app non le inventa mai. Un cognome che in archivio corrisponde già a due persone non viene abbinato e non viene creato, perché un terzo omonimo è peggio di una riga da sistemare a mano; e una sigla che non ha la forma di una classe (anno più sezione, tipo 1A) resta scartata, perché quasi sempre è l’intestazione di una colonna letta storta.',
+    ],
+  },
   {
     versione: '2026-09-08c',
     data: '8 settembre 2026',
@@ -73,16 +82,6 @@ export const NOVITA: VoceNovita[] = [
     voci: [
       'La lettura delle richieste dei docenti non manda più fuori i nomi. Prima il testo che incollavi partiva così com’era, cognomi compresi. Adesso ogni docente che è già in archivio diventa una sigla (D1, D2, D3…) prima che il testo esca dal computer, e il nome vero torna al suo posto qui sull’app, insieme alla frase da cui il vincolo è stato ricavato. Chi in archivio non c’è resta scritto com’era, perché è anche l’unico a cui l’app non saprebbe abbinare niente. Nell’uso non cambia nulla: leggi lo stesso elenco di prima, con gli stessi nomi.',
       'Attenzione, una cosa non è cambiata: il motivo personale della richiesta («ho il rientro all’altra scuola», «per motivi di salute») sta dentro la frase e non dentro il nome, quindi esce lo stesso. La spunta prima di partire lo dice, e il consiglio resta quello: incolla solo la parte utile.',
-    ],
-  },
-  {
-    versione: '2026-09-06d',
-    data: '6 settembre 2026',
-    voci: [
-      'La Guida è stata rimessa in pari con l’app. Le schede sono nove e non più sei: adesso ci sono anche «Assemblee», «Consigli di classe» e «Documenti». C’è un capitolo nuovo, «Scheda: Assemblee sindacali», che spiega come si registra un’assemblea, come l’app conta da sola le ore di chi aderisce, come si aggiungono infanzia, primaria e personale ATA, e come funzionano il tetto di ore dell’anno e il massimo di assemblee al mese.',
-      'Nel capitolo «La barra superiore» sono arrivati i due pulsanti che mancavano: «🔑 Abbonamento IA», dove si incolla e si toglie la chiave, e «🌙 Notte / ☀️ Chiara», che cambia i colori di tutta l’app e si ricorda la scelta.',
-      'Sono state corrette le parti che l’app aveva superato: i modelli di settimana sono quattro (A, B, C e D) e non più due, i tetti di ore al giorno arrivano a otto, le classi articolate valgono per qualsiasi materia e non solo per le tre lingue straniere, e la voce «Cosa NON fa l’app» non dice più che l’app non legge file esterni, visto che con l’abbonamento IA legge l’orario e gli elenchi docenti.',
-      'Il capitolo del Registro Cattedre spiega ora come si mettono due materie nella stessa classe, e quello di «Sezioni & Regole» descrive la scheda «📚 Materie della scuola», quella che rinomina o unisce una materia ovunque in un colpo solo.',
     ],
   },
 ];

@@ -11,11 +11,18 @@
  * davvero: sono il dato da estrarre. Per questo la spunta è scritta chiara e
  * il pulsante resta spento finché non la si mette.
  *
- * Si importano solo le righe in cui il docente è stato riconosciuto fra
- * quelli già in archivio. Le altre restano elencate qui, con il nome come
- * l'ha letto: chi le vuole crea prima quei docenti nella scheda Docenti e
- * rifà la lettura. È voluto: creare da soli settanta persone lette da un PDF
- * storto è il modo migliore per riempire l'archivio di doppioni.
+ * Il caso normale è l'app vuota: si arriva con l'orario completo dell'anno
+ * scorso e dentro EduTime Pro non c'è ancora niente. Perciò la finestra sa
+ * anche creare quello che manca, docenti e classi, con la seconda spunta
+ * «Crea quello che manca». Senza quella spunta si importano soltanto le righe
+ * che stanno in piedi da sole, cioè classe e docente già presenti: chi vuole
+ * tenere pulito l'archivio non si trova settanta nomi nuovi senza averlo
+ * chiesto, e chi parte da zero non deve ribatterli a mano.
+ *
+ * Due cose non si creano mai da sole. I nomi ambigui, cioè quei cognomi che
+ * in archivio corrispondono già a due persone: creare un terzo omonimo è
+ * peggio di una riga da sistemare a mano. E le sigle che non hanno la forma
+ * di una classe, che quasi sempre sono intestazioni di colonna lette storte.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -37,7 +44,11 @@ interface Props {
   /** Quante ore ha la giornata più lunga della griglia. */
   ore: number;
   onChiudi: () => void;
-  onApplica: (righe: RigaOrarioLetta[]) => void;
+  onApplica: (
+    righe: RigaOrarioLetta[],
+    nuoviDocenti: { id: string; name: string }[],
+    nuoveClassi: string[]
+  ) => void;
 }
 
 export default function ImportaOrario({
@@ -52,6 +63,7 @@ export default function ImportaOrario({
   const [testo, setTesto] = useState('');
   const [nomeFile, setNomeFile] = useState('');
   const [consenso, setConsenso] = useState(false);
+  const [creaMancanti, setCreaMancanti] = useState(true);
   const [inCorso, setInCorso] = useState('');
   const [errore, setErrore] = useState('');
   const [esito, setEsito] = useState<EsitoLetturaOrario | null>(null);
@@ -66,12 +78,44 @@ export default function ImportaOrario({
     };
   }, []);
 
-  const importabili = useMemo(
-    () => (esito?.righe || []).filter((r) => r.teacherId),
+  /**
+   * I docenti che il documento nomina e in archivio non ci sono, una volta
+   * sola per nome anche se compaiono in venti righe. Gli ambigui restano
+   * fuori: quelli si sistemano a mano.
+   */
+  const docentiDaCreare = useMemo(() => {
+    const nomi = new Map<string, string>();
+    (esito?.righe || []).forEach((r) => {
+      if (r.teacherId || r.ambiguo || !r.nomeLetto) return;
+      const chiave = r.nomeLetto.toUpperCase();
+      if (!nomi.has(chiave)) nomi.set(chiave, r.nomeLetto);
+    });
+    return Array.from(nomi.values());
+  }, [esito]);
+
+  const classiDaCreare = useMemo(
+    () => esito?.classiSconosciute || [],
     [esito]
   );
-  const senzaDocente = useMemo(
-    () => (esito?.righe || []).filter((r) => !r.teacherId),
+
+  const mancaQualcosa = docentiDaCreare.length > 0 || classiDaCreare.length > 0;
+
+  /**
+   * Cosa entra davvero nell'orario. Senza la spunta valgono solo le righe
+   * complete: una lezione in una classe che non esiste non si può mettere da
+   * nessuna parte, e una senza docente lascerebbe una casella orfana.
+   */
+  const importabili = useMemo(() => {
+    const righe = esito?.righe || [];
+    if (creaMancanti) {
+      return righe.filter((r) => r.teacherId || (r.nomeLetto && !r.ambiguo));
+    }
+    return righe.filter((r) => r.teacherId && !r.classeNuova);
+  }, [esito, creaMancanti]);
+
+  /** Le righe che restano fuori comunque, spunta o no. */
+  const scartateDalNome = useMemo(
+    () => (esito?.righe || []).filter((r) => !r.teacherId && (r.ambiguo || !r.nomeLetto)),
     [esito]
   );
 
@@ -114,6 +158,36 @@ export default function ImportaOrario({
     } finally {
       setInCorso('');
     }
+  };
+
+  /**
+   * I docenti nuovi nascono qui, un id per nome: la stessa persona compare in
+   * decine di righe e deve restare una persona sola. Le righe che la nominano
+   * si portano dietro quell'id, altrimenti l'orario punterebbe a un docente
+   * che non esiste.
+   */
+  const applica = () => {
+    if (!importabili.length) return;
+
+    const adesso = Date.now();
+    const nuovi = new Map<string, { id: string; name: string }>();
+
+    const righe = importabili.map((r) => {
+      if (r.teacherId) return r;
+      const chiave = r.nomeLetto.toUpperCase();
+      let voce = nuovi.get(chiave);
+      if (!voce) {
+        voce = { id: `staff_${adesso}_${nuovi.size}`, name: r.nomeLetto };
+        nuovi.set(chiave, voce);
+      }
+      return { ...r, teacherId: voce.id };
+    });
+
+    const classiNuove = Array.from(
+      new Set(righe.filter((r) => r.classeNuova).map((r) => r.classId))
+    );
+
+    onApplica(righe, Array.from(nuovi.values()), classiNuove);
   };
 
   return (
@@ -219,22 +293,86 @@ export default function ImportaOrario({
                 <p className="text-xs text-slate-600">{esito.nota}</p>
               )}
 
-              {senzaDocente.length > 0 && (
+              {mancaQualcosa && (
+                <div className="border border-brand-200 bg-brand-50 rounded-lg p-3 space-y-2">
+                  <label className="flex items-start gap-2 text-xs text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={creaMancanti}
+                      onChange={(e) => setCreaMancanti(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <b>Crea quello che manca.</b> Nel documento ci sono{' '}
+                      {classiDaCreare.length > 0 && (
+                        <>
+                          {classiDaCreare.length}{' '}
+                          {classiDaCreare.length === 1
+                            ? 'classe'
+                            : 'classi'}
+                        </>
+                      )}
+                      {classiDaCreare.length > 0 &&
+                        docentiDaCreare.length > 0 &&
+                        ' e '}
+                      {docentiDaCreare.length > 0 && (
+                        <>
+                          {docentiDaCreare.length}{' '}
+                          {docentiDaCreare.length === 1
+                            ? 'docente'
+                            : 'docenti'}
+                        </>
+                      )}{' '}
+                      che nell&apos;app non ci sono. Con la spunta li creo
+                      insieme all&apos;orario: i docenti nascono con la materia
+                      «DA COMPLETARE» e con la cattedra contata dalle ore che
+                      hai importato.
+                    </span>
+                  </label>
+
+                  {classiDaCreare.length > 0 && (
+                    <details className="text-xs text-slate-600">
+                      <summary className="cursor-pointer font-semibold">
+                        Classi da creare: {classiDaCreare.length}
+                      </summary>
+                      <p className="mt-2">{classiDaCreare.join(', ')}</p>
+                    </details>
+                  )}
+
+                  {docentiDaCreare.length > 0 && (
+                    <details className="text-xs text-slate-600">
+                      <summary className="cursor-pointer font-semibold">
+                        Docenti da creare: {docentiDaCreare.length}
+                      </summary>
+                      <ul className="mt-2 space-y-1">
+                        {docentiDaCreare.map((n, i) => (
+                          <li key={`nd-${i}`}>- {n}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              )}
+
+              {scartateDalNome.length > 0 && (
                 <details className="text-xs text-slate-600">
                   <summary className="cursor-pointer font-semibold">
-                    {senzaDocente.length}{' '}
-                    {senzaDocente.length === 1
-                      ? 'riga senza un docente riconosciuto: non si importa'
-                      : 'righe senza un docente riconosciuto: non si importano'}
+                    {scartateDalNome.length}{' '}
+                    {scartateDalNome.length === 1
+                      ? 'riga che non si importa comunque'
+                      : 'righe che non si importano comunque'}
                   </summary>
                   <p className="mt-2">
-                    Questi nomi non risultano nella scheda Docenti. Creali lì e
-                    rifai la lettura, oppure inserisci queste ore a mano.
+                    Un cognome che in archivio corrisponde già a due persone
+                    non lo abbino e non lo creo: sceglierei io al posto tuo.
+                    Queste ore vanno messe a mano.
                   </p>
                   <ul className="mt-2 space-y-1">
-                    {esito.nomiSconosciuti.map((n, i) => (
-                      <li key={`ns-${i}`}>- {n}</li>
-                    ))}
+                    {esito.nomiSconosciuti
+                      .filter((n) => n.includes('più di uno'))
+                      .map((n, i) => (
+                        <li key={`ns-${i}`}>- {n}</li>
+                      ))}
                   </ul>
                 </details>
               )}
@@ -260,7 +398,7 @@ export default function ImportaOrario({
               </div>
 
               <button
-                onClick={() => onApplica(importabili)}
+                onClick={applica}
                 disabled={importabili.length === 0}
                 className="bg-salvia-600 hover:bg-salvia-700 disabled:opacity-40 text-white font-bold text-xs py-2 px-4 rounded-lg shadow-sm cursor-pointer disabled:cursor-not-allowed"
               >

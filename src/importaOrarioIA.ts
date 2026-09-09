@@ -13,10 +13,18 @@
  * pannello lo dice a chiare lettere.
  *
  * Quello che torna indietro non è ancora un orario: è una proposta. Ogni riga
- * viene ricontrollata qui (la classe deve esistere, giorno e ora devono stare
- * dentro la griglia, il docente si cerca fra quelli già in archivio) e finisce
- * in un'anteprima con il conto di quante righe si possono importare e quante
- * no. L'orario dell'app cambia solo quando la persona preme «Importa».
+ * viene ricontrollata qui (giorno e ora devono stare dentro la griglia, la
+ * classe deve avere la forma anno + sezione, il docente si cerca fra quelli
+ * già in archivio) e finisce in un'anteprima con il conto di quante righe si
+ * possono importare e quante no. L'orario dell'app cambia solo quando la
+ * persona preme «Importa».
+ *
+ * Classi e docenti che nell'app non ci sono NON fanno buttare la riga: si
+ * segnano come da creare. Chi arriva con l'orario completo dell'istituto e
+ * l'app vuota è il caso normale, e pretendere che ribatta prima settanta nomi
+ * a mano era il modo migliore per farlo smettere al primo tentativo. La
+ * decisione resta sua: nella finestra c'è una spunta, e finché non la mette
+ * si importano solo le righe che stanno in piedi da sole.
  */
 
 import { chiediAlServer, funzioneIaDisponibile } from './iaComune';
@@ -33,6 +41,13 @@ export interface RigaOrarioLetta {
   teacherId: string | null;
   /** Il nome come è arrivato dal documento, sempre. */
   nomeLetto: string;
+  /** La classe della riga nell'app non c'è ancora: va creata. */
+  classeNuova: boolean;
+  /**
+   * Il cognome corrisponde a più di una persona in archivio. Non si abbina e
+   * non si crea: creare un terzo omonimo è peggio di una riga da fare a mano.
+   */
+  ambiguo: boolean;
 }
 
 export interface RigaScartata {
@@ -45,8 +60,27 @@ export interface EsitoLetturaOrario {
   scartate: RigaScartata[];
   /** Nomi trovati nel documento che in archivio non ci sono. */
   nomiSconosciuti: string[];
+  /** Classi lette nel documento che nell'app non esistono ancora. */
+  classiSconosciute: string[];
   nota: string;
 }
+
+/**
+ * La classe come la scrive l'app: anno attaccato alla sezione, in maiuscolo.
+ *
+ * Serve per decidere se una classe letta nel documento si può creare davvero.
+ * «1 A», «1a» e «1A» sono la stessa cosa; «PRIMA A» o «CLASSE» non sono una
+ * classe e la riga si butta, perché quasi sempre è l'intestazione di una
+ * colonna letta storta.
+ */
+const FORMA_CLASSE = /^(\d{1,2})([A-Z]{1,3})$/;
+
+export const normalizzaClasse = (grezza: string): string | null => {
+  const pulita = String(grezza || '')
+    .toUpperCase()
+    .replace(/[^0-9A-Z]/g, '');
+  return FORMA_CLASSE.test(pulita) ? pulita : null;
+};
 
 export const letturaOrarioDisponibile = (): Promise<boolean> =>
   funzioneIaDisponibile(INDIRIZZO);
@@ -137,6 +171,7 @@ export async function leggiOrarioDaTesto(
   const righe: RigaOrarioLetta[] = [];
   const scartate: RigaScartata[] = [];
   const nomiSconosciuti = new Set<string>();
+  const classiSconosciute = new Set<string>();
   /** Una classe non può avere due lezioni nella stessa casella. */
   const occupate = new Set<string>();
 
@@ -145,15 +180,20 @@ export async function leggiOrarioDaTesto(
       r?.materia ?? ''
     } ${r?.docente ?? ''}`.trim();
 
-    const classe = classi.get(
-      String(r?.classe || '')
-        .toUpperCase()
-        .replace(/\s+/g, '')
-    );
+    const scritta = String(r?.classe || '')
+      .toUpperCase()
+      .replace(/\s+/g, '');
+    const gia = classi.get(scritta);
+    const nuova = gia ? null : normalizzaClasse(scritta);
+    const classe = gia || nuova;
     if (!classe) {
-      scartate.push({ riga: grezza, motivo: 'classe non presente nell’app' });
+      scartate.push({
+        riga: grezza,
+        motivo: 'non sembra una classe (serve anno e sezione, tipo 1A)',
+      });
       return;
     }
+    if (!gia) classiSconosciute.add(classe);
 
     const day = Number(r?.giorno);
     const hour = Number(r?.ora);
@@ -189,6 +229,8 @@ export async function leggiOrarioDaTesto(
       subject: String(r?.materia || '').slice(0, 40),
       teacherId: id,
       nomeLetto,
+      classeNuova: !gia,
+      ambiguo,
     });
   });
 
@@ -196,6 +238,7 @@ export async function leggiOrarioDaTesto(
     righe,
     scartate,
     nomiSconosciuti: Array.from(nomiSconosciuti).slice(0, 60),
+    classiSconosciute: Array.from(classiSconosciute).sort(),
     nota: String(dati.nota || ''),
   };
 }
