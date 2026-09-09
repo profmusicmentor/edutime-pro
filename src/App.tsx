@@ -8388,7 +8388,11 @@ export default function App() {
    */
   const applicaOrarioImportato = (
     righe: RigaOrarioLetta[],
-    nuoviDocenti: { id: string; name: string }[] = [],
+    nuoviDocenti: {
+      id: string;
+      name: string;
+      tipo?: 'materia' | 'sostegno';
+    }[] = [],
     nuoveClassi: string[] = [],
     grigliaDocumento?: { giorni: number; ore: number }
   ) => {
@@ -8473,11 +8477,17 @@ export default function App() {
       materieDi.set(r.teacherId, perMateria);
     });
 
-    /** Chi nel documento fa sostegno: nell'app sta in un elenco suo. */
+    /**
+     * Chi nel documento fa sostegno: nell'app sta in un elenco suo.
+     *
+     * Il tipo arriva già deciso dalla finestra dell'import, che a una persona
+     * con due lavori ha dato due schede: quella del sostegno e quella della
+     * sua materia. Qui basta smistarle.
+     */
     const faSostegno = new Set(
-      righe
-        .filter((r) => r.ruolo === 'sostegno' && r.teacherId)
-        .map((r) => String(r.teacherId))
+      nuoviDocenti
+        .filter((d) => d.tipo === 'sostegno')
+        .map((d) => String(d.id))
     );
 
     /** La materia scritta più volte per quel docente nel documento. */

@@ -28,7 +28,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-09c';
+export const NOVITA_VERSIONE = '2026-09-09d';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -40,6 +40,14 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-09d',
+    data: '9 settembre 2026',
+    voci: [
+      'La spunta «i nomi dei docenti vengono mandati fuori» adesso compare solo quando serve davvero. Siccome il PDF lo legge il browser, quel testo stava in mezzo alla finestra anche quando fuori non andava niente: un allarme per una cosa che non succedeva. Ora si preme «Leggi l’orario» e basta; se la tabella non ha la forma che l’app riconosce da sola, allora compare l’avviso, con la spunta e il pulsante «Prova con l’assistente».',
+      'Un docente che nel documento fa sia sostegno sia una materia sua adesso nasce due volte, una scheda per lavoro: la sua materia fra le cattedre curricolari e le ore di sostegno nell’elenco del sostegno. Prima finiva tutto in una scheda sola, e le quattro ore di arte di chi ne fa diciotto di sostegno restavano nascoste in fondo a un elenco dove nessuno le cerca. Succede più spesso di quanto sembri, e non è un errore di lettura: è una cattedra sola fatta di due lavori.',
+    ],
+  },
   {
     versione: '2026-09-09c',
     data: '9 settembre 2026',

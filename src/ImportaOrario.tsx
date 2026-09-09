@@ -48,7 +48,12 @@ interface Props {
   onChiudi: () => void;
   onApplica: (
     righe: RigaOrarioLetta[],
-    nuoviDocenti: { id: string; name: string }[],
+    /** I docenti da creare, ognuno con l'elenco in cui deve nascere. */
+    nuoviDocenti: {
+      id: string;
+      name: string;
+      tipo: 'materia' | 'sostegno';
+    }[],
     nuoveClassi: string[],
     /** La settimana disegnata nel documento: serve a chi crea le sezioni. */
     grigliaDocumento?: { giorni: number; ore: number }
@@ -73,6 +78,11 @@ export default function ImportaOrario({
   const [esito, setEsito] = useState<EsitoLetturaOrario | null>(null);
   /** La lettura è riuscita qui dentro, senza mandare niente fuori. */
   const [letturaLocale, setLetturaLocale] = useState(false);
+  /**
+   * La tabella non si è lasciata leggere dal browser: da qui in avanti serve
+   * il modello, e quindi anche la spunta sui nomi dei docenti.
+   */
+  const [serveModello, setServeModello] = useState(false);
   /**
    * La griglia entro cui le righe sono state accettate. Non sempre è quella
    * dell'app: con la scuola ancora vuota si allarga fino al documento, e
@@ -160,6 +170,7 @@ export default function ImportaOrario({
     if (!file) return;
     setErrore('');
     setEsito(null);
+    setServeModello(false);
     setInCorso('file');
     try {
       const estratto = await testoDelFile(file);
@@ -183,11 +194,19 @@ export default function ImportaOrario({
    * elenchi a frasi.
    */
   const leggi = async () => {
-    if (!consenso || testo.trim().length < 40) return;
+    if (testo.trim().length < 40) return;
     setErrore('');
     setEsito(null);
 
-    const inCasa = leggiGrigliaOrario(testo);
+    /*
+     * La spunta sui nomi si chiede solo quando serve davvero, cioè al secondo
+     * tentativo: se la tabella si legge qui dentro, fuori non va niente e
+     * mettere quell'avviso davanti a tutti sarebbe un allarme per una cosa
+     * che non succede. Chi ha un documento di altra forma lo vede comparire
+     * quando la lettura in casa non ce l'ha fatta, ed è il momento in cui la
+     * domanda ha un senso.
+     */
+    const inCasa = serveModello ? null : leggiGrigliaOrario(testo);
     if (inCasa && inCasa.righe.length >= 20) {
       setLetturaLocale(true);
       /*
@@ -228,6 +247,14 @@ export default function ImportaOrario({
       return;
     }
 
+    // La lettura in casa non ce l'ha fatta: da qui in poi tocca al modello, e
+    // prima di mandargli i nomi si chiede il permesso.
+    if (!serveModello) {
+      setServeModello(true);
+      return;
+    }
+    if (!consenso) return;
+
     setLetturaLocale(false);
     setLimiti({ giorni: giorni.length, ore });
     setInCorso('ia');
@@ -256,19 +283,34 @@ export default function ImportaOrario({
    * decine di righe e deve restare una persona sola. Le righe che la nominano
    * si portano dietro quell'id, altrimenti l'orario punterebbe a un docente
    * che non esiste.
+   *
+   * Con un'eccezione: chi nel documento fa sia sostegno sia una materia sua
+   * nasce due volte, una scheda per parte. Capita davvero (diciotto ore di
+   * sostegno e quattro di arte sono una cattedra sola, ma sono due lavori) e
+   * l'app tiene i due elenchi separati: una persona sola in mezzo li
+   * costringerebbe a stare tutti e due nella scheda del sostegno, con le ore
+   * di arte nascoste in fondo a un elenco dove nessuno le cerca.
    */
   const applica = () => {
     if (!importabili.length) return;
 
     const adesso = Date.now();
-    const nuovi = new Map<string, { id: string; name: string }>();
+    const nuovi = new Map<
+      string,
+      { id: string; name: string; tipo: 'materia' | 'sostegno' }
+    >();
 
     const righe = importabili.map((r) => {
       if (r.teacherId) return r;
-      const chiave = r.nomeLetto.toUpperCase();
+      const tipo = r.ruolo === 'sostegno' ? 'sostegno' : 'materia';
+      const chiave = `${r.nomeLetto.toUpperCase()}::${tipo}`;
       let voce = nuovi.get(chiave);
       if (!voce) {
-        voce = { id: `staff_${adesso}_${nuovi.size}`, name: r.nomeLetto };
+        voce = {
+          id: `staff_${adesso}_${nuovi.size}`,
+          name: r.nomeLetto,
+          tipo,
+        };
         nuovi.set(chiave, voce);
       }
       return { ...r, teacherId: voce.id };
@@ -353,35 +395,50 @@ export default function ImportaOrario({
             onChange={(e) => {
               setTesto(e.target.value);
               setEsito(null);
+              // Testo nuovo, lettura da rifare in casa: la richiesta di mandare
+              // i nomi fuori valeva per la tabella di prima.
+              setServeModello(false);
             }}
             rows={8}
             placeholder="Oppure incolla qui la tabella dell'orario."
             className="w-full text-xs font-mono border border-slate-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-brand-200"
           />
 
-          <label className="flex items-start gap-2 text-xs text-slate-600 bg-bruciato-50 border border-bruciato-200 rounded-lg p-3">
-            <input
-              type="checkbox"
-              checked={consenso}
-              onChange={(e) => setConsenso(e.target.checked)}
-              className="mt-0.5"
-            />
-            <span>
-              Ho capito che, <b>se la tabella non si lascia leggere qui</b>, il
-              testo qui sopra viene mandato alla società che gestisce il modello
-              linguistico per essere letto, <b>nomi dei docenti compresi</b>.
-              Non viene conservato da EduTime Pro. Se nel documento ci sono dati
-              che non c&apos;entrano con l&apos;orario, toglili prima.
-            </span>
-          </label>
+          {serveModello && (
+            <label className="flex items-start gap-2 text-xs text-slate-600 bg-bruciato-50 border border-bruciato-200 rounded-lg p-3">
+              <input
+                type="checkbox"
+                checked={consenso}
+                onChange={(e) => setConsenso(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Questa tabella non sono riuscito a leggerla qui dentro: la forma
+                che riconosco da solo è quella con una riga per docente e in
+                cima i giorni con le ore. Posso provare con l&apos;assistente,
+                ma allora il testo qui sopra viene mandato alla società che
+                gestisce il modello linguistico, <b>nomi dei docenti compresi</b>
+                . Non viene conservato da EduTime Pro. Se nel documento ci sono
+                dati che non c&apos;entrano con l&apos;orario, toglili prima.
+              </span>
+            </label>
+          )}
 
           <div className="flex flex-wrap gap-2">
             <button
               onClick={leggi}
-              disabled={!consenso || inCorso !== '' || testo.trim().length < 40}
+              disabled={
+                inCorso !== '' ||
+                testo.trim().length < 40 ||
+                (serveModello && !consenso)
+              }
               className="bg-fucsia-600 hover:bg-fucsia-700 disabled:opacity-40 text-white font-bold text-xs py-2 px-4 rounded-lg shadow-sm cursor-pointer disabled:cursor-not-allowed"
             >
-              {inCorso === 'ia' ? 'Sto leggendo…' : 'Leggi l’orario'}
+              {inCorso === 'ia'
+                ? 'Sto leggendo…'
+                : serveModello
+                  ? 'Prova con l’assistente'
+                  : 'Leggi l’orario'}
             </button>
           </div>
 
