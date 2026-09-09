@@ -168,6 +168,47 @@ npx vite            # sviluppo su http://localhost:5173
 npx vite build      # build di produzione in dist/
 ```
 
+### Provare le funzioni con l'IA in locale, senza comprare una licenza
+
+`npx vite` serve solo il sito: le funzioni dentro `api/` non girano, quindi
+l'assistente risponde «non è configurato» e gli altri riquadri IA falliscono.
+Per farle girare serve `vercel dev`, che monta anche gli endpoint.
+
+Gli interruttori delle licenze sono variabili d'ambiente, e in locale si
+mettono a `0`: la verifica viene saltata e nessuna chiave di abbonamento è
+richiesta (vedi `verificaLicenza` in `api/_licenza.ts`, che esce subito con
+`{ valida: true }` quando l'interruttore non vale `1`).
+
+```bash
+npx vercel env pull .env --environment=production --scope biscotto-digitale
+```
+
+Poi si apre `.env` e si sistemano tre cose:
+
+1. `ASSISTENTE_RICHIEDE_LICENZA="0"` e `FUNZIONI_IA_RICHIEDONO_LICENZA="0"`,
+   così tutte le funzioni IA sono aperte;
+2. i valori che il pull scrive come `[SENSITIVE]` (le variabili marcate
+   *Secret* su Vercel non si scaricano) vanno riempiti a mano; il modello
+   servito in produzione si legge con
+   `curl -s https://edutimepro.vercel.app/api/assistente`;
+3. si cancellano `KV_*`, `REDIS_URL` e `BREVO_*`: senza, il conteggio delle
+   domande resta nella memoria del processo invece di consumare il contatore
+   vero su Upstash, e i feedback di prova non finiscono nella lista Brevo.
+
+```bash
+npx vercel dev --listen 3000   # sito e API su http://localhost:3000
+```
+
+**Il file deve chiamarsi `.env`, non `.env.local`**: `vercel dev` non passa
+`.env.local` alle funzioni con `runtime: 'edge'`, che si ritrovano
+`process.env` vuoto e rispondono `{"disponibile":false}` senza spiegare
+perché. Il controllo veloce è `curl -s http://localhost:3000/api/assistente`:
+deve rispondere `"disponibile":true` e `"richiedeLicenza":false`.
+
+`.gitignore` copre `.env*`, quindi il file con la chiave del modello non
+finisce nel repo. Resta comunque una chiave vera in chiaro sul disco: non va
+copiato altrove.
+
 ## Configurazione Firebase
 
 Le credenziali stanno in `src/firebase-config.js` e possono essere sostituite

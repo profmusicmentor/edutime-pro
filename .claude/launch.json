@@ -4,14 +4,37 @@
     {
       "name": "edutime-dev",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "--port", "5177", "--strictPort"],
+      "runtimeArgs": [
+        "vite",
+        "--port",
+        "5177",
+        "--strictPort"
+      ],
       "port": 5177
     },
     {
       "name": "edutime-anteprima",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "preview", "--port", "5178", "--strictPort"],
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--port",
+        "5178",
+        "--strictPort"
+      ],
       "port": 5178
+    },
+    {
+      "name": "edutime-ia",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vercel",
+        "dev",
+        "--listen",
+        "3000",
+        "--yes"
+      ],
+      "port": 3000
     }
   ]
 }

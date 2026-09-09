@@ -34,3 +34,4 @@ service-account*.json
 .agents/
 .claude/skills/
 skills-lock.json
+.env*
