@@ -62,9 +62,16 @@ export interface ClasseProposta {
  *
  * Le righe si ricostruiscono dalla posizione verticale dei pezzi di testo:
  * il PDF non ha il concetto di riga, ha frammenti con delle coordinate. I
- * frammenti che stanno alla stessa altezza tornano sulla stessa riga,
- * separati da due spazi quando fra loro c'è un salto orizzontale: sono i due
- * spazi che più avanti fanno riconoscere le colonne di una tabella.
+ * frammenti che stanno alla stessa altezza tornano sulla stessa riga.
+ *
+ * Dentro la riga ogni pezzo viene rimesso alla colonna in cui sta davvero,
+ * riempiendo di spazi il vuoto che ha davanti: la tabella esce allineata,
+ * come la si vede sul foglio. Prima i pezzi venivano solo separati da due
+ * spazi, e su un orario questo cancellava l'informazione più importante:
+ * nella riga di un docente le ore libere non stampano niente, quindi
+ * diciotto classi scritte di fila non dicono più a quale delle trentacinque
+ * ore appartengono. Con le colonne al loro posto, invece, ogni classe sta
+ * sotto il suo giorno e la sua ora, e si può leggere.
  */
 export async function estraiTestoPdf(file: File): Promise<string> {
   const pdfjs = await import('pdfjs-dist');
@@ -88,36 +95,57 @@ export async function estraiTestoPdf(file: File): Promise<string> {
       const pagina = await documento.getPage(n);
       const contenuto = await pagina.getTextContent();
 
+      type Pezzo = { str?: string; width?: number; transform?: number[] };
+      const pezzi = (contenuto.items as Pezzo[]).filter(
+        (item) => item.transform && (item.str ?? '').length
+      );
+
+      /*
+       * Quanto è larga una lettera su questa pagina, in punti. Serve a
+       * trasformare le coordinate in colonne di caratteri: senza una misura
+       * presa dal documento stesso, un orario stampato in corpo piccolo e uno
+       * in corpo grande finirebbero con allineamenti diversi. Si prende la
+       * misura più stretta fra i pezzi lunghi, che è quella che non fa
+       * sovrapporre niente.
+       */
+      let passo = 5;
+      const larghezze = pezzi
+        .filter((item) => (item.str ?? '').length >= 4 && (item.width ?? 0) > 0)
+        .map((item) => (item.width as number) / (item.str as string).length);
+      if (larghezze.length) passo = Math.min(...larghezze);
+      if (!(passo > 0.5)) passo = 5;
+
+      const xMinimo = Math.min(...pezzi.map((item) => item.transform![4]));
+
       let riga = '';
       let ultimaY: number | null = null;
-      let ultimoFine = 0;
       const righe: string[] = [];
 
-      for (const pezzo of contenuto.items) {
-        const item = pezzo as {
-          str?: string;
-          width?: number;
-          transform?: number[];
-        };
+      for (const item of pezzi) {
         const testo = item.str ?? '';
-        const t = item.transform;
-        if (!t) continue;
-        const x = t[4];
-        const y = t[5];
+        const x = item.transform![4];
+        const y = item.transform![5];
 
         // Più di tre punti di dislivello: è una riga nuova.
         if (ultimaY !== null && Math.abs(y - ultimaY) > 3) {
-          righe.push(riga.trim());
+          righe.push(riga.trimEnd());
           riga = '';
-          ultimoFine = 0;
         }
-        if (riga && x - ultimoFine > 8) riga += '  ';
+        // La colonna in cui il pezzo sta sul foglio. Se il posto è già
+        // occupato (due scritte attaccate, o misure arrotondate per difetto)
+        // si accoda con uno spazio, senza mai tornare indietro.
+        const colonna = Math.round((x - xMinimo) / passo);
+        riga +=
+          colonna > riga.length
+            ? ' '.repeat(colonna - riga.length)
+            : riga
+              ? ' '
+              : '';
         riga += testo;
         ultimaY = y;
-        ultimoFine = x + (item.width ?? 0);
       }
-      righe.push(riga.trim());
-      pagine.push(righe.filter(Boolean).join('\n'));
+      righe.push(riga.trimEnd());
+      pagine.push(righe.filter((r) => r.trim()).join('\n'));
       pagina.cleanup();
     }
   } finally {

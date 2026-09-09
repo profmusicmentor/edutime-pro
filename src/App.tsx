@@ -3293,6 +3293,8 @@ export default function App() {
   const [editingNoteCell, setEditingNoteCell] = useState<any>(null);
   const [noteText, setNoteText] = useState('');
   const [showResetModal, setShowResetModal] = useState(false);
+  /** Conferma dello svuotamento completo: docenti, classi e orario via. */
+  const [showWipeModal, setShowWipeModal] = useState(false);
   const [printAlertOpen, setPrintAlertOpen] = useState(false);
   const [sectionActionModal, setSectionActionModal] = useState<any>(null);
   const [conflictModal, setConflictModal] = useState<any>(null);
@@ -6908,6 +6910,61 @@ export default function App() {
     setShowResetModal(false);
   };
 
+  /**
+   * Toglie di mezzo la scuola di esempio e lascia l'app vuota.
+   *
+   * Serve a chi arriva con l'orario dell'anno scorso da importare: i dati di
+   * esempio hanno le stesse sezioni (1A, 2B, 3C) e docenti inventati, quindi
+   * l'orario letto dal documento si mescola con quello finto e alla fine non
+   * si capisce più quali nomi siano veri. Meglio svuotare prima e importare
+   * dentro un'app pulita.
+   *
+   * Restano le cose che non sono «la scuola» ma l'attrezzatura: la griglia
+   * oraria, le regole di generazione, le aule e le sedi. Senza almeno
+   * un'aula il generatore non avrebbe dove mettere le lezioni, e ricrearle a
+   * mano sarebbe una punizione per chi voleva solo cancellare i finti nomi.
+   */
+  const handleWipeSchool = () => {
+    if (readOnlyMode) return;
+    setTeachers([]);
+    setSostegno([]);
+    setStrumento([]);
+    setSectionsConfig({});
+    setTimetable([]);
+    setCellNotes({});
+    setGroupConstraints([]);
+    setMixedClasses([]);
+    setAbsences([]);
+    setSubstitutions([]);
+    setAssemblee([]);
+    setPersonaleExtra([]);
+    setConsigli([]);
+    pushDataToCloud(
+      [],
+      [],
+      [],
+      {},
+      [],
+      diurnalHours,
+      afternoonHours,
+      generationRules,
+      generateOptions,
+      {},
+      [],
+      [],
+      rooms,
+      sedi,
+      [],
+      [],
+      [],
+      [],
+      assembleeConfig,
+      [],
+      consigliConfig
+    );
+    setShowWipeModal(false);
+  };
+
   const handleAddSection = (e: React.FormEvent) => {
     e.preventDefault();
     if (readOnlyMode) return;
@@ -8332,9 +8389,42 @@ export default function App() {
   const applicaOrarioImportato = (
     righe: RigaOrarioLetta[],
     nuoviDocenti: { id: string; name: string }[] = [],
-    nuoveClassi: string[] = []
+    nuoveClassi: string[] = [],
+    grigliaDocumento?: { giorni: number; ore: number }
   ) => {
     if (readOnlyMode || !righe.length) return;
+
+    /*
+     * La settimana del modello A, se le classi nascono adesso.
+     *
+     * Le sezioni create dall'import prendono il modello A, e la sua griglia
+     * di partenza (sei giorni, cinque ore) non è detto che sia quella della
+     * scuola che si sta importando: chi ha sei ore al giorno si ritroverebbe
+     * la sesta ora importata ma invisibile, cioè il modo peggiore di
+     * sbagliare. Qui la griglia si allarga fino a contenere il documento.
+     * Non si stringe mai: chi ha già una settimana più larga se la tiene.
+     */
+    let grigliePerModello = modelGrids;
+    if (nuoveClassi.length && grigliaDocumento) {
+      const base =
+        modelGrids?.modelloA || DEFAULT_MODEL_GRIDS.modelloA;
+      const days = Math.min(
+        GRID_MAX_DAYS,
+        Math.max(Number(base.days) || 6, grigliaDocumento.giorni)
+      );
+      const hours = Math.min(
+        GRID_MAX_HOURS,
+        Math.max(Number(base.hours) || 5, grigliaDocumento.ore)
+      );
+      if (days !== base.days || hours !== base.hours) {
+        grigliePerModello = normalizeModelGrids({
+          ...modelGrids,
+          modelloA: { ...base, days, hours },
+        });
+        modelGridsRef.current = grigliePerModello;
+        setModelGrids(grigliePerModello);
+      }
+    }
 
     /* --- le sezioni che mancano, ricavate dalle classi da creare --- */
 
@@ -8363,19 +8453,32 @@ export default function App() {
     /* --- i docenti che mancano, con la cattedra contata dalle righe --- */
 
     const oreDi = new Map<string, Map<string, number>>();
+    const compresenzeDi = new Map<string, Map<string, number>>();
     const materieDi = new Map<string, Map<string, number>>();
     righe.forEach((r) => {
       if (!r.teacherId) return;
-      const perClasse = oreDi.get(r.teacherId) || new Map<string, number>();
+      // Le ore da secondo docente non sono cattedra: stanno nella riga delle
+      // compresenze del Registro, altrimenti il monte ore della classe
+      // risulterebbe doppio e i Conflitti si riempirebbero di errori finti.
+      const dove = r.ruolo === 'compresenza' ? compresenzeDi : oreDi;
+      const perClasse = dove.get(r.teacherId) || new Map<string, number>();
       perClasse.set(r.classId, (perClasse.get(r.classId) || 0) + 1);
-      oreDi.set(r.teacherId, perClasse);
+      dove.set(r.teacherId, perClasse);
 
+      if (r.ruolo === 'compresenza') return;
       const materia = (r.subject || '').trim().toUpperCase();
       if (!materia) return;
       const perMateria = materieDi.get(r.teacherId) || new Map<string, number>();
       perMateria.set(materia, (perMateria.get(materia) || 0) + 1);
       materieDi.set(r.teacherId, perMateria);
     });
+
+    /** Chi nel documento fa sostegno: nell'app sta in un elenco suo. */
+    const faSostegno = new Set(
+      righe
+        .filter((r) => r.ruolo === 'sostegno' && r.teacherId)
+        .map((r) => String(r.teacherId))
+    );
 
     /** La materia scritta più volte per quel docente nel documento. */
     const materiaPrevalente = (id: string): string => {
@@ -8393,10 +8496,58 @@ export default function App() {
       assignments: Array.from(oreDi.get(d.id) || new Map()).map(
         ([classId, hours]) => ({ classId, hours })
       ),
+      // Le ore in cui sta accanto a un collega vengono dichiarate come le
+      // altre: così restano anche dopo un «Allinea Compresenze», che rifà da
+      // capo tutte le compresenze non bloccate partendo da queste righe.
+      coTeaching: Array.from(compresenzeDi.get(d.id) || new Map()).map(
+        ([classId, hours]) => ({ classId, hours })
+      ),
     }));
-    const teachersAggiornati = aggiunti.length
-      ? [...teachers, ...aggiunti]
-      : teachers;
+
+    /*
+     * I docenti di sostegno vanno nel loro elenco, non fra le materie.
+     * Nel documento si riconoscono perché al posto della materia c'è scritto
+     * «SOSTEGNO»: metterli fra i curricolari vorrebbe dire ritrovarsi otto
+     * cattedre di una materia che non esiste, e doverli spostare a mano uno
+     * per uno prima ancora di cominciare.
+     */
+    const aggiuntiCurricolari = aggiunti.filter((d) => !faSostegno.has(d.id));
+    const aggiuntiSostegno = aggiunti
+      .filter((d) => faSostegno.has(d.id))
+      .map((d) => ({ ...d, subject: 'SOSTEGNO', color: '#d8613c' }));
+
+    /*
+     * Le compresenze dei docenti che in archivio c'erano già.
+     *
+     * La cattedra di chi è già nel Registro non si tocca: l'ha scritta la
+     * persona, e l'import non è autorizzato a rifarla. Le righe delle
+     * compresenze però vanno aggiunte quando per quella classe non ce n'è
+     * nessuna, altrimenti il primo «Allinea Compresenze» cancellerebbe le ore
+     * appena importate: quel pulsante rifà le compresenze partendo dalle
+     * dichiarazioni del Registro, e ore non dichiarate per lui non esistono.
+     * Una dichiarazione già scritta resta com'è.
+     */
+    const conCompresenzeImportate = (elenco: any[]) =>
+      elenco.map((persona: any) => {
+        const perClasse = compresenzeDi.get(String(persona.id));
+        if (!perClasse || !perClasse.size) return persona;
+        const gia = (persona.coTeaching || []) as any[];
+        const daAggiungere = Array.from(perClasse)
+          .filter(
+            ([classId]) => !gia.some((row) => row && row.classId === classId)
+          )
+          .map(([classId, hours]) => ({ classId, hours }));
+        if (!daAggiungere.length) return persona;
+        return { ...persona, coTeaching: [...gia, ...daAggiungere] };
+      });
+
+    const teachersAggiornati = conCompresenzeImportate(
+      aggiuntiCurricolari.length ? [...teachers, ...aggiuntiCurricolari] : teachers
+    );
+    const sostegnoAggiornato = conCompresenzeImportate(
+      aggiuntiSostegno.length ? [...sostegno, ...aggiuntiSostegno] : sostegno
+    );
+    const strumentoAggiornato = conCompresenzeImportate(strumento);
 
     /* --- l'orario --- */
 
@@ -8407,31 +8558,44 @@ export default function App() {
       (s: any) => !occupate.has(`${s.classId}_${s.day}_${s.hour}`)
     );
 
-    const importate = righe.map((r) => ({
-      classId: r.classId,
-      day: r.day,
-      hour: r.hour,
-      teacherId: r.teacherId,
-      subject: r.subject || 'Da completare',
-      type: 'materia',
-      room: getRoomForSubject(
-        r.subject,
-        rooms,
-        getSedeForClass(r.classId, classes, nuovaConfig)
-      ),
-    }));
+    /*
+     * Le caselle. Il titolare prende la materia e l'aula che le spetta; chi
+     * gli sta accanto (compresenza o sostegno) resta in «Aula», perché non
+     * prenota un laboratorio per conto suo: sta dove sta la lezione.
+     */
+    const importate = righe.map((r) => {
+      const affiancato = r.ruolo !== 'materia';
+      return {
+        classId: r.classId,
+        day: r.day,
+        hour: r.hour,
+        teacherId: r.teacherId,
+        subject:
+          r.subject || (r.ruolo === 'sostegno' ? 'Sostegno' : 'Da completare'),
+        type: r.ruolo,
+        room: affiancato
+          ? 'Aula'
+          : getRoomForSubject(
+              r.subject,
+              rooms,
+              getSedeForClass(r.classId, classes, nuovaConfig)
+            ),
+      };
+    });
 
     const nuovo = [...restanti, ...importate];
 
     if (nuoveClassi.length) setSectionsConfig(nuovaConfig);
-    if (aggiunti.length) setTeachers(teachersAggiornati);
+    setTeachers(teachersAggiornati);
+    setSostegno(sostegnoAggiornato);
+    setStrumento(strumentoAggiornato);
     setTimetable(nuovo);
     pushDataToCloud(
       nuovo,
       teachersAggiornati,
-      sostegno,
+      sostegnoAggiornato,
       nuovaConfig,
-      strumento,
+      strumentoAggiornato,
       diurnalHours,
       afternoonHours,
       generationRules,
@@ -12664,9 +12828,18 @@ export default function App() {
                 <button
                   onClick={() => setShowResetModal(true)}
                   disabled={readOnlyMode}
+                  title="Toglie le ore assegnate e svuota l'orario, ma i docenti e le classi restano"
                   className="px-4 py-2 rounded-lg text-xs font-bold bg-fucsia-50 text-fucsia-600 border border-fucsia-200 hover:bg-fucsia-100 hover:text-fucsia-700 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  🗑️ Resetta Tutto
+                  🗑️ Azzera le ore
+                </button>
+                <button
+                  onClick={() => setShowWipeModal(true)}
+                  disabled={readOnlyMode}
+                  title="Cancella docenti, classi e orario: l'app resta vuota, pronta per importare il tuo orario"
+                  className="px-4 py-2 rounded-lg text-xs font-bold bg-fucsia-50 text-fucsia-600 border border-fucsia-200 hover:bg-fucsia-100 hover:text-fucsia-700 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  🧹 Svuota la scuola
                 </button>
               </div>
             </div>
@@ -16326,6 +16499,9 @@ export default function App() {
           docenti={allStaff.map((s: any) => ({
             id: String(s.id),
             name: String(s.name || ''),
+            // In quale elenco sta: chi è nel sostegno entra come sostegno
+            // anche quando nel documento è scritto come tutti gli altri.
+            tipo: s.staffType === 'sostegno' ? 'sostegno' : s.staffType === 'strumento' ? 'strumento' : 'materia',
           }))}
           giorni={DAYS_IN_USE}
           ore={gridHourRows.length}
@@ -17044,12 +17220,13 @@ export default function App() {
                 ⚠️
               </div>
               <h3 className="text-xl font-bold text-slate-800 mb-2">
-                Azzerare tutto?
+                Azzerare le ore?
               </h3>
               <p className="text-sm text-slate-500 mb-6">
                 Cancellerà{' '}
                 <strong className="text-fucsia-600">tutti i carichi orari</strong>{' '}
                 e <strong className="text-fucsia-600">svuoterà l'orario</strong>.
+                I docenti e le classi restano dove sono.
               </p>
               <div className="flex gap-3">
                 <button
@@ -17063,6 +17240,55 @@ export default function App() {
                   className="flex-1 bg-fucsia-600 hover:bg-fucsia-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all cursor-pointer"
                 >
                   Sì, azzera
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showWipeModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full overflow-hidden">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-fucsia-100 text-fucsia-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                🧹
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">
+                Svuotare la scuola?
+              </h3>
+              <p className="text-sm text-slate-500 mb-4">
+                Spariscono{' '}
+                <strong className="text-fucsia-600">
+                  docenti, sostegno, strumento, classi e orario
+                </strong>
+                , insieme ad assenze, sostituzioni, assemblee e consigli di
+                classe. Restano la griglia oraria, le regole, le aule e le
+                sedi.
+              </p>
+              <p className="text-xs text-slate-500 mb-4">
+                È la strada giusta per partire dai dati di esempio e caricare
+                al loro posto l&apos;orario della tua scuola con «📥 Importa
+                orario». Non si torna indietro: se dentro c&apos;è già del
+                lavoro tuo, scarica prima il backup.
+              </p>
+              <button
+                onClick={handleBackupDownload}
+                className="text-xs font-bold text-brand-700 hover:underline mb-5 cursor-pointer"
+              >
+                ⬇️ Scarica il backup adesso
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowWipeModal(false)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition-all shadow-sm cursor-pointer"
+                >
+                  Annulla
+                </button>
+                <button
+                  onClick={handleWipeSchool}
+                  className="flex-1 bg-fucsia-600 hover:bg-fucsia-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  Sì, svuota tutto
                 </button>
               </div>
             </div>

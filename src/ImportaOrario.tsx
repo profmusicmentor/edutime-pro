@@ -27,7 +27,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { testoDelFile } from './letturaElenchi';
+import { leggiGrigliaOrario } from './letturaOrarioGriglia';
 import {
+  componiEsito,
   leggiOrarioDaTesto,
   letturaOrarioDisponibile,
   type EsitoLetturaOrario,
@@ -47,7 +49,9 @@ interface Props {
   onApplica: (
     righe: RigaOrarioLetta[],
     nuoviDocenti: { id: string; name: string }[],
-    nuoveClassi: string[]
+    nuoveClassi: string[],
+    /** La settimana disegnata nel documento: serve a chi crea le sezioni. */
+    grigliaDocumento?: { giorni: number; ore: number }
   ) => void;
 }
 
@@ -67,6 +71,15 @@ export default function ImportaOrario({
   const [inCorso, setInCorso] = useState('');
   const [errore, setErrore] = useState('');
   const [esito, setEsito] = useState<EsitoLetturaOrario | null>(null);
+  /** La lettura è riuscita qui dentro, senza mandare niente fuori. */
+  const [letturaLocale, setLetturaLocale] = useState(false);
+  /**
+   * La griglia entro cui le righe sono state accettate. Non sempre è quella
+   * dell'app: con la scuola ancora vuota si allarga fino al documento, e
+   * l'avviso «settimana più larga» deve guardare questa, altrimenti compare
+   * anche quando non è stato tagliato niente.
+   */
+  const [limiti, setLimiti] = useState({ giorni: giorni.length, ore });
 
   useEffect(() => {
     let vivo = true;
@@ -107,11 +120,35 @@ export default function ImportaOrario({
    */
   const importabili = useMemo(() => {
     const righe = esito?.righe || [];
-    if (creaMancanti) {
-      return righe.filter((r) => r.teacherId || (r.nomeLetto && !r.ambiguo));
-    }
-    return righe.filter((r) => r.teacherId && !r.classeNuova);
+    const tenute = creaMancanti
+      ? righe.filter((r) => r.teacherId || (r.nomeLetto && !r.ambiguo))
+      : righe.filter((r) => r.teacherId && !r.classeNuova);
+
+    /*
+     * Se il titolare di una casella è rimasto fuori (nome ambiguo, o classe
+     * che non si crea) chi gli stava accanto diventa il titolare: una
+     * compresenza da sola sarebbe un secondo docente appoggiato a una lezione
+     * che nell'orario non c'è.
+     */
+    const conTitolare = new Set(
+      tenute
+        .filter((r) => r.ruolo === 'materia')
+        .map((r) => `${r.classId}_${r.day}_${r.hour}`)
+    );
+    return tenute.map((r) => {
+      if (r.ruolo !== 'compresenza') return r;
+      const chiave = `${r.classId}_${r.day}_${r.hour}`;
+      if (conTitolare.has(chiave)) return r;
+      conTitolare.add(chiave);
+      return { ...r, ruolo: 'materia' as const };
+    });
   }, [esito, creaMancanti]);
+
+  /** Quanti secondi docenti entrano: compresenze e ore di sostegno. */
+  const affiancati = useMemo(
+    () => importabili.filter((r) => r.ruolo !== 'materia').length,
+    [importabili]
+  );
 
   /** Le righe che restano fuori comunque, spunta o no. */
   const scartateDalNome = useMemo(
@@ -135,10 +172,64 @@ export default function ImportaOrario({
     }
   };
 
+  /*
+   * Prima si prova a leggere qui, contando le colonne della tabella: gli
+   * orari stampati dalle scuole hanno quasi tutti la stessa forma, una riga
+   * per docente e in cima i giorni con le ore. Quando la forma c'è, questa
+   * strada è più precisa del modello (che su trentacinque colonne si tira
+   * indietro), è istantanea, non costa niente e soprattutto i nomi dei
+   * colleghi non escono dal computer. Il modello parte solo se qui non si
+   * ricava abbastanza: documenti scritti a modo proprio, tabelle per classe,
+   * elenchi a frasi.
+   */
   const leggi = async () => {
     if (!consenso || testo.trim().length < 40) return;
     setErrore('');
     setEsito(null);
+
+    const inCasa = leggiGrigliaOrario(testo);
+    if (inCasa && inCasa.righe.length >= 20) {
+      setLetturaLocale(true);
+      /*
+       * Con l'app ancora vuota la griglia da rispettare è quella del
+       * documento, non quella di partenza dell'app: le classi non ci sono
+       * ancora, quindi i cinque giorni e le sei ore che si vedono sono solo
+       * un valore di riserva. Tagliare il sabato di una scuola che il sabato
+       * ci va, per rispettare una griglia che nessuno ha scelto, sarebbe
+       * assurdo: le sezioni nascono adesso e si adattano al documento.
+       */
+      const scuolaVuota = classi.length === 0;
+      const quantiGiorni = scuolaVuota
+        ? Math.max(giorni.length, Math.min(6, inCasa.giorniDocumento))
+        : giorni.length;
+      const quanteOre = scuolaVuota
+        ? Math.max(ore, Math.min(12, inCasa.oreDocumento))
+        : ore;
+      setLimiti({ giorni: quantiGiorni, ore: quanteOre });
+      setEsito(
+        componiEsito(
+          {
+            righe: inCasa.righe,
+            giorniDocumento: inCasa.giorniDocumento,
+            oreDocumento: inCasa.oreDocumento,
+            nota: '',
+          },
+          {
+            classiValide: classi,
+            docentiNoti: docenti,
+            giorni: Array.from(
+              { length: quantiGiorni },
+              (_, i) => giorni[i] || `giorno ${i + 1}`
+            ),
+            ore: quanteOre,
+          }
+        )
+      );
+      return;
+    }
+
+    setLetturaLocale(false);
+    setLimiti({ giorni: giorni.length, ore });
     setInCorso('ia');
     try {
       const risultato = await leggiOrarioDaTesto(testo, {
@@ -187,7 +278,14 @@ export default function ImportaOrario({
       new Set(righe.filter((r) => r.classeNuova).map((r) => r.classId))
     );
 
-    onApplica(righe, Array.from(nuovi.values()), classiNuove);
+    onApplica(
+      righe,
+      Array.from(nuovi.values()),
+      classiNuove,
+      esito?.giorniDocumento && esito?.oreDocumento
+        ? { giorni: esito.giorniDocumento, ore: esito.oreDocumento }
+        : undefined
+    );
   };
 
   return (
@@ -215,10 +313,25 @@ export default function ImportaOrario({
         <div className="p-6 space-y-4">
           {!pronta && (
             <div className="bg-bruciato-50 border border-bruciato-200 rounded-lg p-3 text-xs text-bruciato-800">
-              La lettura assistita non è accesa su questo sito. L&apos;orario si
-              compila dalla scheda «Orario Generale».
+              La lettura assistita non è accesa su questo sito: qui funziona
+              solo la lettura delle tabelle fatta dal browser, quella che conta
+              le colonne del documento. Se il tuo orario ha una riga per
+              docente e in cima i giorni con le ore, va lo stesso.
             </div>
           )}
+
+          {/*
+            I dati di esempio hanno le stesse sezioni di mezza Italia (1A, 2B,
+            3C) e docenti inventati: l'orario letto dal documento ci si
+            incastra sopra e alla fine, fra i nomi, non si distingue più il
+            vero dal finto. Chi importa per la prima volta va avvisato prima
+            di caricare il file, non dopo.
+          */}
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600">
+            Nell&apos;app ci sono ancora i docenti e le classi di esempio? Se
+            sì, svuotala prima: <strong>Registro Cattedre → 🧹 Svuota la
+            scuola</strong>. Altrimenti i nomi finti restano mescolati ai tuoi.
+          </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <label className="bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs py-2 px-4 rounded-lg cursor-pointer">
@@ -254,20 +367,18 @@ export default function ImportaOrario({
               className="mt-0.5"
             />
             <span>
-              Ho capito che il testo qui sopra, <b>nomi dei docenti compresi</b>,
-              viene mandato alla società che gestisce il modello linguistico per
-              essere letto. Non viene conservato da EduTime Pro. Se nel
-              documento ci sono dati che non c&apos;entrano con l&apos;orario,
-              toglili prima.
+              Ho capito che, <b>se la tabella non si lascia leggere qui</b>, il
+              testo qui sopra viene mandato alla società che gestisce il modello
+              linguistico per essere letto, <b>nomi dei docenti compresi</b>.
+              Non viene conservato da EduTime Pro. Se nel documento ci sono dati
+              che non c&apos;entrano con l&apos;orario, toglili prima.
             </span>
           </label>
 
           <div className="flex flex-wrap gap-2">
             <button
               onClick={leggi}
-              disabled={
-                !pronta || !consenso || inCorso !== '' || testo.trim().length < 40
-              }
+              disabled={!consenso || inCorso !== '' || testo.trim().length < 40}
               className="bg-fucsia-600 hover:bg-fucsia-700 disabled:opacity-40 text-white font-bold text-xs py-2 px-4 rounded-lg shadow-sm cursor-pointer disabled:cursor-not-allowed"
             >
               {inCorso === 'ia' ? 'Sto leggendo…' : 'Leggi l’orario'}
@@ -288,6 +399,55 @@ export default function ImportaOrario({
                   ? 'lezione pronta da importare'
                   : 'lezioni pronte da importare'}
               </p>
+
+              {letturaLocale && (
+                <p className="text-xs text-salvia-700 bg-salvia-50 border border-salvia-200 rounded-lg p-2">
+                  🔒 La tabella è stata letta qui dentro, contando le colonne
+                  del documento: nessun nome è uscito dal tuo computer e non è
+                  stata usata nessuna funzione a pagamento.
+                </p>
+              )}
+
+              {affiancati > 0 && (
+                <p className="text-xs text-slate-600">
+                  Di queste, {affiancati}{' '}
+                  {affiancati === 1
+                    ? 'è un secondo docente'
+                    : 'sono secondi docenti'}{' '}
+                  su un&apos;ora già occupata: compresenze e ore di sostegno.
+                  Entrano nella stessa casella del titolare, ognuno con la sua
+                  riga.
+                </p>
+              )}
+
+              {/*
+                La griglia dell'app più stretta della settimana del documento:
+                capita a chi fa lezione il sabato e ha ancora la settimana
+                corta dei dati di partenza. Le celle in eccesso non hanno dove
+                andare, e senza questo avviso sembrerebbe che l'app abbia
+                letto male.
+              */}
+              {((esito.giorniDocumento || 0) > limiti.giorni ||
+                (esito.oreDocumento || 0) > limiti.ore) && (
+                <div className="bg-bruciato-50 border border-bruciato-200 rounded-lg p-3 text-xs text-bruciato-800">
+                  Il documento ha una settimana più larga di quella dell&apos;app
+                  {(esito.giorniDocumento || 0) > limiti.giorni && (
+                    <>
+                      {' '}
+                      ({esito.giorniDocumento} giorni contro {limiti.giorni})
+                    </>
+                  )}
+                  {(esito.oreDocumento || 0) > limiti.ore && (
+                    <>
+                      {' '}
+                      ({esito.oreDocumento} ore al giorno contro {limiti.ore})
+                    </>
+                  )}
+                  . Le lezioni che cadono fuori dalla griglia non si possono
+                  importare. Chiudi, vai in «⚙️ Sezioni &amp; Regole» e allarga
+                  il modello di settimana, poi torna qui.
+                </div>
+              )}
 
               {esito.nota && (
                 <p className="text-xs text-slate-600">{esito.nota}</p>

@@ -219,6 +219,19 @@ export default function WorkspaceGate({ invitedCode, onChoose }: Props) {
               {importError && (
                 <p className="text-xs text-fucsia-600 mt-1">{importError}</p>
               )}
+              {/*
+                L'orario dell'anno scorso in PDF è la cosa che quasi tutti
+                hanno in mano arrivando qui, ma l'import non può stare in
+                questa schermata: gli servono le classi e la griglia oraria
+                dell'app, che qui ancora non esistono. Quindi si dice dove
+                trovarlo, invece di aprire una terza strada che si romperebbe
+                al primo clic.
+              */}
+              <p className="text-xs text-slate-500 mt-3">
+                Hai l'orario dell'anno scorso in PDF o in Excel? Entra e poi
+                usa <strong>📥 Importa orario</strong>, nella scheda Orario
+                Generale.
+              </p>
             </div>
           </section>
 

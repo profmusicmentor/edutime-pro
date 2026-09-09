@@ -32,11 +32,22 @@ import { nomePulito } from './letturaElenchi';
 
 const INDIRIZZO = '/api/importa-orario';
 
+/**
+ * Che posto occupa il docente dentro la casella.
+ *
+ * «materia» è il titolare, «compresenza» il secondo docente sulla stessa ora,
+ * «sostegno» chi in archivio sta nell'elenco del sostegno: sono i tre tipi di
+ * casella che l'app conosce già, e l'import non ne inventa un quarto.
+ */
+export type RuoloRiga = 'materia' | 'compresenza' | 'sostegno';
+
 export interface RigaOrarioLetta {
   classId: string;
   day: number;
   hour: number;
   subject: string;
+  /** Titolare, secondo docente o sostegno. */
+  ruolo: RuoloRiga;
   /** Il docente riconosciuto fra quelli in archivio, quando c'è. */
   teacherId: string | null;
   /** Il nome come è arrivato dal documento, sempre. */
@@ -58,6 +69,14 @@ export interface RigaScartata {
 export interface EsitoLetturaOrario {
   righe: RigaOrarioLetta[];
   scartate: RigaScartata[];
+  /**
+   * Quanti giorni e quante ore ha la settimana disegnata nel documento.
+   * Quando sono più di quelli della griglia dell'app, le celle in eccesso non
+   * hanno dove andare: la finestra lo dice, invece di lasciar credere che il
+   * sabato sia sparito per un errore di lettura.
+   */
+  giorniDocumento: number | null;
+  oreDocumento: number | null;
   /** Nomi trovati nel documento che in archivio non ci sono. */
   nomiSconosciuti: string[];
   /** Classi lette nel documento che nell'app non esistono ancora. */
@@ -89,6 +108,12 @@ export const letturaOrarioDisponibile = (): Promise<boolean> =>
 export interface PersonaNota {
   id: string;
   name: string;
+  /**
+   * In quale elenco sta, quando si sa. Serve a dare alla casella il tipo
+   * giusto: il docente di sostegno riconosciuto in archivio entra come
+   * sostegno anche se nel documento sta su una riga come tutti gli altri.
+   */
+  tipo?: 'materia' | 'sostegno' | 'strumento';
 }
 
 const perConfronto = (nome: string): string =>
@@ -111,23 +136,24 @@ const perConfronto = (nome: string): string =>
 const abbina = (
   nomeLetto: string,
   noti: PersonaNota[]
-): { id: string | null; ambiguo: boolean } => {
+): { persona: PersonaNota | null; ambiguo: boolean } => {
   const cercato = perConfronto(nomeLetto);
-  if (!cercato) return { id: null, ambiguo: false };
+  if (!cercato) return { persona: null, ambiguo: false };
 
   const esatti = noti.filter((p) => perConfronto(p.name) === cercato);
-  if (esatti.length === 1) return { id: esatti[0].id, ambiguo: false };
-  if (esatti.length > 1) return { id: null, ambiguo: true };
+  if (esatti.length === 1) return { persona: esatti[0], ambiguo: false };
+  if (esatti.length > 1) return { persona: null, ambiguo: true };
 
   const cognome = cercato.split(' ')[0];
-  if (cognome.length < 3) return { id: null, ambiguo: false };
+  if (cognome.length < 3) return { persona: null, ambiguo: false };
 
   const perCognome = noti.filter((p) => {
     const parti = perConfronto(p.name).split(' ');
     return parti.includes(cognome);
   });
-  if (perCognome.length === 1) return { id: perCognome[0].id, ambiguo: false };
-  return { id: null, ambiguo: perCognome.length > 1 };
+  if (perCognome.length === 1)
+    return { persona: perCognome[0], ambiguo: false };
+  return { persona: null, ambiguo: perCognome.length > 1 };
 };
 
 interface RispostaOrario {
@@ -138,6 +164,8 @@ interface RispostaOrario {
     materia?: string;
     docente?: string;
   }[];
+  giorniDocumento?: number | null;
+  oreDocumento?: number | null;
   nota?: string;
 }
 
@@ -165,6 +193,26 @@ export async function leggiOrarioDaTesto(
     ore: opzioni.ore,
   });
 
+  return componiEsito(dati, opzioni);
+}
+
+/**
+ * Passa al setaccio le righe grezze, da qualunque parte arrivino.
+ *
+ * Le stesse regole valgono per la lettura fatta qui nel browser e per quella
+ * fatta dal modello: giorno e ora dentro la griglia, classe con la forma
+ * giusta, docente cercato in archivio, due posti per casella. Tenerle in un
+ * punto solo è l'unico modo perché le due strade diano lo stesso risultato.
+ */
+export function componiEsito(
+  dati: RispostaOrario,
+  opzioni: {
+    classiValide: string[];
+    docentiNoti: PersonaNota[];
+    giorni: string[];
+    ore: number;
+  }
+): EsitoLetturaOrario {
   const classi = new Map(
     opzioni.classiValide.map((c) => [c.toUpperCase().replace(/\s+/g, ''), c])
   );
@@ -172,8 +220,17 @@ export async function leggiOrarioDaTesto(
   const scartate: RigaScartata[] = [];
   const nomiSconosciuti = new Set<string>();
   const classiSconosciute = new Set<string>();
-  /** Una classe non può avere due lezioni nella stessa casella. */
-  const occupate = new Set<string>();
+  /**
+   * Chi è già stato messo in una casella, casella per casella.
+   *
+   * Due docenti nella stessa ora della stessa classe sono la normalità: il
+   * titolare e chi gli sta accanto, cioè la compresenza o il sostegno. Prima
+   * la seconda riga si buttava, e su un orario vero questo voleva dire
+   * perderne una su cinque: sparivano proprio le ore di sostegno, che sono
+   * quelle che nessuno vuole ribattere a mano. Il terzo docente invece resta
+   * fuori: l'app tiene due caselle per ora e in tre non è più un orario.
+   */
+  const dentroLaCasella = new Map<string, RigaOrarioLetta[]>();
 
   (dati.righe || []).forEach((r) => {
     const grezza = `${r?.classe ?? '?'} ${r?.giorno ?? '?'}/${r?.ora ?? '?'} ${
@@ -207,36 +264,82 @@ export async function leggiOrarioDaTesto(
     }
 
     const chiave = `${classe}_${day}_${hour}`;
-    if (occupate.has(chiave)) {
+    const giaDentro = dentroLaCasella.get(chiave) || [];
+    if (giaDentro.length >= 2) {
       scartate.push({
         riga: grezza,
-        motivo: 'quella classe ha già una lezione in quella casella',
+        motivo: 'in quella casella ci sono già due docenti',
       });
       return;
     }
 
     const nomeLetto = String(r?.docente || '').trim();
-    const { id, ambiguo } = abbina(nomeLetto, opzioni.docentiNoti);
-    if (!id && nomeLetto) {
+    const { persona, ambiguo } = abbina(nomeLetto, opzioni.docentiNoti);
+    if (!persona && nomeLetto) {
       nomiSconosciuti.add(ambiguo ? `${nomeLetto} (più di uno con questo cognome)` : nomeLetto);
     }
 
-    occupate.add(chiave);
-    righe.push({
+    // La stessa persona due volte nella stessa ora è il documento letto
+    // storto, non una compresenza con se stessa.
+    const stessoNome = perConfronto(nomeLetto);
+    if (
+      stessoNome &&
+      giaDentro.some((r2) => perConfronto(r2.nomeLetto) === stessoNome)
+    ) {
+      scartate.push({
+        riga: grezza,
+        motivo: 'quel docente è già in quella casella',
+      });
+      return;
+    }
+
+    /*
+     * Il ruolo. Chi in archivio sta nell'elenco del sostegno entra come
+     * sostegno comunque, anche se nel documento è il primo della casella:
+     * l'elenco dell'app è più affidabile dell'ordine delle righe del PDF.
+     * Vale lo stesso per chi in archivio non c'è ancora ma nel documento ha
+     * «SOSTEGNO» al posto della materia, che è come lo scrivono tutti.
+     * Fuori da quel caso il titolare è chi arriva per primo, e chi lo segue
+     * gli sta accanto in compresenza. Si guarda però se il titolare c'è
+     * davvero, non solo quanti sono: in una casella dove il sostegno è
+     * finito per primo, il collega che viene dopo è il titolare, non una
+     * compresenza appesa al nulla.
+     */
+    const materiaLetta = String(r?.materia || '')
+      .trim()
+      .toUpperCase();
+    const ruolo: RuoloRiga =
+      persona?.tipo === 'sostegno' || materiaLetta.startsWith('SOSTEGNO')
+        ? 'sostegno'
+        : giaDentro.some((r2) => r2.ruolo === 'materia')
+          ? 'compresenza'
+          : 'materia';
+
+    const riga: RigaOrarioLetta = {
       classId: classe,
       day,
       hour,
       subject: String(r?.materia || '').slice(0, 40),
-      teacherId: id,
+      ruolo,
+      teacherId: persona?.id ?? null,
       nomeLetto,
       classeNuova: !gia,
       ambiguo,
-    });
+    };
+    dentroLaCasella.set(chiave, [...giaDentro, riga]);
+    righe.push(riga);
   });
+
+  const numeroSano = (valore: unknown): number | null => {
+    const n = Number(valore);
+    return Number.isInteger(n) && n > 0 && n < 30 ? n : null;
+  };
 
   return {
     righe,
     scartate,
+    giorniDocumento: numeroSano(dati.giorniDocumento),
+    oreDocumento: numeroSano(dati.oreDocumento),
     nomiSconosciuti: Array.from(nomiSconosciuti).slice(0, 60),
     classiSconosciute: Array.from(classiSconosciute).sort(),
     nota: String(dati.nota || ''),
