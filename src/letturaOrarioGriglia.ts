@@ -29,6 +29,8 @@
  * diversi.
  */
 
+import type { SfondiPdf } from './letturaElenchi';
+
 /** Una cella letta: dove sta e cosa c'è scritto. */
 interface Pezzo {
   colonna: number;
@@ -50,12 +52,76 @@ export interface RigaGrezzaLetta {
   docente: string;
 }
 
+/**
+ * Una giornata intera dipinta di un colore solo, nella riga di un docente.
+ *
+ * Negli orari già costruiti dalla scuola il colore dice quello che la casella
+ * vuota non dice: qui il docente non c'è, e non è un buco fra due lezioni. Il
+ * rosso di solito è il giorno libero, il giallo il giorno in cui insegna in
+ * un'altra scuola, ma ogni istituto usa i suoi: qui si riporta il colore così
+ * com'è e a dargli un significato ci pensa chi guarda l'anteprima.
+ */
+export interface GiornoColorato {
+  docente: string;
+  giorno: number;
+  /** «#rrggbb». */
+  colore: string;
+}
+
+/** Un'ora segnata «D»: disponibilità per le supplenze. */
+export interface DisponibilitaLetta {
+  docente: string;
+  giorno: number;
+  ora: number;
+}
+
 export interface EsitoGriglia {
   righe: RigaGrezzaLetta[];
   /** Quanti giorni e quante ore ha la settimana disegnata nel documento. */
   giorniDocumento: number;
   oreDocumento: number;
+  /** Le giornate dipinte di un colore solo, quando il documento ha i colori. */
+  giorniColorati: GiornoColorato[];
+  /** Le ore segnate «D». Queste si leggono dal testo, colori o non colori. */
+  disponibilita: DisponibilitaLetta[];
 }
+
+/** Cosa vuol dire un colore, secondo il primo colpo d'occhio. */
+export type SensoColore = 'libero' | 'altraScuola' | 'niente';
+
+/**
+ * L'ipotesi di partenza sul significato di un colore.
+ *
+ * Rosso vuol dire giorno libero e giallo altra scuola: è la convenzione che
+ * gli orari delle scuole usano quasi sempre. È solo un'ipotesi, e l'anteprima
+ * la mette in un menù da cui si cambia: un istituto che il giorno libero lo
+ * segna in verde non deve trovarsi l'app che indovina male in silenzio.
+ *
+ * I colori pallidi non contano. Un fondo grigetto è quasi sempre la riga
+ * alternata di una tabella, e le tinte tenui gli orari le usano per le note.
+ */
+export const sensoDelColore = (colore: string): SensoColore => {
+  const r = parseInt(colore.slice(1, 3), 16) / 255;
+  const g = parseInt(colore.slice(3, 5), 16) / 255;
+  const b = parseInt(colore.slice(5, 7), 16) / 255;
+  if (![r, g, b].every((v) => Number.isFinite(v))) return 'niente';
+  const massimo = Math.max(r, g, b);
+  const minimo = Math.min(r, g, b);
+  const pienezza = massimo === 0 ? 0 : (massimo - minimo) / massimo;
+  if (massimo < 0.5 || pienezza < 0.45) return 'niente';
+
+  // La tinta, in gradi: 0 rosso, 60 giallo, 120 verde.
+  const giro = massimo - minimo;
+  let tinta = 0;
+  if (massimo === r) tinta = ((g - b) / giro) * 60;
+  else if (massimo === g) tinta = ((b - r) / giro) * 60 + 120;
+  else tinta = ((r - g) / giro) * 60 + 240;
+  if (tinta < 0) tinta += 360;
+
+  if (tinta <= 20 || tinta >= 340) return 'libero';
+  if (tinta >= 35 && tinta <= 75) return 'altraScuola';
+  return 'niente';
+};
 
 /** La forma di una classe: anno attaccato alla sezione. */
 const FORMA_CLASSE = /^\d{1,2}[A-Z]{1,3}$/;
@@ -329,8 +395,19 @@ const allineaTabulazioni = (testo: string): string => {
  * modello. Torna un esito con poche righe quando la forma c'è ma il contenuto
  * è magro, e sta a chi chiama decidere se basta.
  */
-export function leggiGrigliaOrario(testo: string): EsitoGriglia | null {
-  const righe = allineaTabulazioni(String(testo || '')).split('\n');
+export function leggiGrigliaOrario(
+  testo: string,
+  sfondi?: SfondiPdf | null
+): EsitoGriglia | null {
+  const grezzo = String(testo || '');
+  const righe = allineaTabulazioni(grezzo).split('\n');
+  /*
+   * I colori sono agganciati alla colonna di carattere del testo com'è
+   * arrivato. `allineaTabulazioni` riscrive le colonne, quindi dove ha
+   * lavorato i colori non combaciano più e si lasciano perdere: succede solo
+   * col copia e incolla e col foglio di Excel, che i colori non ce li hanno.
+   */
+  const colori = grezzo.includes('\t') ? null : sfondi || null;
 
   let indiceIntestazione = -1;
   let colonne: ColonnaOraria[] | null = null;
@@ -374,8 +451,57 @@ export function leggiGrigliaOrario(testo: string): EsitoGriglia | null {
     scarto: number;
   }
   const celle: CellaLetta[] = [];
+  const giorniColorati: GiornoColorato[] = [];
+  const disponibilita: DisponibilitaLetta[] = [];
   let docenteCorrente = '';
   let materiaCorrente = '';
+
+  /**
+   * La colonna oraria più vicina all'inizio di una cella, se ce n'è una
+   * abbastanza vicina.
+   */
+  const colonnaVicina = (colonna: number): number => {
+    let vicina = -1;
+    let distanza = Number.POSITIVE_INFINITY;
+    for (let k = 0; k < colonne!.length; k++) {
+      const quanto = Math.abs(colonne![k].colonna - colonna);
+      if (quanto < distanza) {
+        distanza = quanto;
+        vicina = k;
+      }
+    }
+    return distanza > tolleranza ? -1 : vicina;
+  };
+
+  /**
+   * Le giornate che sulla riga di un docente sono dipinte tutte di un colore
+   * solo.
+   *
+   * Si guarda il colore sotto ogni ora della giornata e si tiene solo il caso
+   * in cui sono tutte uguali: una giornata mezza colorata è un'altra cosa (una
+   * mattina di disponibilità, una nota) e non va scambiata per un giorno di
+   * assenza. Il colore si legge sulla riga dove sta il nome, che è quella che
+   * la fascia colorata attraversa di sicuro anche quando la casella di un
+   * docente va a capo.
+   */
+  const giornateDipinte = (riga: number): { giorno: number; colore: string }[] => {
+    if (!colori) return [];
+    const perGiorno = new Map<number, string[]>();
+    for (const c of colonne!) {
+      const trovato = colori.coloreDi(riga, c.colonna);
+      const elenco = perGiorno.get(c.giorno) || [];
+      elenco.push(trovato || '');
+      perGiorno.set(c.giorno, elenco);
+    }
+    const dipinte: { giorno: number; colore: string }[] = [];
+    perGiorno.forEach((elenco, giorno) => {
+      if (elenco.length < 2) return;
+      const primo = elenco[0];
+      if (!primo || !elenco.every((c) => c === primo)) return;
+      dipinte.push({ giorno, colore: primo });
+    });
+    return dipinte;
+  };
 
   for (let i = indiceIntestazione + 1; i < righe.length; i++) {
     const riga = righe[i];
@@ -394,25 +520,50 @@ export function leggiGrigliaOrario(testo: string): EsitoGriglia | null {
     if (anagrafica.length) {
       docenteCorrente = anagrafica[0].testo;
       materiaCorrente = anagrafica[1]?.testo || '';
+      /*
+       * Il colore si guarda qui, sulla riga che apre il docente, e una volta
+       * sola: è la riga che porta il nome, quindi è quella su cui la fascia
+       * colorata passa di sicuro. Le righe di continuazione, quelle di chi ha
+       * due scritte in una casella, cadono più in basso e potrebbero già
+       * sporgere nella fascia del docente dopo.
+       */
+      for (const dipinta of giornateDipinte(i)) {
+        giorniColorati.push({
+          docente: docenteCorrente,
+          giorno: dipinta.giorno,
+          colore: dipinta.colore,
+        });
+      }
     }
     if (!docenteCorrente) continue;
 
     for (const pezzo of pezzi) {
       if (pezzo.colonna < primaColonnaOraria - tolleranza) continue;
+
+      /*
+       * La «D» delle ore di disponibilità. Sta scritta nella casella come una
+       * classe qualsiasi, ma classe non è: prima veniva buttata via, e con lei
+       * l'unica cosa che nell'orario dice dove il docente è tenuto a restare a
+       * scuola per le supplenze.
+       */
+      if (/^d\.?$/i.test(pezzo.testo.trim())) {
+        const dove = colonnaVicina(pezzo.colonna);
+        if (dove >= 0) {
+          disponibilita.push({
+            docente: docenteCorrente,
+            giorno: colonne[dove].giorno,
+            ora: colonne[dove].ora,
+          });
+        }
+        continue;
+      }
+
       const classe = classeDellaCella(pezzo.testo);
       if (!classe) continue;
 
       // La colonna oraria più vicina all'inizio della cella.
-      let vicina = -1;
-      let distanza = Number.POSITIVE_INFINITY;
-      for (let k = 0; k < colonne.length; k++) {
-        const quanto = Math.abs(colonne[k].colonna - pezzo.colonna);
-        if (quanto < distanza) {
-          distanza = quanto;
-          vicina = k;
-        }
-      }
-      if (vicina < 0 || distanza > tolleranza) continue;
+      const vicina = colonnaVicina(pezzo.colonna);
+      if (vicina < 0) continue;
 
       celle.push({
         classe,
@@ -425,6 +576,19 @@ export function leggiGrigliaOrario(testo: string): EsitoGriglia | null {
   }
 
   if (!celle.length) return null;
+
+  /*
+   * Un docente che nel documento non ha nemmeno un'ora e nemmeno una «D» non
+   * ha una riga d'orario: è un nome in elenco e basta, tipico dei docenti di
+   * sostegno che l'orario ce l'hanno a parte. Di suo non porta colori (la sua
+   * riga è bianca), ma se il documento gliene mette uno per altre ragioni non
+   * deve diventare un vincolo che nessuno ha deciso.
+   */
+  const conRiga = new Set([
+    ...celle.map((c) => c.docente),
+    ...disponibilita.map((d) => d.docente),
+  ]);
+  const colorateVere = giorniColorati.filter((g) => conRiga.has(g.docente));
 
   /*
    * Le caselle larghe due ore.
@@ -474,5 +638,11 @@ export function leggiGrigliaOrario(testo: string): EsitoGriglia | null {
     }
   }
 
-  return { righe: lette, giorniDocumento, oreDocumento };
+  return {
+    righe: lette,
+    giorniDocumento,
+    oreDocumento,
+    giorniColorati: colorateVere,
+    disponibilita,
+  };
 }

@@ -34,7 +34,7 @@ import {
 } from './risolviConflittiIA';
 import PannelloSostituzioni from './PannelloSostituzioni';
 import type { AssegnazioneProposta, BucoScoperto } from './sostituzioniIA';
-import ImportaOrario from './ImportaOrario';
+import ImportaOrario, { type VincoliImportati } from './ImportaOrario';
 import type { RigaOrarioLetta } from './importaOrarioIA';
 import RichiesteDocenti from './RichiesteDocenti';
 import DiagnosiGenerazione from './DiagnosiGenerazione';
@@ -1220,6 +1220,100 @@ const dailyCapFor = (rules: any, idealPerDay: any, teacherId: string) => {
 
 /** Chiave di una cella di indisponibilità oraria dentro teacherHoursOff. */
 const hourOffKey = (day: number, hour: number) => `${day}_${hour}`;
+
+/**
+ * Mette dentro le regole i vincoli letti dal documento importato.
+ *
+ * Sono tre cose diverse e vanno in tre posti diversi. Il giorno libero è un
+ * giorno intero e sta in `teacherDaysOff`. Il giorno in un'altra scuola non è
+ * un giorno libero (il docente lavora, solo non qui) e va bloccato ora per
+ * ora in `teacherHoursOff`, che è il posto che l'app tiene proprio per chi
+ * divide la cattedra fra due istituti. Le ore «D» non vincolano niente: sono
+ * un'etichetta, e stanno in `teacherDisponibilita`.
+ *
+ * Sui giorni liberi c'è un tetto, che dipende dalle ore di cattedra: chi ne ha
+ * diciotto può averne uno solo. Il documento però a volte ne segna tre, perché
+ * il sabato di una settimana corta è rosso per tutti insieme al giorno libero
+ * vero. I giorni oltre il tetto non si buttano: diventano ore bloccate, che
+ * per il generatore vale lo stesso e non fa saltare il conto dei giorni
+ * liberi. Buttarli vorrebbe dire ritrovarsi una lezione nel giorno in cui il
+ * docente non c'è.
+ *
+ * Quello che c'era prima non si perde: i vincoli si aggiungono, non
+ * sostituiscono. Chi ha già scritto a mano un'indisponibilità se la tiene.
+ */
+const conVincoliImportati = (
+  regole: any,
+  vincoli:
+    | {
+        giorniLiberi: Record<string, number[]>;
+        oreBloccate: Record<string, string[]>;
+        disponibilita: Record<string, string[]>;
+      }
+    | undefined,
+  righe: { teacherId: string | null }[],
+  oreDelGiorno: number
+): any => {
+  if (!vincoli) return regole;
+  const quanti =
+    Object.keys(vincoli.giorniLiberi).length +
+    Object.keys(vincoli.oreBloccate).length +
+    Object.keys(vincoli.disponibilita).length;
+  if (!quanti) return regole;
+
+  // Le ore di cattedra da cui dipende il tetto: quelle che il documento ha
+  // appena consegnato, che sono più aggiornate di quelle in archivio.
+  const oreDelDocente: Record<string, number> = {};
+  righe.forEach((r) => {
+    if (!r.teacherId) return;
+    oreDelDocente[r.teacherId] = (oreDelDocente[r.teacherId] || 0) + 1;
+  });
+
+  const giorniOff: Record<string, number[]> = {
+    ...(regole?.teacherDaysOff || {}),
+  };
+  const oreOff: Record<string, string[]> = {
+    ...(regole?.teacherHoursOff || {}),
+  };
+  const disponibili: Record<string, string[]> = {
+    ...(regole?.teacherDisponibilita || {}),
+  };
+
+  const unisci = (prima: string[] | undefined, nuove: string[]): string[] =>
+    Array.from(new Set([...(prima || []), ...nuove]));
+
+  Object.entries(vincoli.oreBloccate).forEach(([id, chiavi]) => {
+    oreOff[id] = unisci(oreOff[id], chiavi);
+  });
+  Object.entries(vincoli.disponibilita).forEach(([id, chiavi]) => {
+    disponibili[id] = unisci(disponibili[id], chiavi);
+  });
+
+  Object.entries(vincoli.giorniLiberi).forEach(([id, giorni]) => {
+    const tutti = Array.from(
+      new Set([...(giorniOff[id] || []), ...giorni])
+    ).sort((a, b) => a - b);
+    const tetto = getMaxDaysOffForHours(oreDelDocente[id] || 0);
+    giorniOff[id] = tutti.slice(0, tetto);
+    const oltre = tutti.slice(tetto);
+    if (oltre.length) {
+      const bloccate: string[] = [];
+      oltre.forEach((giorno) => {
+        for (let ora = 0; ora < oreDelGiorno; ora++) {
+          bloccate.push(hourOffKey(giorno, ora));
+        }
+      });
+      oreOff[id] = unisci(oreOff[id], bloccate);
+    }
+  });
+
+  return {
+    ...regole,
+    teacherDaysOff: giorniOff,
+    teacherHoursOff: oreOff,
+    teacherDisponibilita: disponibili,
+  };
+};
 
 /**
  * Valore speciale del menu della cella nell'Orario Generale: invece di una
@@ -8394,7 +8488,8 @@ export default function App() {
       tipo?: 'materia' | 'sostegno';
     }[] = [],
     nuoveClassi: string[] = [],
-    grigliaDocumento?: { giorni: number; ore: number }
+    grigliaDocumento?: { giorni: number; ore: number },
+    vincoli?: VincoliImportati
   ) => {
     if (readOnlyMode || !righe.length) return;
 
@@ -8595,11 +8690,21 @@ export default function App() {
 
     const nuovo = [...restanti, ...importate];
 
+    /* --- i vincoli che il documento porta con sé --- */
+
+    const regoleAggiornate = conVincoliImportati(
+      generationRules,
+      vincoli,
+      righe,
+      gridHourRows.length
+    );
+
     if (nuoveClassi.length) setSectionsConfig(nuovaConfig);
     setTeachers(teachersAggiornati);
     setSostegno(sostegnoAggiornato);
     setStrumento(strumentoAggiornato);
     setTimetable(nuovo);
+    if (regoleAggiornate !== generationRules) setGenerationRules(regoleAggiornate);
     pushDataToCloud(
       nuovo,
       teachersAggiornati,
@@ -8608,7 +8713,7 @@ export default function App() {
       strumentoAggiornato,
       diurnalHours,
       afternoonHours,
-      generationRules,
+      regoleAggiornate,
       generateOptions,
       cellNotes,
       groupConstraints,

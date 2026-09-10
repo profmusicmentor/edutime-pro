@@ -28,7 +28,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-10';
+export const NOVITA_VERSIONE = '2026-09-10b';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -40,6 +40,17 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-10b',
+    data: '10 settembre 2026',
+    voci: [
+      '«📥 Importa orario» adesso guarda anche i colori del documento. Negli orari che le scuole costruiscono da sé la giornata in cui il docente non c’è è dipinta: rossa quando è il giorno libero, gialla quando quel giorno insegna in un’altra scuola. Sono due righe vuote uguali, e senza il colore erano indistinguibili da un buco fra due lezioni: i giorni liberi di sessanta colleghi andavano riscritti a mano uno per uno, dopo aver importato l’orario. Adesso si leggono dal foglio insieme alle lezioni.',
+        'Il significato dei colori non viene indovinato in silenzio. Nell’anteprima si vede il colore com’è, quante giornate ha dipinto e su quanti docenti, e da un menù si dice cosa vuol dire: il rosso arriva già proposto come giorno libero e il giallo come altra scuola, ma un istituto che li usa al contrario cambia due menù e via. Le tinte tenui non contano: un fondo grigetto è quasi sempre solo una riga alternata.',
+      'Il giorno in un’altra scuola non diventa un giorno libero: viene bloccato ora per ora, che è il posto che l’app tiene per chi divide la cattedra fra due istituti. E quando il documento segna più giorni liberi di quanti il tetto ne consenta (chi ha diciotto ore ne ha diritto a uno solo), quelli in più non si buttano: diventano ore bloccate, che per il generatore vale lo stesso. Buttarli vorrebbe dire ritrovarsi una lezione nel giorno in cui il docente non c’è.',
+      'Entrano anche le ore segnate «D», la disponibilità per le supplenze. Prima venivano scartate perché non hanno la forma di una classe, e con loro se ne andava l’unica cosa che nell’orario dice dove il docente deve restare a scuola. Adesso si ritrovano nell’Orario Generale e nel prospetto delle ore di disponibilità della segreteria. Le «D» si leggono da qualsiasi documento, anche dal foglio di Excel e dal copia e incolla; i colori, per ora, solo dal PDF.',
+      'Chi nel documento compare solo con i colori e le «D», senza nemmeno una lezione sua, adesso ha una scheda dove finire: è il caso del docente di potenziamento con sei ore di disponibilità. Prima i suoi vincoli si perdevano in silenzio.',
+    ],
+  },
   {
     versione: '2026-09-10',
     data: '10 settembre 2026',
@@ -121,14 +132,6 @@ export const NOVITA: VoceNovita[] = [
     data: '8 settembre 2026',
     voci: [
       'La chiave dell’abbonamento si può incollare anche senza trattini. La mail dell’acquisto stampa la chiave tutta attaccata, ma il negozio la riconosce solo scritta come «xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx»: chi copiava dalla ricevuta si sentiva rispondere «Chiave non valida» pur avendo pagato, e non c’era modo di indovinare che mancavano cinque trattini. Adesso li rimette l’app, e sotto il campo c’è scritto dove trovare la chiave. Segnalazione arrivata dal pulsante dei feedback.',
-    ],
-  },
-  {
-    versione: '2026-09-08b',
-    data: '8 settembre 2026',
-    voci: [
-      'Il riquadro «✨ Fatti aiutare dall’IA» dei Conflitti adesso ammette quando non può fare niente. Se quel che resta in lista sono solo avvisi «giornata sotto il minimo di ore», te lo dice prima che tu prema il pulsante: quegli avvisi non si tolgono spostando lezioni, perché l’ora isolata deve avere un altro giorno dove andare e con i docenti divisi su più scuole quel giorno non c’è. Prima l’IA ci provava lo stesso e rispondeva «nessuna mossa migliora l’orario», che è vero ma sembra una resa. Adesso la strada c’è: si porta «🚪 Minimo ore al giorno» su «Nessun minimo» in «⚙️ Sezioni & Regole» e spariscono tutti insieme. Vale la pena ricordare che quegli avvisi non sono errori: un orario con zero errori si può già usare. Segnalazione di un collega.',
-      'Tolte due date di scadenza rimaste scritte a mano nell’app: il riquadro dei conflitti e la striscia dell’assistente della guida promettevano una prova gratuita «fino al 5 settembre 2026», che è passato da un pezzo. Ora dicono semplicemente come stanno le cose oggi.',
     ],
   },
 ];

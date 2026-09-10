@@ -2072,9 +2072,17 @@ export const chapters: Chapter[] = [
             Puoi anche toglierla, e allora si importano solo le righe con classe
             e docente già presenti. Due cose non si creano mai: un cognome che in
             archivio corrisponde già a due persone, e una sigla che non ha la
-            forma di una classe (anno più sezione, tipo 1A). Attenzione: le
-            caselle importate sostituiscono quello che c'era. Qui i nomi escono
-            davvero dal computer, quindi serve la spunta del consenso.
+            forma di una classe (anno più sezione, tipo 1A). Se il PDF ha le
+            giornate dipinte, come fanno quasi tutti gli orari costruiti dalla
+            scuola, i colori si leggono: nell'anteprima dici cosa vuol dire
+            ognuno (il rosso arriva proposto come <B>giorno libero</B>, il
+            giallo come <B>in un'altra scuola</B>) e i vincoli entrano insieme
+            alle lezioni, senza riscriverli a mano. Le ore segnate{' '}
+            <B>«D»</B>, cioè la disponibilità per le supplenze, entrano anche
+            loro, e da qualsiasi documento: quelle si leggono dal testo, non
+            dal colore. Attenzione: le caselle importate sostituiscono quello
+            che c'era. Qui i nomi escono davvero dal computer, quindi serve la
+            spunta del consenso.
           </>
         ),
       },

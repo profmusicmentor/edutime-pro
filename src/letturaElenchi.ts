@@ -125,6 +125,201 @@ const staccaOreAttaccate = (pezzi: PezzoPdf[]): PezzoPdf[] => {
  * sotto il suo giorno e la sua ora, e si può leggere.
  */
 export async function estraiTestoPdf(file: File): Promise<string> {
+  return (await leggiPdf(file, false)).testo;
+}
+
+/**
+ * Il testo di un PDF insieme ai colori di fondo delle sue caselle.
+ *
+ * Serve agli orari già costruiti dalla scuola, dove il colore dice quello che
+ * il testo non dice: la fascia rossa sul giorno libero, quella gialla sul
+ * giorno in cui il docente sta in un'altra scuola. Sono righe vuote tutte e
+ * due, e senza il colore restano indistinguibili da un'ora buca qualsiasi.
+ */
+export async function estraiTestoPdfConSfondi(
+  file: File
+): Promise<{ testo: string; sfondi: SfondiPdf | null }> {
+  return leggiPdf(file, true);
+}
+
+/**
+ * Il colore di fondo del documento, letto per riga di testo e colonna di
+ * carattere: le stesse due misure con cui `leggiGrigliaOrario` conta le celle,
+ * così le due letture parlano la stessa lingua e non serve incrociare
+ * coordinate.
+ */
+export interface SfondiPdf {
+  /** «#rrggbb» se lì sotto c'è un colore, `null` se il foglio è bianco. */
+  coloreDi: (riga: number, colonna: number) => string | null;
+}
+
+/** Una riga ricostruita dal PDF, con il posto che occupa sul foglio. */
+interface RigaPdf {
+  testo: string;
+  /** La pagina, contata da 1. */
+  pagina: number;
+  /** L'altezza a cui sta la riga, in punti PDF (dal basso). */
+  y: number;
+}
+
+/** Il colore di un pixel, nella forma «#rrggbb». */
+const esadecimale = (r: number, g: number, b: number): string =>
+  '#' +
+  [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+
+/**
+ * Il campione è caduto sopra una lettera o sopra il filo di una tabella?
+ *
+ * Si guarda la componente più forte, non la luminosità: il rosso pieno è un
+ * colore scuro a guardarlo con gli occhi (viene un terzo del bianco), e
+ * scartando i campioni scuri sparivano proprio le fasce rosse dei giorni
+ * liberi, cioè la cosa che si era venuti a cercare. L'inchiostro, invece, è
+ * spento in tutti e tre i colori.
+ */
+const inchiostro = (r: number, g: number, b: number): boolean =>
+  Math.max(r, g, b) < 110;
+
+/**
+ * Guarda che colore ha il foglio sotto ogni casella.
+ *
+ * La strada più corta non è leggere i comandi di disegno del PDF, che cambiano
+ * da una versione all'altra della libreria e da un programma di stampa
+ * all'altro: è stampare la pagina in un'immagine e guardare i pixel, che è
+ * quello che farebbe una persona. La pagina si disegna in memoria, non si vede
+ * e non esce di qui, esattamente come il testo.
+ *
+ * Di ogni casella si prendono sei campioni, un po' più in alto della riga di
+ * scrittura e in tre punti diversi della sua larghezza, e vince il colore che
+ * esce più volte: così una lettera o il filo della tabella non spostano il
+ * risultato. I campioni scuri si buttano prima di contarli.
+ */
+const campionaSfondi = async (
+  documento: any,
+  righe: RigaPdf[],
+  xMinimo: number,
+  passo: number
+): Promise<SfondiPdf | null> => {
+  if (typeof document === 'undefined' || !righe.length) return null;
+
+  // Fin dove guardare: la riga più lunga del documento, più un margine. Il
+  // colore va cercato anche dove non c'è scritto niente, che è proprio il caso
+  // del giorno libero.
+  const colonne = righe.reduce((m, r) => Math.max(m, r.testo.length), 0) + 12;
+  const trovati = new Map<string, string>();
+
+  for (let n = 1; n <= documento.numPages; n++) {
+    const diQui = righe
+      .map((r, indice) => ({ ...r, indice }))
+      .filter((r) => r.pagina === n);
+    if (!diQui.length) continue;
+
+    /*
+     * Quanto è alta una riga su questa pagina. Si prende la distanza più
+     * frequente fra una riga e la successiva: serve a sapere di quanto salire
+     * sopra la riga di scrittura per finire in mezzo alla casella e non sulla
+     * casella di sopra. Misurarla sul documento invece di fissarla vuol dire
+     * che vale anche per un orario stampato in corpo grande.
+     */
+    const salti = diQui
+      .slice(1)
+      .map((r, i) => diQui[i].y - r.y)
+      .filter((d) => d > 0.5)
+      .sort((a, b) => a - b);
+    const altezza = salti.length ? salti[Math.floor(salti.length / 2)] : 10;
+
+    const pagina = await documento.getPage(n);
+    const misura = pagina.getViewport({ scale: 1 });
+    // Un tetto ai pixel: una pagina grande non deve far esplodere la memoria.
+    const scala = Math.min(
+      2,
+      Math.max(1, Math.sqrt(4_000_000 / (misura.width * misura.height)))
+    );
+    const vista = pagina.getViewport({ scale: scala });
+    const tela = document.createElement('canvas');
+    tela.width = Math.ceil(vista.width);
+    tela.height = Math.ceil(vista.height);
+    const pennello = tela.getContext('2d', { willReadFrequently: true });
+    if (!pennello) return null;
+    // Il foglio è bianco: senza questo, dove il PDF non disegna niente
+    // resterebbe trasparente e i campioni uscirebbero neri.
+    pennello.fillStyle = '#ffffff';
+    pennello.fillRect(0, 0, tela.width, tela.height);
+    /*
+     * Si disegna «come per la stampa», e non è un dettaglio: con il disegno
+     * normale pdf.js avanza un pezzo per fotogramma, e una scheda che in quel
+     * momento non è in primo piano di fotogrammi non ne riceve nessuno. La
+     * pagina resterebbe lì a metà per sempre, e l'import con lei. Il disegno
+     * per la stampa va avanti da solo, senza aspettare lo schermo, e i colori
+     * di fondo delle caselle sono gli stessi nei due modi.
+     */
+    await pagina.render({
+      canvasContext: pennello,
+      canvas: tela,
+      viewport: vista,
+      intent: 'print',
+    }).promise;
+    const pixel = pennello.getImageData(0, 0, tela.width, tela.height).data;
+
+    const pixelDi = (x: number, y: number): [number, number, number] | null => {
+      const punto = vista.convertToViewportPoint(x, y);
+      const cx = Math.round(punto[0]);
+      const cy = Math.round(punto[1]);
+      if (cx < 0 || cy < 0 || cx >= tela.width || cy >= tela.height) return null;
+      const i = (cy * tela.width + cx) * 4;
+      return [pixel[i], pixel[i + 1], pixel[i + 2]];
+    };
+
+    const alture = [altezza * 0.22, altezza * 0.42];
+    const larghi = [passo * 0.3, passo * 0.5, passo * 0.7];
+    for (const riga of diQui) {
+      for (let colonna = 0; colonna < colonne; colonna++) {
+        const conto = new Map<string, number>();
+        for (const su of alture) {
+          for (const lato of larghi) {
+            const c = pixelDi(xMinimo + colonna * passo + lato, riga.y + su);
+            if (!c) continue;
+            if (inchiostro(c[0], c[1], c[2])) continue;
+            const chiave = esadecimale(c[0], c[1], c[2]);
+            conto.set(chiave, (conto.get(chiave) || 0) + 1);
+          }
+        }
+        let vincitore = '';
+        let quante = 0;
+        conto.forEach((v, k) => {
+          if (v > quante) {
+            quante = v;
+            vincitore = k;
+          }
+        });
+        // Il bianco del foglio non è un colore: è l'assenza di colore, e
+        // tenerlo vorrebbe dire riempire la mappa di niente.
+        if (!vincitore || quante < 2) continue;
+        const r = parseInt(vincitore.slice(1, 3), 16);
+        const g = parseInt(vincitore.slice(3, 5), 16);
+        const b = parseInt(vincitore.slice(5, 7), 16);
+        if (r > 245 && g > 245 && b > 245) continue;
+        trovati.set(`${riga.indice}:${colonna}`, vincitore);
+      }
+    }
+    pagina.cleanup();
+  }
+
+  if (!trovati.size) return null;
+  return {
+    coloreDi: (riga: number, colonna: number) =>
+      trovati.get(`${riga}:${colonna}`) || null,
+  };
+};
+
+/**
+ * Il corpo della lettura, uguale col colore e senza. I colori costano una
+ * stampa in memoria di ogni pagina, perciò si fanno solo quando servono: chi
+ * importa un elenco di docenti non deve pagarla.
+ */
+async function leggiPdf(
+  file: File,
+  conSfondi: boolean
+): Promise<{ testo: string; sfondi: SfondiPdf | null }> {
   const pdfjs = await import('pdfjs-dist');
   const workerUrl = (
     await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
@@ -141,6 +336,9 @@ export async function estraiTestoPdf(file: File): Promise<string> {
   const documento = await caricamento.promise;
 
   const pagine: string[] = [];
+  /** Le righe emesse, nell'ordine in cui escono, per la lettura dei colori. */
+  const righeConPosto: RigaPdf[] = [];
+  let sfondi: SfondiPdf | null = null;
   try {
     /*
      * I pezzi fatti di soli spazi si buttano via. Certi programmi riempiono
@@ -190,7 +388,7 @@ export async function estraiTestoPdf(file: File): Promise<string> {
       ? Math.min(...tuttiIPezzi.map((item) => item.transform![4]))
       : 0;
 
-    for (const pezzi of pezziPerPagina) {
+    for (const [indicePagina, pezzi] of pezziPerPagina.entries()) {
       /*
        * Le righe si mettono insieme guardando l'altezza, non l'ordine in cui i
        * pezzi stanno scritti nel file. Nel PDF il testo sta nell'ordine in cui
@@ -225,6 +423,10 @@ export async function estraiTestoPdf(file: File): Promise<string> {
 
       const righe: string[] = [];
       for (const gruppo of gruppi) {
+        // L'altezza della riga si prende prima di rimettere i pezzi in fila da
+        // sinistra a destra: dopo, il primo pezzo non è più quello che ha
+        // aperto la riga.
+        const altezzaRiga = gruppo[0]?.transform?.[5] ?? 0;
         gruppo.sort((a, b) => a.transform![4] - b.transform![4]);
         let riga = '';
         for (const item of gruppo) {
@@ -242,15 +444,35 @@ export async function estraiTestoPdf(file: File): Promise<string> {
                 : '';
           riga += testo;
         }
-        righe.push(riga.trimEnd());
+        const pulita = riga.trimEnd();
+        // Le righe vuote non escono nel testo: per far tornare i conti a chi
+        // legge i colori, non devono contare nemmeno qui.
+        if (!pulita.trim()) continue;
+        righe.push(pulita);
+        righeConPosto.push({
+          testo: pulita,
+          pagina: indicePagina + 1,
+          y: altezzaRiga,
+        });
       }
-      pagine.push(righe.filter((r) => r.trim()).join('\n'));
+      pagine.push(righe.join('\n'));
+    }
+
+    if (conSfondi) {
+      try {
+        sfondi = await campionaSfondi(documento, righeConPosto, xMinimo, passo);
+      } catch {
+        // Un documento che non si lascia stampare in memoria non è un
+        // documento rotto: il testo c'è ed è quello che conta. Si va avanti
+        // senza colori.
+        sfondi = null;
+      }
     }
   } finally {
     await caricamento.destroy();
   }
 
-  return pagine.join('\n');
+  return { testo: pagine.join('\n'), sfondi };
 }
 
 /** Legge un file di testo semplice (txt, csv) così com'è. */
@@ -261,11 +483,32 @@ const leggiTesto = (file: File): Promise<string> => file.text();
  * Error con un messaggio già pronto da mostrare quando il file non va bene.
  */
 export async function testoDelFile(file: File): Promise<string> {
+  return (await apriFile(file, false)).testo;
+}
+
+/**
+ * Come `testoDelFile`, ma dei PDF si porta dietro anche i colori di fondo.
+ * La usa l'import dell'orario, l'unico posto in cui il colore di una casella
+ * vuole dire qualcosa.
+ */
+export async function apriFileOrario(
+  file: File
+): Promise<{ testo: string; sfondi: SfondiPdf | null }> {
+  return apriFile(file, true);
+}
+
+async function apriFile(
+  file: File,
+  conSfondi: boolean
+): Promise<{ testo: string; sfondi: SfondiPdf | null }> {
   const nome = file.name.toLowerCase();
   if (nome.endsWith('.pdf')) {
     let testo: string;
+    let sfondi: SfondiPdf | null = null;
     try {
-      testo = await estraiTestoPdf(file);
+      const letto = await leggiPdf(file, conSfondi);
+      testo = letto.testo;
+      sfondi = letto.sfondi;
     } catch {
       throw new Error(
         'Non riesco ad aprire questo PDF. Se è protetto da password, toglila e riprova.'
@@ -276,7 +519,7 @@ export async function testoDelFile(file: File): Promise<string> {
         'Questo PDF non contiene testo: è la fotografia di un foglio. Serve un PDF con il testo dentro, oppure copia e incolla l\'elenco qui sotto.'
       );
     }
-    return testo;
+    return { testo, sfondi };
   }
   /*
    * Il file di Excel. Si apre qui dentro come il PDF, senza mandare niente
@@ -287,7 +530,7 @@ export async function testoDelFile(file: File): Promise<string> {
    */
   if (nome.endsWith('.xlsx')) {
     const { testoDaFoglio } = await import('./letturaFoglioCalcolo');
-    return testoDaFoglio(file);
+    return { testo: await testoDaFoglio(file), sfondi: null };
   }
   /*
    * Il vecchio .xls di Excel 2003 non è un foglio compresso ma un file
@@ -299,7 +542,8 @@ export async function testoDelFile(file: File): Promise<string> {
       'Questo è un vecchio file .xls. Aprilo in Excel e salvalo con «Salva con nome» scegliendo «Cartella di lavoro di Excel (.xlsx)», poi ricaricalo qui.'
     );
   }
-  if (/\.(txt|csv|tsv)$/.test(nome)) return leggiTesto(file);
+  if (/\.(txt|csv|tsv)$/.test(nome))
+    return { testo: await leggiTesto(file), sfondi: null };
   throw new Error(
     'Formato non riconosciuto: serve un PDF, un file Excel .xlsx, un TXT o un CSV.'
   );

@@ -156,6 +156,19 @@ const abbina = (
   return { persona: null, ambiguo: perCognome.length > 1 };
 };
 
+/**
+ * Il docente in archivio che corrisponde a un nome scritto nel documento.
+ *
+ * La usa l'import dell'orario per i vincoli, che arrivano col nome e non con
+ * la lezione: un docente può avere il giorno libero segnato in rosso anche se
+ * nel documento non ha nemmeno un'ora sua, e quel nome va abbinato con lo
+ * stesso metro con cui si abbinano le lezioni.
+ */
+export const abbinaDocente = (
+  nomeLetto: string,
+  noti: PersonaNota[]
+): { persona: PersonaNota | null; ambiguo: boolean } => abbina(nomeLetto, noti);
+
 interface RispostaOrario {
   righe?: {
     classe?: string;

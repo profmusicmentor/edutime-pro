@@ -26,9 +26,16 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { testoDelFile } from './letturaElenchi';
-import { leggiGrigliaOrario } from './letturaOrarioGriglia';
+import { apriFileOrario, type SfondiPdf } from './letturaElenchi';
 import {
+  leggiGrigliaOrario,
+  sensoDelColore,
+  type DisponibilitaLetta,
+  type GiornoColorato,
+  type SensoColore,
+} from './letturaOrarioGriglia';
+import {
+  abbinaDocente,
   componiEsito,
   leggiOrarioDaTesto,
   letturaOrarioDisponibile,
@@ -37,6 +44,20 @@ import {
   type RigaOrarioLetta,
 } from './importaOrarioIA';
 import { messaggioErroreIa } from './iaComune';
+
+/**
+ * I vincoli che il documento porta con sé oltre alle lezioni: i giorni in cui
+ * il docente non c'è e le ore di disponibilità. Sono già abbinati alle
+ * persone dell'app, id per id, perché è la finestra a sapere chi è chi.
+ */
+export interface VincoliImportati {
+  /** id docente → giorni liberi. */
+  giorniLiberi: Record<string, number[]>;
+  /** id docente → chiavi «giorno_ora» in cui è in un'altra scuola. */
+  oreBloccate: Record<string, string[]>;
+  /** id docente → chiavi «giorno_ora» segnate «D». */
+  disponibilita: Record<string, string[]>;
+}
 
 interface Props {
   /** Le classi dell'istituto, come le conosce l'app. */
@@ -56,7 +77,9 @@ interface Props {
     }[],
     nuoveClassi: string[],
     /** La settimana disegnata nel documento: serve a chi crea le sezioni. */
-    grigliaDocumento?: { giorni: number; ore: number }
+    grigliaDocumento?: { giorni: number; ore: number },
+    /** Giorni liberi, altra scuola e ore «D» letti dai colori del documento. */
+    vincoli?: VincoliImportati
   ) => void;
 }
 
@@ -90,6 +113,21 @@ export default function ImportaOrario({
    * anche quando non è stato tagliato niente.
    */
   const [limiti, setLimiti] = useState({ giorni: giorni.length, ore });
+  /** I colori di fondo del documento, quando è un PDF che ne ha. */
+  const [sfondi, setSfondi] = useState<SfondiPdf | null>(null);
+  /**
+   * Quello che il documento dice oltre alle lezioni: le giornate dipinte e le
+   * ore segnate «D». Si tiene a parte dalle righe perché sono vincoli, non
+   * lezioni, e chi guarda decide se portarseli dentro.
+   */
+  const [extra, setExtra] = useState<{
+    colorati: GiornoColorato[];
+    disponibilita: DisponibilitaLetta[];
+  } | null>(null);
+  /** Che significato dare a ogni colore trovato. Modificabile qui. */
+  const [sensi, setSensi] = useState<Record<string, SensoColore>>({});
+  const [portaVincoli, setPortaVincoli] = useState(true);
+  const [portaDisponibilita, setPortaDisponibilita] = useState(true);
 
   useEffect(() => {
     let vivo = true;
@@ -160,6 +198,55 @@ export default function ImportaOrario({
     [importabili]
   );
 
+  /**
+   * I colori trovati, uno per riga, con quante giornate hanno dipinto e su
+   * quanti docenti. È quello che si vede nell'anteprima: il colore non si può
+   * mostrare a parole, ma si può mostrare com'è.
+   */
+  const colori = useMemo(() => {
+    const conti = new Map<
+      string,
+      { colore: string; giornate: number; docenti: Set<string> }
+    >();
+    (extra?.colorati || []).forEach((g) => {
+      const voce = conti.get(g.colore) || {
+        colore: g.colore,
+        giornate: 0,
+        docenti: new Set<string>(),
+      };
+      voce.giornate++;
+      voce.docenti.add(g.docente);
+      conti.set(g.colore, voce);
+    });
+    return Array.from(conti.values()).sort((a, b) => b.giornate - a.giornate);
+  }, [extra]);
+
+  /**
+   * I nomi che nel documento hanno solo colori o ore «D», e nell'app non
+   * esistono: il docente di potenziamento con sei ore di disponibilità e
+   * nessuna lezione sua. Senza una scheda dove metterli, i loro vincoli
+   * restano fuori, e questo va detto prima di premere «Importa».
+   */
+  const soloVincoli = useMemo(() => {
+    if (!extra) return [];
+    const conLezione = new Set(
+      importabili.map((r) => (r.nomeLetto || '').toUpperCase().trim())
+    );
+    const nomi = new Set<string>();
+    extra.colorati.forEach((g) => nomi.add(g.docente));
+    extra.disponibilita.forEach((d) => nomi.add(d.docente));
+    return Array.from(nomi).filter((nome) => {
+      if (conLezione.has(nome.toUpperCase().trim())) return false;
+      return !abbinaDocente(nome, docenti).persona;
+    });
+  }, [extra, importabili, docenti]);
+
+  /** Quanti docenti hanno almeno un'ora «D». */
+  const docentiConD = useMemo(
+    () => new Set((extra?.disponibilita || []).map((d) => d.docente)).size,
+    [extra]
+  );
+
   /** Le righe che restano fuori comunque, spunta o no. */
   const scartateDalNome = useMemo(
     () => (esito?.righe || []).filter((r) => !r.teacherId && (r.ambiguo || !r.nomeLetto)),
@@ -173,8 +260,10 @@ export default function ImportaOrario({
     setServeModello(false);
     setInCorso('file');
     try {
-      const estratto = await testoDelFile(file);
-      setTesto(estratto);
+      const estratto = await apriFileOrario(file);
+      setTesto(estratto.testo);
+      setSfondi(estratto.sfondi);
+      setExtra(null);
       setNomeFile(file.name);
     } catch (e) {
       setErrore(e instanceof Error ? e.message : 'Non riesco ad aprire il file.');
@@ -206,7 +295,7 @@ export default function ImportaOrario({
      * quando la lettura in casa non ce l'ha fatta, ed è il momento in cui la
      * domanda ha un senso.
      */
-    const inCasa = serveModello ? null : leggiGrigliaOrario(testo);
+    const inCasa = serveModello ? null : leggiGrigliaOrario(testo, sfondi);
     if (inCasa && inCasa.righe.length >= 20) {
       setLetturaLocale(true);
       /*
@@ -225,6 +314,25 @@ export default function ImportaOrario({
         ? Math.max(ore, Math.min(12, inCasa.oreDocumento))
         : ore;
       setLimiti({ giorni: quantiGiorni, ore: quanteOre });
+      /*
+       * I colori e le «D» stanno dentro la griglia dell'app come le lezioni:
+       * un giorno libero il sabato non ha senso in una scuola che il sabato
+       * non ce l'ha.
+       */
+      const colorati = inCasa.giorniColorati.filter(
+        (g) => g.giorno < quantiGiorni
+      );
+      setExtra({
+        colorati,
+        disponibilita: inCasa.disponibilita.filter(
+          (d) => d.giorno < quantiGiorni && d.ora < quanteOre
+        ),
+      });
+      const primaIdea: Record<string, SensoColore> = {};
+      colorati.forEach((g) => {
+        if (!primaIdea[g.colore]) primaIdea[g.colore] = sensoDelColore(g.colore);
+      });
+      setSensi(primaIdea);
       setEsito(
         componiEsito(
           {
@@ -257,6 +365,8 @@ export default function ImportaOrario({
 
     setLetturaLocale(false);
     setLimiti({ giorni: giorni.length, ore });
+    // Il modello legge il testo, e nel testo i colori non ci sono.
+    setExtra(null);
     setInCorso('ia');
     try {
       const risultato = await leggiOrarioDaTesto(testo, {
@@ -320,13 +430,94 @@ export default function ImportaOrario({
       new Set(righe.filter((r) => r.classeNuova).map((r) => r.classId))
     );
 
+    /*
+     * I vincoli arrivano col nome scritto nel documento e vanno consegnati con
+     * l'id della persona. Si guarda prima fra le righe appena importate, che
+     * hanno già l'abbinamento fatto (e l'id di chi nasce adesso), poi in
+     * archivio: il docente che ha solo ore di disponibilità, senza nemmeno una
+     * lezione, in quelle righe non compare e altrimenti si perderebbe.
+     */
+    const perNome = new Map<string, string>();
+    righe.forEach((r) => {
+      const chiave = (r.nomeLetto || '').toUpperCase().trim();
+      if (chiave && r.teacherId && !perNome.has(chiave))
+        perNome.set(chiave, r.teacherId);
+    });
+    /*
+     * Chi nel documento compare solo per i colori o per le «D».
+     *
+     * Capita davvero, e non è un caso di scuola: il docente di potenziamento
+     * ha sei ore di disponibilità e nemmeno una lezione sua, e nella riga ha
+     * il giorno libero segnato come tutti. Senza una scheda in cui metterli,
+     * quei vincoli si perderebbero in silenzio, che è il modo peggiore di
+     * perderli. Se la spunta «Crea quello che manca» è messa, la scheda nasce
+     * qui, vuota di cattedra come quella di chi si aggiunge a mano.
+     */
+    const idDelNome = (nome: string): string | null => {
+      const chiave = (nome || '').toUpperCase().trim();
+      const gia = perNome.get(chiave);
+      if (gia) return gia;
+      const { persona, ambiguo } = abbinaDocente(nome, docenti);
+      if (persona) return persona.id;
+      // Un cognome che in archivio è già di due persone non si crea e non si
+      // sceglie, qui come per le lezioni.
+      if (!creaMancanti || ambiguo || !chiave) return null;
+      const chiaveNuovo = `${chiave}::materia`;
+      let voce = nuovi.get(chiaveNuovo);
+      if (!voce) {
+        voce = { id: `staff_${adesso}_${nuovi.size}`, name: nome, tipo: 'materia' };
+        nuovi.set(chiaveNuovo, voce);
+      }
+      perNome.set(chiave, voce.id);
+      return voce.id;
+    };
+
+    const vincoli: VincoliImportati = {
+      giorniLiberi: {},
+      oreBloccate: {},
+      disponibilita: {},
+    };
+    const aggiungi = (dove: Record<string, any[]>, id: string, cosa: any) => {
+      const elenco = dove[id] || [];
+      if (!elenco.includes(cosa)) elenco.push(cosa);
+      dove[id] = elenco;
+    };
+
+    if (portaVincoli) {
+      (extra?.colorati || []).forEach((g) => {
+        const senso = sensi[g.colore];
+        if (senso !== 'libero' && senso !== 'altraScuola') return;
+        const id = idDelNome(g.docente);
+        if (!id) return;
+        if (senso === 'libero') {
+          aggiungi(vincoli.giorniLiberi, id, g.giorno);
+          return;
+        }
+        // L'altra scuola non è un giorno libero: è un giorno in cui il
+        // docente c'è, ma non qui. Si blocca ora per ora, come fa l'app per
+        // chi divide la cattedra fra due istituti.
+        for (let h = 0; h < limiti.ore; h++) {
+          aggiungi(vincoli.oreBloccate, id, `${g.giorno}_${h}`);
+        }
+      });
+    }
+
+    if (portaDisponibilita) {
+      (extra?.disponibilita || []).forEach((d) => {
+        const id = idDelNome(d.docente);
+        if (!id) return;
+        aggiungi(vincoli.disponibilita, id, `${d.giorno}_${d.ora}`);
+      });
+    }
+
     onApplica(
       righe,
       Array.from(nuovi.values()),
       classiNuove,
       esito?.giorniDocumento && esito?.oreDocumento
         ? { giorni: esito.giorniDocumento, ore: esito.oreDocumento }
-        : undefined
+        : undefined,
+      vincoli
     );
   };
 
@@ -396,6 +587,10 @@ export default function ImportaOrario({
             onChange={(e) => {
               setTesto(e.target.value);
               setEsito(null);
+              // Testo battuto a mano: i colori del file di prima non valgono
+              // più, e le colonne nemmeno.
+              setSfondi(null);
+              setExtra(null);
               // Testo nuovo, lettura da rifare in casa: la richiesta di mandare
               // i nomi fuori valeva per la tabella di prima.
               setServeModello(false);
@@ -509,6 +704,122 @@ export default function ImportaOrario({
 
               {esito.nota && (
                 <p className="text-xs text-slate-600">{esito.nota}</p>
+              )}
+
+              {/*
+                I colori del documento. Negli orari già costruiti dalla scuola
+                la fascia colorata dice quello che la casella vuota non dice, e
+                senza di essa un giorno libero e un buco di due ore si
+                assomigliano troppo. Il significato però non si indovina in
+                silenzio: qui si vede il colore com'è, quante giornate ha
+                dipinto, e da un menù si cambia cosa vuol dire.
+              */}
+              {colori.length > 0 && (
+                <div className="border border-brand-200 bg-brand-50 rounded-lg p-3 space-y-2">
+                  <label className="flex items-start gap-2 text-xs text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={portaVincoli}
+                      onChange={(e) => setPortaVincoli(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <b>Leggi anche i colori.</b> Nel documento ci sono
+                      giornate intere dipinte di un colore solo: di solito è
+                      così che si segnano il giorno libero e il giorno in
+                      un&apos;altra scuola. Controlla che il significato sia
+                      quello giusto, poi li porto dentro come vincoli del
+                      docente.
+                    </span>
+                  </label>
+
+                  {portaVincoli && (
+                    <ul className="space-y-2">
+                      {colori.map((c) => (
+                        <li
+                          key={c.colore}
+                          className="flex flex-wrap items-center gap-2 text-xs text-slate-700"
+                        >
+                          <span
+                            className="inline-block w-5 h-5 rounded border border-slate-300 shrink-0"
+                            style={{ backgroundColor: c.colore }}
+                          />
+                          <span className="min-w-[9rem]">
+                            {c.giornate}{' '}
+                            {c.giornate === 1 ? 'giornata' : 'giornate'} su{' '}
+                            {c.docenti.size}{' '}
+                            {c.docenti.size === 1 ? 'docente' : 'docenti'}
+                          </span>
+                          <select
+                            value={sensi[c.colore] || 'niente'}
+                            onChange={(e) =>
+                              setSensi((prima) => ({
+                                ...prima,
+                                [c.colore]: e.target.value as SensoColore,
+                              }))
+                            }
+                            className="border border-slate-200 rounded-lg px-2 py-1 bg-white cursor-pointer"
+                          >
+                            <option value="libero">giorno libero</option>
+                            <option value="altraScuola">
+                              in un&apos;altra scuola
+                            </option>
+                            <option value="niente">non vuol dire niente</option>
+                          </select>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/*
+                Le ore «D». Queste stanno scritte nel testo, quindi si leggono
+                anche senza colori: prima venivano buttate via perché non hanno
+                la forma di una classe, e con loro se ne andava l'unica cosa
+                che nell'orario dice dove il docente deve restare a scuola per
+                le supplenze.
+              */}
+              {(extra?.disponibilita.length || 0) > 0 && (
+                <label className="flex items-start gap-2 text-xs text-slate-700 border border-brand-200 bg-brand-50 rounded-lg p-3">
+                  <input
+                    type="checkbox"
+                    checked={portaDisponibilita}
+                    onChange={(e) => setPortaDisponibilita(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <b>Prendi anche le ore «D».</b> Nel documento ce ne sono{' '}
+                    {extra?.disponibilita.length} su {docentiConD}{' '}
+                    {docentiConD === 1 ? 'docente' : 'docenti'}: sono le ore di
+                    disponibilità per le supplenze. Le segno nell&apos;Orario
+                    Generale e le conto nel prospetto della segreteria.
+                  </span>
+                </label>
+              )}
+
+              {soloVincoli.length > 0 && (portaVincoli || portaDisponibilita) && (
+                <details className="text-xs text-slate-600">
+                  <summary className="cursor-pointer font-semibold">
+                    {soloVincoli.length}{' '}
+                    {soloVincoli.length === 1
+                      ? 'docente compare solo con i colori o le «D»'
+                      : 'docenti compaiono solo con i colori o le «D»'}
+                  </summary>
+                  <p className="mt-2">
+                    Nel documento non hanno nessuna lezione propria e
+                    nell&apos;app non ci sono ancora: è il caso di chi ha solo
+                    ore di disponibilità.{' '}
+                    {creaMancanti
+                      ? 'Con la spunta «Crea quello che manca» nasce una scheda anche per loro, senza cattedra, e i vincoli ci finiscono dentro.'
+                      : 'Senza la spunta «Crea quello che manca» i loro vincoli restano fuori.'}
+                  </p>
+                  <ul className="mt-2 space-y-1">
+                    {soloVincoli.map((n, i) => (
+                      <li key={`sv-${i}`}>- {n}</li>
+                    ))}
+                  </ul>
+                </details>
               )}
 
               {mancaQualcosa && (
