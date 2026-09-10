@@ -45,9 +45,9 @@ export const NOVITA: VoceNovita[] = [
     data: '10 settembre 2026',
     voci: [
       '«📥 Importa orario» adesso legge anche gli orari stampati con «Stampa in PDF» di Windows, che prima non entravano affatto. Quella stampante scrive il file in un ordine suo: prima il nome del giorno, poi le sue ore, poi il giorno dopo. La fascia delle ore arrivava spezzata in cinque pezzi da sette, e senza la riga delle ore intera la tabella non si può leggere: restava solo la strada dell’assistente, cioè l’abbonamento e i nomi dei colleghi mandati fuori. Adesso le righe si rimettono insieme guardando l’altezza sul foglio, non l’ordine in cui sono scritte. Segnalazione di un collega.',
-      'Nello stesso documento le ore erano scritte tutte attaccate — «10.00 11.00 12.00 13.00 14.00» in un pezzo solo — e se ne leggeva una su cinque. Ora si staccano, e ognuna torna al suo posto sul foglio.',
+      'Nello stesso documento le ore erano scritte tutte attaccate, «10.00 11.00 12.00 13.00 14.00» in un pezzo solo, e se ne leggeva una su cinque. Ora si staccano, e ognuna torna al suo posto sul foglio.',
       'Gli orari di più pagine non si spostano più dopo il primo foglio. La larghezza delle colonne veniva misurata pagina per pagina, ma il nome più lungo, quello che detta la misura, sta su una pagina sola: dal secondo foglio in poi le lezioni finivano tutte nell’ora sbagliata. La misura adesso si prende una volta per tutto il documento.',
-      'Le lezioni di due ore di fila nella stessa classe entrano tutte e due anche quando il foglio le stampa come un’unica casella larga il doppio, con la classe scritta in mezzo. Su un orario vero di un istituto comprensivo — sessantatré docenti, cinque giorni per sette ore — erano ottantuno ore su ottocentottanta che sparivano. Adesso si leggono tutte e ottocentottanta, senza sbagliarne una.',
+      'Le lezioni di due ore di fila nella stessa classe entrano tutte e due anche quando il foglio le stampa come un’unica casella larga il doppio, con la classe scritta in mezzo. Su un orario vero di un istituto comprensivo, sessantatré docenti e cinque giorni per sette ore, erano ottantuno ore su ottocentottanta che sparivano. Adesso si leggono tutte e ottocentottanta, senza sbagliarne una.',
     ],
   },
   {
