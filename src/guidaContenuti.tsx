@@ -600,20 +600,38 @@ export const chapters: Chapter[] = [
               potenziamento o nei laboratori a classe intera.
             </p>
             <p className="mt-2">
-              Per ogni riga scegli il docente che si affianca, la classe, le
-              ore settimanali e, se vuoi, la materia: indicandola, quelle ore
-              finiscono solo sulle lezioni di quella materia, altrimenti su
-              una lezione qualunque della classe. Le piazza{' '}
-              <B>Auto-Genera Orario</B>; se hai già l'orario buono e non vuoi
-              rifarlo, usa <B>👥 Allinea Compresenze</B> nella barra in alto,
-              che rifà solo quelle.
+              La compresenza si dichiara in due modi, con i due pulsanti in
+              cima al riquadro. Con <B>👤 per docente</B> scegli la persona che
+              si affianca, la classe, le ore settimanali e, se vuoi, la
+              materia: indicandola, quelle ore finiscono solo sulle lezioni di
+              quella materia, altrimenti su una lezione qualunque della classe.
+            </p>
+            <p className="mt-2">
+              Con <B>📚 per discipline</B> non nomini nessuno: scegli la
+              classe, la <B>disciplina che ospita</B> (le ore su cui la
+              compresenza si appoggia) e la <B>disciplina che affianca</B>. Il
+              docente lo trova l'app: cerca chi insegna quella disciplina in
+              quella classe e, se in classe non c'è, chi ha quella materia nel
+              Registro. Se le persone possibili sono più di una te lo dice, e
+              scegli tu con «per docente». È il modo in cui la compresenza
+              viene decisa nei consigli: «in 2A inglese entra sulle ore di
+              geografia».
+            </p>
+            <p className="mt-2">
+              Le ore le piazza <B>Auto-Genera Orario</B>; se hai già l'orario
+              buono e non vuoi rifarlo, usa <B>👥 Allinea Compresenze</B> nella
+              barra in alto, che rifà solo quelle.
             </p>
             <p className="mt-2">
               La compresenza non aggiunge un'ora alla classe (l'ora è una
-              sola) ma conta nel monte ore di chi la fa, e la scheda Conflitti
-              segnala se quel docente in quell'ora è anche in un'altra classe.
-              Per un caso isolato puoi sempre aggiungerla a mano dalla cella
-              dell'orario, spuntando <B>Aggiungi in compresenza</B>.
+              sola) e non è cattedra: nell'Orario Generale, nel file Excel e
+              nelle stampe la colonna <B>Ore</B> mostra le ore di cattedra, e
+              le compresenze le trovi sotto, scritte come <B>+2h comp.</B> Per
+              l'orario però restano ore di servizio, quindi la scheda
+              Conflitti segnala se quel docente in quell'ora è anche in
+              un'altra classe. Per un caso isolato puoi sempre aggiungerla a
+              mano dalla cella dell'orario, spuntando{' '}
+              <B>Aggiungi in compresenza</B>.
             </p>
           </>
         ),

@@ -28,7 +28,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-10b';
+export const NOVITA_VERSIONE = '2026-09-10c';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -40,6 +40,14 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-10c',
+    data: '10 settembre 2026',
+    voci: [
+      'Le ore di compresenza non gonfiano più il monte ore del docente. Nell’Orario Generale, nel file Excel e nelle stampe la colonna «Ore» dice adesso le sole ore di cattedra, e le compresenze si leggono sotto, scritte come «+2h comp.»: chi ha diciotto ore di cattedra e due di compresenza si vedeva scritto venti accanto al proprio nome, che non è la sua cattedra e non è il numero che si aspetta di trovare in un prospetto. Per l’orario restano ore di servizio come prima, quindi i Conflitti continuano a segnalare il docente che in quell’ora sarebbe in due classi. Segnalazione di un collega.',
+      'Le compresenze si possono dichiarare per disciplina, senza fare nomi. Nel riquadro «👥 Compresenze» del Registro Cattedre due pulsanti scelgono il modo: «per docente» è quello di sempre, «per discipline» chiede la classe, la disciplina che ospita e la disciplina che affianca, e il docente lo trova l’app. È il modo in cui la compresenza viene decisa nei consigli, «in 2A inglese entra sulle ore di geografia», e non costringe più a cercare a mano chi insegna cosa in quella classe. Se le persone possibili sono più di una, l’app lo dice e la scelta resta tua.',
+    ],
+  },
   {
     versione: '2026-09-10b',
     data: '10 settembre 2026',
@@ -125,13 +133,6 @@ export const NOVITA: VoceNovita[] = [
       '«📥 Importa orario» adesso crea anche le classi e i docenti che nell’app non ci sono. Prima leggeva il PDF o il foglio dell’anno scorso, ma teneva solo le righe in cui il docente era già in archivio: chi arrivava con l’orario completo dell’istituto e l’app ancora vuota si vedeva scartare tutto, e per usare la funzione doveva prima ribattere a mano settanta nomi e tutte le sezioni. Era il contrario di quello che serviva. Adesso, dopo la lettura, compare la spunta «Crea quello che manca» con il conto di quante classi e quanti docenti nascerebbero: con la spunta entrano insieme all’orario, senza la spunta si importano solo le righe che stanno in piedi da sole, come prima.',
       'I docenti creati così non arrivano vuoti: la cattedra viene contata dalle ore che hai importato, classe per classe, e la materia è quella scritta più volte accanto al loro nome nel documento. Restano da controllare, ma il registro non è più da riempire da zero.',
       'Due cose l’app non le inventa mai. Un cognome che in archivio corrisponde già a due persone non viene abbinato e non viene creato, perché un terzo omonimo è peggio di una riga da sistemare a mano; e una sigla che non ha la forma di una classe (anno più sezione, tipo 1A) resta scartata, perché quasi sempre è l’intestazione di una colonna letta storta.',
-    ],
-  },
-  {
-    versione: '2026-09-08c',
-    data: '8 settembre 2026',
-    voci: [
-      'La chiave dell’abbonamento si può incollare anche senza trattini. La mail dell’acquisto stampa la chiave tutta attaccata, ma il negozio la riconosce solo scritta come «xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx»: chi copiava dalla ricevuta si sentiva rispondere «Chiave non valida» pur avendo pagato, e non c’era modo di indovinare che mancavano cinque trattini. Adesso li rimette l’app, e sotto il campo c’è scritto dove trovare la chiave. Segnalazione arrivata dal pulsante dei feedback.',
     ],
   },
 ];

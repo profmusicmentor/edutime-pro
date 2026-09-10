@@ -3423,6 +3423,16 @@ export default function App() {
   const [coClasse, setCoClasse] = useState('');
   const [coOre, setCoOre] = useState(1);
   const [coMateria, setCoMateria] = useState('');
+  /**
+   * Come si dichiara la compresenza: indicando la persona, oppure indicando
+   * le due discipline che stanno insieme in quella classe. Il secondo modo è
+   * quello con cui la compresenza viene decisa nei consigli («inglese entra
+   * sulle ore di geografia»), e il docente lo trova l'app.
+   */
+  const [coModo, setCoModo] = useState<'docente' | 'discipline'>('docente');
+  const [coMateriaOspite, setCoMateriaOspite] = useState('');
+  const [coMateriaAffianca, setCoMateriaAffianca] = useState('');
+  const [coAvviso, setCoAvviso] = useState('');
   const [groupConstraints, setGroupConstraints] = useState<any[]>([]);
   const [newGroupC1, setNewGroupC1] = useState('');
   const [newGroupC2, setNewGroupC2] = useState('');
@@ -4340,6 +4350,33 @@ export default function App() {
         // Le ore di compresenza sono ore di servizio come le altre: il docente
         // in quell'ora e' in classe.
         coTeachingHours(s);
+    });
+    return hours;
+  }, [allStaff]);
+
+  /**
+   * Le sole ore di cattedra, senza le compresenze.
+   *
+   * Nei prospetti la colonna «Ore» dice la cattedra, che è il numero che il
+   * docente si aspetta di leggere accanto al proprio nome; le ore in cui sta
+   * accanto a un collega si mostrano a parte. Il totale con dentro tutto resta
+   * `staffHoursPlanned`, ed è quello che continuano a usare i controlli: per
+   * l'orario quelle ore sono servizio come le altre.
+   */
+  const staffHoursCattedra = useMemo(() => {
+    const hours: any = {};
+    allStaff.forEach((s) => {
+      hours[s.id] =
+        s.assignments?.reduce((sum: number, a: any) => sum + a.hours, 0) || 0;
+    });
+    return hours;
+  }, [allStaff]);
+
+  /** Le sole ore di compresenza dichiarate nel Registro Cattedre. */
+  const staffHoursCompresenza = useMemo(() => {
+    const hours: any = {};
+    allStaff.forEach((s) => {
+      hours[s.id] = coTeachingHours(s);
     });
     return hours;
   }, [allStaff]);
@@ -6742,6 +6779,103 @@ export default function App() {
         else rows.push(row);
         return { ...t, coTeaching: rows };
       })
+    );
+  };
+
+  /**
+   * Le discipline che in una classe hanno un docente nel Registro: sono
+   * quelle che possono ospitare una compresenza, perché sono le uniche ore
+   * che in quella classe esistono davvero.
+   */
+  const disciplineDellaClasse = (classId: string) => {
+    const nomi = new Map<string, string>();
+    teachers.forEach((t: any) =>
+      righeDiClasse(t, classId).forEach((riga: any) => {
+        const nome = chiaveMateria(materiaDellaRiga(riga, t));
+        if (nome && !nomi.has(nome)) nomi.set(nome, nome);
+      })
+    );
+    return Array.from(nomi.values()).sort();
+  };
+
+  /** Tutte le discipline del Registro, per chi affianca da fuori classe. */
+  const tutteLeDiscipline = useMemo(() => {
+    const nomi = new Set<string>();
+    teachers.forEach((t: any) => {
+      if (t.subject) nomi.add(chiaveMateria(t.subject));
+      (t.assignments || []).forEach((riga: any) => {
+        const nome = chiaveMateria(materiaDellaRiga(riga, t));
+        if (nome) nomi.add(nome);
+      });
+    });
+    return Array.from(nomi).sort();
+  }, [teachers]);
+
+  /**
+   * Chi insegna una disciplina in una classe. Si guarda prima dentro la
+   * classe: il docente di quella materia che ci lavora già. Se in quella
+   * classe non c'è nessuno (il potenziamento, il CLIL di un collega di
+   * un'altra sezione) si allarga a chi ha quella materia come propria.
+   */
+  const docentiDiDisciplina = (classId: string, materia: string) => {
+    const cercata = chiaveMateria(materia);
+    if (!cercata) return [];
+    const inClasse = teachers.filter((t: any) =>
+      righeDiClasse(t, classId).some(
+        (riga: any) => chiaveMateria(materiaDellaRiga(riga, t)) === cercata
+      )
+    );
+    if (inClasse.length) return inClasse;
+    return teachers.filter(
+      (t: any) => chiaveMateria(t.subject) === cercata
+    );
+  };
+
+  /**
+   * La compresenza dichiarata per discipline: «in 2A inglese sta sulle ore di
+   * geografia per 2 ore». Finisce nella stessa riga di sempre, quella del
+   * docente: cambia solo il modo di dirlo.
+   */
+  const handleAddCompresenzaDiscipline = (
+    classId: string,
+    materiaOspite: string,
+    materiaAffianca: string,
+    hours: number
+  ) => {
+    if (readOnlyMode) return;
+    if (!classId || !materiaOspite || !materiaAffianca || hours <= 0) {
+      setCoAvviso('Scegli la classe e tutte e due le discipline.');
+      return;
+    }
+    if (chiaveMateria(materiaOspite) === chiaveMateria(materiaAffianca)) {
+      setCoAvviso('Le due discipline devono essere diverse.');
+      return;
+    }
+    const candidati = docentiDiDisciplina(classId, materiaAffianca);
+    if (!candidati.length) {
+      setCoAvviso(
+        `Nessun docente di ${chiaveMateria(
+          materiaAffianca
+        )} nel Registro Cattedre: aggiungilo prima, oppure dichiara la compresenza scegliendo la persona.`
+      );
+      return;
+    }
+    if (candidati.length > 1) {
+      setCoAvviso(
+        `In ${classId} ci sono ${candidati.length} docenti di ${chiaveMateria(
+          materiaAffianca
+        )} (${candidati
+          .map((t: any) => t.name)
+          .join(', ')}): scegli la persona con «per docente».`
+      );
+      return;
+    }
+    setCoAvviso('');
+    handleAddCoTeaching(
+      candidati[0].id,
+      classId,
+      hours,
+      chiaveMateria(materiaOspite)
     );
   };
 
@@ -9229,7 +9363,16 @@ export default function App() {
 
       const cells: (XlsxCell | null)[] = [
         { value: `${staff.name}\n[${staff.subject}]`, style: deptStyle },
-        { value: `${staffHoursPlanned[staff.id]}h`, style: 'HoursCell' },
+        {
+          // Cattedra e compresenza separate: sommate diventavano un monte ore
+          // che il docente non riconosce come il proprio.
+          value: staffHoursCompresenza[staff.id]
+            ? `${staffHoursCattedra[staff.id]}h\n+${
+                staffHoursCompresenza[staff.id]
+              }h comp.`
+            : `${staffHoursCattedra[staff.id]}h`,
+          style: 'HoursCell',
+        },
         { value: staffClassSummary[staff.id], style: 'ClassList' },
       ];
       days.forEach((_, dIdx) => {
@@ -9380,8 +9523,14 @@ export default function App() {
         )}<span class="subj">${escapeXml(
           staff.subject
         )}</span></td><td class="hours-cell">${
-          staffHoursPlanned[staff.id]
-        }h</td><td class="class-cell">${escapeXml(
+          staffHoursCattedra[staff.id]
+        }h${
+          staffHoursCompresenza[staff.id]
+            ? `<span class="subj">+${
+                staffHoursCompresenza[staff.id]
+              }h comp.</span>`
+            : ''
+        }</td><td class="class-cell">${escapeXml(
           staffClassSummary[staff.id]
         )}</td>`;
         DAYS_IN_USE.forEach((_, dIdx) => {
@@ -9460,8 +9609,14 @@ export default function App() {
         )}<span class="subj">${escapeXml(
           staff.subject
         )}</span></td><td class="hours-cell">${
-          staffHoursPlanned[staff.id]
-        }h</td><td class="class-cell" style="color: #6ea54b;">${escapeXml(
+          staffHoursCattedra[staff.id]
+        }h${
+          staffHoursCompresenza[staff.id]
+            ? `<span class="subj">+${
+                staffHoursCompresenza[staff.id]
+              }h comp.</span>`
+            : ''
+        }</td><td class="class-cell" style="color: #6ea54b;">${escapeXml(
           staffClassSummary[staff.id]
         )}</td>`;
         DAYS_IN_USE.forEach((_, dIdx) => {
@@ -11032,6 +11187,9 @@ export default function App() {
                         const classSummary =
                           staffClassSummary[staff.id] || 'Nessun carico';
                         const hoursPlanned = staffHoursPlanned[staff.id] || 0;
+                        const oreCattedra = staffHoursCattedra[staff.id] || 0;
+                        const oreCompresenza =
+                          staffHoursCompresenza[staff.id] || 0;
                         const deptColor = coloreMateria(staff.subject);
                         const isNewDept =
                           staff.subject !== prevSubject && idx > 0;
@@ -11164,8 +11322,20 @@ export default function App() {
                                   })()}
                                 </div>
                               </td>
-                              <td className="p-2 w-16 border-r-4 border-slate-300 text-center font-bold text-brand-700 bg-brand-50/10 sticky left-80 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]">
-                                {hoursPlanned}h
+                              <td
+                                className="p-2 w-16 border-r-4 border-slate-300 text-center font-bold text-brand-700 bg-brand-50/10 sticky left-80 z-10 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)]"
+                                title={
+                                  oreCompresenza
+                                    ? `${oreCattedra}h di cattedra più ${oreCompresenza}h di compresenza: in orario sta in classe ${hoursPlanned}h.`
+                                    : undefined
+                                }
+                              >
+                                {oreCattedra}h
+                                {oreCompresenza > 0 && (
+                                  <div className="text-[10px] font-bold text-sky-700">
+                                    +{oreCompresenza}h comp.
+                                  </div>
+                                )}
                               </td>
                               {DAYS_IN_USE.map((_day, dIdx) => {
                                 const activeHours =
@@ -13579,15 +13749,153 @@ export default function App() {
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 👥 Compresenze
               </h3>
-              <p className="text-xs text-slate-500 mt-1 mb-4">
+              <p className="text-xs text-slate-500 mt-1 mb-3">
                 Ore in cui un docente sta in classe insieme al titolare: il
                 CLIL, il potenziamento, i laboratori a classe intera. Non sono
-                ore in più per la classe, sono ore di servizio per il docente.
+                ore in più per la classe, sono ore di servizio per il docente,
+                e nei prospetti si contano a parte dalle ore di cattedra.
                 Indicando la materia, l'orario le mette solo sulle lezioni di
                 quella materia. Le piazza l'Auto-Genera Orario, oppure il
                 pulsante "Allinea Compresenze" senza rifare tutto.
               </p>
-              <div className="flex flex-wrap items-end gap-3 mb-4">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs font-semibold text-slate-600">
+                  Dichiara la compresenza:
+                </span>
+                <div className="inline-flex rounded-lg border border-sky-200 overflow-hidden">
+                  {(
+                    [
+                      ['docente', '👤 per docente'],
+                      ['discipline', '📚 per discipline'],
+                    ] as const
+                  ).map(([valore, etichetta]) => (
+                    <button
+                      key={valore}
+                      type="button"
+                      onClick={() => {
+                        setCoModo(valore);
+                        setCoAvviso('');
+                      }}
+                      className={`px-3 py-1.5 text-xs font-bold cursor-pointer ${
+                        coModo === valore
+                          ? 'bg-sky-600 text-white'
+                          : 'bg-white text-sky-700 hover:bg-sky-50'
+                      }`}
+                    >
+                      {etichetta}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {coModo === 'discipline' && (
+                <div className="flex flex-wrap items-end gap-3 mb-2">
+                  <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                    Classe
+                    <select
+                      value={coClasse}
+                      onChange={(e) => {
+                        setCoClasse(e.target.value);
+                        setCoMateriaOspite('');
+                        setCoAvviso('');
+                      }}
+                      disabled={readOnlyMode}
+                      className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm disabled:opacity-50"
+                    >
+                      <option value="">Scegli...</option>
+                      {classes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                    Disciplina che ospita
+                    <select
+                      value={coMateriaOspite}
+                      onChange={(e) => {
+                        setCoMateriaOspite(e.target.value);
+                        setCoAvviso('');
+                      }}
+                      disabled={readOnlyMode || !coClasse}
+                      className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm min-w-[180px] disabled:opacity-50"
+                    >
+                      <option value="">
+                        {coClasse ? 'Scegli...' : 'Prima la classe'}
+                      </option>
+                      {disciplineDellaClasse(coClasse).map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                    Disciplina che affianca
+                    <select
+                      value={coMateriaAffianca}
+                      onChange={(e) => {
+                        setCoMateriaAffianca(e.target.value);
+                        setCoAvviso('');
+                      }}
+                      disabled={readOnlyMode}
+                      className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm min-w-[180px] disabled:opacity-50"
+                    >
+                      <option value="">Scegli...</option>
+                      {tutteLeDiscipline.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                    Ore
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={coOre}
+                      onChange={(e) => setCoOre(Number(e.target.value) || 1)}
+                      disabled={readOnlyMode}
+                      className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm font-bold disabled:opacity-50"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleAddCompresenzaDiscipline(
+                        coClasse,
+                        coMateriaOspite,
+                        coMateriaAffianca,
+                        coOre
+                      )
+                    }
+                    disabled={readOnlyMode}
+                    className="bg-sky-600 hover:bg-sky-700 text-white font-bold text-sm px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    ➕ Aggiungi
+                  </button>
+                </div>
+              )}
+              {coModo === 'discipline' && (
+                <p className="text-xs text-slate-500 mb-4">
+                  Il docente lo trova l'app: cerca chi insegna la disciplina
+                  che affianca in quella classe e, se lì non c'è, chi ha quella
+                  materia nel Registro. Se le persone possibili sono più di
+                  una, te lo dice e scegli tu con «per docente».
+                </p>
+              )}
+              {coAvviso && (
+                <p className="text-xs font-semibold text-bruciato-700 bg-bruciato-50 border border-bruciato-200 rounded-lg px-3 py-2 mb-4">
+                  {coAvviso}
+                </p>
+              )}
+              <div
+                className={`flex-wrap items-end gap-3 mb-4 ${
+                  coModo === 'docente' ? 'flex' : 'hidden'
+                }`}
+              >
                 <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                   Docente
                   <select
