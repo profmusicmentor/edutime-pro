@@ -55,6 +55,57 @@ export interface ClasseProposta {
 
 /* -------------------------------------------------- lettura del file */
 
+/** Un pezzo di testo del PDF, con la sua misura e il suo posto sul foglio. */
+type PezzoPdf = { str?: string; width?: number; transform?: number[] };
+
+/** Un'ora scritta da sola: «8.00», «13h30», «10:15», oppure il suo numero. */
+const SOLO_ORA = /^(?:(?:[01]?\d|2[0-3])[h:.][0-5]\d|\d{1,2})$/i;
+
+/**
+ * Stacca le ore che il PDF ha scritto tutte in un pezzo solo.
+ *
+ * Un pezzo di testo del PDF di solito è una casella. La stampante «Microsoft
+ * Print to PDF» di Windows però tira via di seguito le ore che le stanno
+ * comode, e la fascia delle ore arriva come «10.00 11.00 12.00 13.00 14.00»:
+ * un pezzo unico, di cui si legge la prima ora e le altre quattro spariscono.
+ * Senza quelle non si sa più quante colonne ha la tabella, e l'orario non si
+ * legge.
+ *
+ * Si stacca solo il pezzo fatto tutto di ore, e da tre in su: un nome e
+ * cognome non si tocca, e nemmeno «1 A», che è una classe. Ogni ora si rimette
+ * al suo posto sul foglio dividendo la larghezza del pezzo per le lettere che
+ * ha: è il conto che serve, perché quelle ore sul foglio sono distanti fra
+ * loro il doppio di quanto sembrano dalle lettere.
+ */
+const staccaOreAttaccate = (pezzi: PezzoPdf[]): PezzoPdf[] => {
+  const staccati: PezzoPdf[] = [];
+  for (const item of pezzi) {
+    const testo = item.str ?? '';
+    const larghezza = item.width ?? 0;
+    const parole: { testo: string; da: number }[] = [];
+    const regola = /\S+/g;
+    let trovato: RegExpExecArray | null;
+    while ((trovato = regola.exec(testo))) {
+      parole.push({ testo: trovato[0], da: trovato.index });
+    }
+    const tutteOre = parole.every((p) => SOLO_ORA.test(p.testo));
+    if (parole.length < 3 || !tutteOre || !(larghezza > 0) || !item.transform) {
+      staccati.push(item);
+      continue;
+    }
+    for (const parola of parole) {
+      const transform = [...item.transform];
+      transform[4] += (parola.da / testo.length) * larghezza;
+      staccati.push({
+        str: parola.testo,
+        width: (parola.testo.length / testo.length) * larghezza,
+        transform,
+      });
+    }
+  }
+  return staccati;
+};
+
 /**
  * Estrae il testo di un PDF. pdf.js si carica solo qui, con un import
  * dinamico: è una libreria grossa e chi non importa mai niente non deve
@@ -91,62 +142,109 @@ export async function estraiTestoPdf(file: File): Promise<string> {
 
   const pagine: string[] = [];
   try {
+    /*
+     * I pezzi fatti di soli spazi si buttano via. Certi programmi riempiono
+     * le caselle vuote di una tabella con uno spazio lungo quanto la casella:
+     * quello spazio non porta niente da leggere, ma occupa posto nella riga e
+     * fa scivolare a destra tutto quello che viene dopo, che in una tabella
+     * vuol dire mandare le celle sotto l'ora sbagliata.
+     */
+    const pezziPerPagina: PezzoPdf[][] = [];
     for (let n = 1; n <= documento.numPages; n++) {
       const pagina = await documento.getPage(n);
       const contenuto = await pagina.getTextContent();
+      pezziPerPagina.push(
+        staccaOreAttaccate(
+          (contenuto.items as PezzoPdf[]).filter(
+            (item) => item.transform && (item.str ?? '').trim().length
+          )
+        )
+      );
+      pagina.cleanup();
+    }
+    const tuttiIPezzi = pezziPerPagina.flat();
 
-      type Pezzo = { str?: string; width?: number; transform?: number[] };
-      const pezzi = (contenuto.items as Pezzo[]).filter(
-        (item) => item.transform && (item.str ?? '').length
+    /*
+     * Quanto è larga una lettera in questo documento, in punti. Serve a
+     * trasformare le coordinate in colonne di caratteri: senza una misura
+     * presa dal documento stesso, un orario stampato in corpo piccolo e uno
+     * in corpo grande finirebbero con allineamenti diversi. Si prende la
+     * misura più stretta fra i pezzi lunghi, che è quella che non fa
+     * sovrapporre niente.
+     *
+     * La misura si prende una volta sola per tutto il documento, non pagina
+     * per pagina. Un orario di più pagine ha la stessa tabella su ognuna, ma
+     * il nome più lungo, quello che detta la misura, sta su una pagina sola:
+     * misurando pagina per pagina le colonne uscivano di larghezza diversa da
+     * una pagina all'altra, e le ore dei docenti stampati dopo il primo foglio
+     * finivano tutte spostate.
+     */
+    let passo = 5;
+    const larghezze = tuttiIPezzi
+      .filter((item) => (item.str ?? '').length >= 4 && (item.width ?? 0) > 0)
+      .map((item) => (item.width as number) / (item.str as string).length);
+    if (larghezze.length) passo = Math.min(...larghezze);
+    if (!(passo > 0.5)) passo = 5;
+
+    const xMinimo = tuttiIPezzi.length
+      ? Math.min(...tuttiIPezzi.map((item) => item.transform![4]))
+      : 0;
+
+    for (const pezzi of pezziPerPagina) {
+      /*
+       * Le righe si mettono insieme guardando l'altezza, non l'ordine in cui i
+       * pezzi stanno scritti nel file. Nel PDF il testo sta nell'ordine in cui
+       * il programma l'ha buttato giù, che non è per forza quello in cui si
+       * legge: la stampante «Microsoft Print to PDF» di Windows, per esempio,
+       * scrive il nome del giorno e subito sotto le sue sette ore, poi passa al
+       * giorno dopo. Seguendo quell'ordine la riga delle ore usciva spezzata in
+       * cinque tronconi da sette, e con un'intestazione monca non si capisce
+       * più sotto quale ora cade ogni casella: l'orario di un istituto vero
+       * (Orario Facile, cinque giorni per sette ore) non si leggeva affatto.
+       *
+       * Prima si ordinano i pezzi dall'alto in basso, poi si raccolgono in
+       * righe: si sta nella stessa riga finché non si scende di più di tre
+       * punti dal primo pezzo della riga. Dentro la riga si va da sinistra a
+       * destra, che è come la si legge sul foglio.
+       */
+      const dallAlto = [...pezzi].sort(
+        (a, b) => b.transform![5] - a.transform![5]
       );
 
-      /*
-       * Quanto è larga una lettera su questa pagina, in punti. Serve a
-       * trasformare le coordinate in colonne di caratteri: senza una misura
-       * presa dal documento stesso, un orario stampato in corpo piccolo e uno
-       * in corpo grande finirebbero con allineamenti diversi. Si prende la
-       * misura più stretta fra i pezzi lunghi, che è quella che non fa
-       * sovrapporre niente.
-       */
-      let passo = 5;
-      const larghezze = pezzi
-        .filter((item) => (item.str ?? '').length >= 4 && (item.width ?? 0) > 0)
-        .map((item) => (item.width as number) / (item.str as string).length);
-      if (larghezze.length) passo = Math.min(...larghezze);
-      if (!(passo > 0.5)) passo = 5;
-
-      const xMinimo = Math.min(...pezzi.map((item) => item.transform![4]));
-
-      let riga = '';
-      let ultimaY: number | null = null;
-      const righe: string[] = [];
-
-      for (const item of pezzi) {
-        const testo = item.str ?? '';
-        const x = item.transform![4];
+      const gruppi: PezzoPdf[][] = [];
+      let yRiga: number | null = null;
+      for (const item of dallAlto) {
         const y = item.transform![5];
-
-        // Più di tre punti di dislivello: è una riga nuova.
-        if (ultimaY !== null && Math.abs(y - ultimaY) > 3) {
-          righe.push(riga.trimEnd());
-          riga = '';
+        // Più di tre punti di dislivello dall'inizio della riga: riga nuova.
+        if (yRiga === null || Math.abs(y - yRiga) > 3) {
+          gruppi.push([]);
+          yRiga = y;
         }
-        // La colonna in cui il pezzo sta sul foglio. Se il posto è già
-        // occupato (due scritte attaccate, o misure arrotondate per difetto)
-        // si accoda con uno spazio, senza mai tornare indietro.
-        const colonna = Math.round((x - xMinimo) / passo);
-        riga +=
-          colonna > riga.length
-            ? ' '.repeat(colonna - riga.length)
-            : riga
-              ? ' '
-              : '';
-        riga += testo;
-        ultimaY = y;
+        gruppi[gruppi.length - 1].push(item);
       }
-      righe.push(riga.trimEnd());
+
+      const righe: string[] = [];
+      for (const gruppo of gruppi) {
+        gruppo.sort((a, b) => a.transform![4] - b.transform![4]);
+        let riga = '';
+        for (const item of gruppo) {
+          const testo = item.str ?? '';
+          const x = item.transform![4];
+          // La colonna in cui il pezzo sta sul foglio. Se il posto è già
+          // occupato (due scritte attaccate, o misure arrotondate per difetto)
+          // si accoda con uno spazio, senza mai tornare indietro.
+          const colonna = Math.round((x - xMinimo) / passo);
+          riga +=
+            colonna > riga.length
+              ? ' '.repeat(colonna - riga.length)
+              : riga
+                ? ' '
+                : '';
+          riga += testo;
+        }
+        righe.push(riga.trimEnd());
+      }
       pagine.push(righe.filter((r) => r.trim()).join('\n'));
-      pagina.cleanup();
     }
   } finally {
     await caricamento.destroy();

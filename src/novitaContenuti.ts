@@ -28,7 +28,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-09g';
+export const NOVITA_VERSIONE = '2026-09-10';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -40,6 +40,16 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-10',
+    data: '10 settembre 2026',
+    voci: [
+      '«📥 Importa orario» adesso legge anche gli orari stampati con «Stampa in PDF» di Windows, che prima non entravano affatto. Quella stampante scrive il file in un ordine suo: prima il nome del giorno, poi le sue ore, poi il giorno dopo. La fascia delle ore arrivava spezzata in cinque pezzi da sette, e senza la riga delle ore intera la tabella non si può leggere: restava solo la strada dell’assistente, cioè l’abbonamento e i nomi dei colleghi mandati fuori. Adesso le righe si rimettono insieme guardando l’altezza sul foglio, non l’ordine in cui sono scritte. Segnalazione di un collega.',
+      'Nello stesso documento le ore erano scritte tutte attaccate — «10.00 11.00 12.00 13.00 14.00» in un pezzo solo — e se ne leggeva una su cinque. Ora si staccano, e ognuna torna al suo posto sul foglio.',
+      'Gli orari di più pagine non si spostano più dopo il primo foglio. La larghezza delle colonne veniva misurata pagina per pagina, ma il nome più lungo, quello che detta la misura, sta su una pagina sola: dal secondo foglio in poi le lezioni finivano tutte nell’ora sbagliata. La misura adesso si prende una volta per tutto il documento.',
+      'Le lezioni di due ore di fila nella stessa classe entrano tutte e due anche quando il foglio le stampa come un’unica casella larga il doppio, con la classe scritta in mezzo. Su un orario vero di un istituto comprensivo — sessantatré docenti, cinque giorni per sette ore — erano ottantuno ore su ottocentottanta che sparivano. Adesso si leggono tutte e ottocentottanta, senza sbagliarne una.',
+    ],
+  },
   {
     versione: '2026-09-09g',
     data: '9 settembre 2026',
@@ -119,13 +129,6 @@ export const NOVITA: VoceNovita[] = [
     voci: [
       'Il riquadro «✨ Fatti aiutare dall’IA» dei Conflitti adesso ammette quando non può fare niente. Se quel che resta in lista sono solo avvisi «giornata sotto il minimo di ore», te lo dice prima che tu prema il pulsante: quegli avvisi non si tolgono spostando lezioni, perché l’ora isolata deve avere un altro giorno dove andare e con i docenti divisi su più scuole quel giorno non c’è. Prima l’IA ci provava lo stesso e rispondeva «nessuna mossa migliora l’orario», che è vero ma sembra una resa. Adesso la strada c’è: si porta «🚪 Minimo ore al giorno» su «Nessun minimo» in «⚙️ Sezioni & Regole» e spariscono tutti insieme. Vale la pena ricordare che quegli avvisi non sono errori: un orario con zero errori si può già usare. Segnalazione di un collega.',
       'Tolte due date di scadenza rimaste scritte a mano nell’app: il riquadro dei conflitti e la striscia dell’assistente della guida promettevano una prova gratuita «fino al 5 settembre 2026», che è passato da un pezzo. Ora dicono semplicemente come stanno le cose oggi.',
-    ],
-  },
-  {
-    versione: '2026-09-08',
-    data: '8 settembre 2026',
-    voci: [
-      'Nel «Registro Cattedre» la preferenza delle ore consecutive si può dare materia per materia. Prima la casella «2h» valeva per tutta la cattedra: chi insegna italiano in una classe e storia in un’altra doveva scegliere fra blocchi di due ore ovunque e blocchi da nessuna parte, mentre le due materie hanno esigenze opposte. Adesso, nel riquadro delle assegnazioni (pulsante ➕ a fine riga, poi la classe), ogni materia ha la sua casella «2h»: quella scritta lì batte la colonna, e con ↺ la materia torna a seguire il resto della cattedra. Chi non tocca niente non vede cambiare nulla. Suggerimento di un collega arrivato dal pulsante dei feedback.',
     ],
   },
 ];

@@ -187,8 +187,47 @@ const dallOrologio = (pezzi: Pezzo[]): ColonnaOraria[] | null => {
  * colonne prima della prima ora sono l'anagrafica del docente e non si
  * toccano.
  */
+/**
+ * Apre le intestazioni che arrivano tutte attaccate in un pezzo solo.
+ *
+ * Un pezzo è quello che sta fra due spazi larghi, e di solito è una casella.
+ * Certe stampe però scrivono più caselle di seguito con un unico spazio in
+ * mezzo, e allora le ore di mezza giornata arrivano qui come «10.00 11.00
+ * 12.00 13.00 14.00»: un pezzo solo, di cui si legge la prima ora e le altre
+ * quattro si perdono. Succede con «Microsoft Print to PDF», la stampante di
+ * Windows, ed è bastato a non far leggere un orario intero.
+ *
+ * Si aprono solo i pezzi che portano dentro tre o più ore: è il segno che
+ * sono caselle diverse finite insieme. Con due si sta fermi, perché due ore in
+ * una casella sono una casella vera: EDT scrive «13h00» e sotto «14h00» per
+ * dire l'ora che va dalle 13 alle 14, ed è una colonna sola.
+ *
+ * La colonna di ogni ora si conta in lettere dall'inizio del pezzo, che nel
+ * testo allineato è la stessa cosa che misurarla sul foglio.
+ */
+const apriPezziAttaccati = (pezzi: Pezzo[]): Pezzo[] => {
+  const aperti: Pezzo[] = [];
+  for (const pezzo of pezzi) {
+    const dentro: Pezzo[] = [];
+    const regola = /\S+/g;
+    let trovato: RegExpExecArray | null;
+    while ((trovato = regola.exec(pezzo.testo))) {
+      dentro.push({
+        colonna: pezzo.colonna + trovato.index,
+        testo: trovato[0],
+      });
+    }
+    const ore = dentro.filter(
+      (p) => minutiOrologio(p.testo) !== null || /^\d{1,2}$/.test(p.testo)
+    );
+    if (dentro.length > 1 && ore.length >= 3) aperti.push(...dentro);
+    else aperti.push(pezzo);
+  }
+  return aperti;
+};
+
 const colonneOrarie = (riga: string): ColonnaOraria[] | null => {
-  const pezzi = pezziDellaRiga(riga);
+  const pezzi = apriPezziAttaccati(pezziDellaRiga(riga));
   return dallaNumerazione(pezzi) ?? dallOrologio(pezzi);
 };
 
@@ -322,7 +361,19 @@ export function leggiGrigliaOrario(testo: string): EsitoGriglia | null {
   const giorniDocumento = colonne[colonne.length - 1].giorno + 1;
   const oreDocumento = Math.max(...colonne.map((c) => c.ora)) + 1;
 
-  const lette: RigaGrezzaLetta[] = [];
+  /*
+   * Le celle si raccolgono tutte prima di trasformarle in ore, perché una
+   * cella da sola non dice quanto è larga: lo dice il confronto con tutte le
+   * altre. Vedi `oreDellaCella`.
+   */
+  interface CellaLetta {
+    classe: string;
+    docente: string;
+    materia: string;
+    indice: number;
+    scarto: number;
+  }
+  const celle: CellaLetta[] = [];
   let docenteCorrente = '';
   let materiaCorrente = '';
 
@@ -352,27 +403,76 @@ export function leggiGrigliaOrario(testo: string): EsitoGriglia | null {
       if (!classe) continue;
 
       // La colonna oraria più vicina all'inizio della cella.
-      let vicina: ColonnaOraria | null = null;
+      let vicina = -1;
       let distanza = Number.POSITIVE_INFINITY;
-      for (const colonna of colonne) {
-        const quanto = Math.abs(colonna.colonna - pezzo.colonna);
+      for (let k = 0; k < colonne.length; k++) {
+        const quanto = Math.abs(colonne[k].colonna - pezzo.colonna);
         if (quanto < distanza) {
           distanza = quanto;
-          vicina = colonna;
+          vicina = k;
         }
       }
-      if (!vicina || distanza > tolleranza) continue;
+      if (vicina < 0 || distanza > tolleranza) continue;
 
-      lette.push({
+      celle.push({
         classe,
-        giorno: vicina.giorno,
-        ora: vicina.ora,
-        materia: materiaCorrente,
         docente: docenteCorrente,
+        materia: materiaCorrente,
+        indice: vicina,
+        scarto: pezzo.colonna - colonne[vicina].colonna,
       });
     }
   }
 
-  if (!lette.length) return null;
+  if (!celle.length) return null;
+
+  /*
+   * Le caselle larghe due ore.
+   *
+   * Quando un docente ha due ore di fila nella stessa classe, i programmi che
+   * stampano l'orario non scrivono la classe due volte: uniscono le due
+   * caselle in una sola e ci mettono la classe in mezzo. Nel testo resta una
+   * scritta sola, e letta com'è vale un'ora invece di due: su un orario vero
+   * (Orario Facile, un istituto comprensivo) sono ottantuno ore su
+   * ottocentottanta che sparivano.
+   *
+   * Una casella unita si riconosce da dove comincia. Le caselle normali
+   * cominciano tutte allo stesso modo rispetto alla loro ora, un po' più in là
+   * perché la scritta è più corta della colonna e sta in mezzo. Quella unita
+   * sta in mezzo a due colonne, quindi comincia mezza colonna prima delle
+   * altre. Il «come cominciano le altre» si prende dal documento stesso, con
+   * la mediana: così vale sia per chi centra le scritte sia per chi le
+   * incolonna a sinistra, senza dover sapere quale programma le ha stampate.
+   */
+  const scarti = [...celle].map((c) => c.scarto).sort((a, b) => a - b);
+  const scartoNormale = scarti[Math.floor(scarti.length / 2)];
+  const oreDellaCella = (cella: CellaLetta): number[] => {
+    const indietro = scartoNormale - cella.scarto;
+    const unita = indietro >= passo * 0.35 && indietro <= passo * 0.8;
+    const prima = colonne![cella.indice - 1];
+    if (
+      !unita ||
+      !prima ||
+      prima.giorno !== colonne![cella.indice].giorno ||
+      prima.ora !== colonne![cella.indice].ora - 1
+    ) {
+      return [cella.indice];
+    }
+    return [cella.indice - 1, cella.indice];
+  };
+
+  const lette: RigaGrezzaLetta[] = [];
+  for (const cella of celle) {
+    for (const indice of oreDellaCella(cella)) {
+      lette.push({
+        classe: cella.classe,
+        giorno: colonne[indice].giorno,
+        ora: colonne[indice].ora,
+        materia: cella.materia,
+        docente: cella.docente,
+      });
+    }
+  }
+
   return { righe: lette, giorniDocumento, oreDocumento };
 }
