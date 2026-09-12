@@ -200,6 +200,12 @@ const DEFAULT_RULES: any = {
    */
   teacherDisponibilita: {},
   /**
+   * Ore di potenziamento ("P"): stessa forma delle ore di disponibilità,
+   * mappa id docente → elenco di chiavi "giorno_ora". Chi ha ore di
+   * potenziamento in cattedra le segna qui e smettono di sembrare buchi.
+   */
+  teacherPotenziamento: {},
+  /**
    * Preferenza oraria del docente: 'early' per chi vorrebbe le prime ore,
    * 'late' per chi vorrebbe le ultime. Mappa id docente → preferenza; chi non
    * c'è dentro non ha preferenze ed è il comportamento di sempre.
@@ -1323,6 +1329,13 @@ const conVincoliImportati = (
 const DISPONIBILITA_VALUE = '__D__';
 
 /**
+ * L'altro valore speciale del menu: l'ora di potenziamento (la "P"). Chi ha
+ * ore di potenziamento in cattedra le segna qui, esattamente come la "D":
+ * non sono lezioni di una classe, ma non sono nemmeno ore buche.
+ */
+const POTENZIAMENTO_VALUE = '__P__';
+
+/**
  * Ore di disponibilità dichiarate per un docente, dentro
  * generationRules.teacherDisponibilita. Sono un'etichetta sull'orario, non
  * un vincolo per il generatore: si mettono sulle ore buca che restano dopo
@@ -1335,6 +1348,23 @@ const isDisponibilitaHour = (
   hour: number
 ) =>
   ((rules?.teacherDisponibilita || {})[teacherId] || []).includes(
+    hourOffKey(day, hour)
+  );
+
+/**
+ * Ore di potenziamento dichiarate per un docente, dentro
+ * generationRules.teacherPotenziamento. Funzionano come le ore di
+ * disponibilità: sono un'etichetta sull'orario, non un vincolo per il
+ * generatore, e servono a far vedere che quell'ora è occupata dal
+ * potenziamento e non è un'ora buca.
+ */
+const isPotenziamentoHour = (
+  rules: any,
+  teacherId: string,
+  day: number,
+  hour: number
+) =>
+  ((rules?.teacherPotenziamento || {})[teacherId] || []).includes(
     hourOffKey(day, hour)
   );
 
@@ -1633,6 +1663,33 @@ const roomOccupantsAt = (
         s.type !== 'sostegno'
     )
     .map((s) => s.classId);
+
+/**
+ * Come roomOccupantsAt, ma con il nome del docente accanto alla classe:
+ * "2B (Rossi)". Sapere solo che il laboratorio è occupato da 2B non basta,
+ * perché per liberarlo bisogna parlare con chi ci sta dentro.
+ */
+const roomOccupantLabelsAt = (
+  tt: any[],
+  staffList: any[],
+  roomName: string,
+  day: number,
+  hour: number,
+  exceptClassId?: string
+) =>
+  tt
+    .filter(
+      (s) =>
+        s.room === roomName &&
+        s.day === day &&
+        s.hour === hour &&
+        s.classId !== exceptClassId &&
+        s.type !== 'sostegno'
+    )
+    .map((s) => {
+      const docente = staffList.find((t: any) => t.id === s.teacherId)?.name;
+      return docente ? `${s.classId} (${docente})` : s.classId;
+    });
 
 const getRoomSede = (roomName: string, rooms: any[]) =>
   (rooms || []).find((r) => r.name === roomName)?.sedeId;
@@ -2754,6 +2811,8 @@ const GiornataDocente = ({
               }`
             : o.disponibile
             ? `${o.label}: ora di disponibilità (D)`
+            : o.potenziamento
+            ? `${o.label}: ora di potenziamento (P)`
             : o.bloccata
             ? `${o.label}: ora non disponibile`
             : `${o.label}: ora libera`
@@ -2765,6 +2824,8 @@ const GiornataDocente = ({
             ? 'bg-brand-50 border-brand-200 text-brand-800'
             : o.disponibile
             ? 'bg-bruciato-50 border-bruciato-300 text-bruciato-800'
+            : o.potenziamento
+            ? 'bg-salvia-50 border-salvia-300 text-salvia-800'
             : o.bloccata
             ? 'bg-fucsia-50 border-fucsia-200 text-fucsia-700'
             : 'bg-slate-50 border-slate-200 text-slate-400'
@@ -2772,7 +2833,14 @@ const GiornataDocente = ({
       >
         <div className="text-[9px] font-semibold opacity-70">{o.label}</div>
         <div className={`font-bold ${compatta ? 'text-[10px]' : 'text-xs'}`}>
-          {o.classId || (o.disponibile ? 'D' : o.bloccata ? '—' : '·')}
+          {o.classId ||
+            (o.disponibile
+              ? 'D'
+              : o.potenziamento
+              ? 'P'
+              : o.bloccata
+              ? '—'
+              : '·')}
         </div>
         {!compatta && o.classId && (
           <div className="text-[9px] font-medium opacity-80 truncate max-w-[5rem]">
@@ -3693,6 +3761,16 @@ export default function App() {
                   safeDisponibilita[k] = v.map(String);
               });
             }
+            // Ore di potenziamento ("P"): stessa storia della "D", i file
+            // salvati prima non ce le hanno e partono vuote.
+            const safePotenziamento: any = {};
+            if (rules.teacherPotenziamento) {
+              Object.keys(rules.teacherPotenziamento).forEach((k) => {
+                const v = rules.teacherPotenziamento[k];
+                if (Array.isArray(v) && v.length > 0)
+                  safePotenziamento[k] = v.map(String);
+              });
+            }
             // Preferenza oraria per docente: i file salvati prima non ce
             // l'hanno, e i valori diversi da 'early'/'late' si scartano.
             const safeHourPreference: any = {};
@@ -3723,6 +3801,7 @@ export default function App() {
               teacherHoursOff: safeHoursOff,
               teacherHourPreference: safeHourPreference,
               teacherDisponibilita: safeDisponibilita,
+              teacherPotenziamento: safePotenziamento,
             });
           }
           if (data.generateOptions) setGenerateOptions(data.generateOptions);
@@ -4209,6 +4288,39 @@ export default function App() {
         (s: any) =>
           allStaff.find((t: any) => t.id === s.teacherId)?.name || s.teacherId
       );
+
+  /**
+   * I docenti di sostegno che stanno in quella classe in quell'ora. Servono
+   * nella vista del laboratorio: chi legge il foglio appeso alla porta deve
+   * sapere chi c'è davvero dentro, sostegno compreso.
+   */
+  const sostegnoOf = (lesson: any) =>
+    timetable
+      .filter(
+        (s: any) =>
+          s.type === 'sostegno' &&
+          s.classId === lesson.classId &&
+          s.day === lesson.day &&
+          s.hour === lesson.hour
+      )
+      .map(
+        (s: any) =>
+          allStaff.find((t: any) => t.id === s.teacherId)?.name || s.teacherId
+      );
+
+  /**
+   * La lezione di materia che la classe sta facendo in quell'ora. Serve nella
+   * vista del sostegno, dove «Classe 2B» da solo non dice con chi si lavora
+   * né in quale aula si finisce.
+   */
+  const lezioneDiClasseA = (classId: string, day: number, hour: number) =>
+    timetable.find(
+      (s: any) =>
+        s.classId === classId &&
+        s.day === day &&
+        s.hour === hour &&
+        (s.type === 'materia' || s.type === 'pomeriggio_musica')
+    );
 
   /** Il laboratorio in vista, con ripiego sul primo se quello scelto sparisce. */
   const roomInView = namedRooms.some((r: any) => r.name === selectedRoom)
@@ -5475,21 +5587,27 @@ export default function App() {
         room,
       });
     }
-    // Scrivere (o svuotare) la cella toglie la "D": in quell'ora il docente
-    // ha lezione, non è più a disposizione. Le regole si aggiornano qui e non
-    // in un secondo giro, altrimenti il salvataggio successivo rispedirebbe
-    // l'orario vecchio e la cella tornerebbe com'era.
+    // Scrivere (o svuotare) la cella toglie la "D" e la "P": in quell'ora il
+    // docente ha lezione, non è più a disposizione né in potenziamento. Le
+    // regole si aggiornano qui e non in un secondo giro, altrimenti il
+    // salvataggio successivo rispedirebbe l'orario vecchio e la cella
+    // tornerebbe com'era.
     let regoleAggiornate = generationRules;
-    if (isDisponibilitaHour(generationRules, teacherId, day, hour)) {
-      const mappa = { ...(generationRules.teacherDisponibilita || {}) };
+    const togliEtichetta = (campo: string) => {
+      const mappa = { ...(regoleAggiornate[campo] || {}) };
       const rimaste = (mappa[teacherId] || []).filter(
         (k: string) => k !== hourOffKey(day, hour)
       );
       if (rimaste.length > 0) mappa[teacherId] = rimaste;
       else delete mappa[teacherId];
-      regoleAggiornate = { ...generationRules, teacherDisponibilita: mappa };
+      regoleAggiornate = { ...regoleAggiornate, [campo]: mappa };
+    };
+    if (isDisponibilitaHour(generationRules, teacherId, day, hour))
+      togliEtichetta('teacherDisponibilita');
+    if (isPotenziamentoHour(generationRules, teacherId, day, hour))
+      togliEtichetta('teacherPotenziamento');
+    if (regoleAggiornate !== generationRules)
       setGenerationRules(regoleAggiornate);
-    }
     setTimetable(filtered);
     pushDataToCloud(
       filtered,
@@ -5508,11 +5626,16 @@ export default function App() {
   };
 
   /**
-   * Accende o spegne la "D" su una cella dell'Orario Generale. Le ore di
-   * disponibilità stanno nelle regole insieme ai giorni liberi, così vengono
-   * salvate e sincronizzate senza toccare la struttura dell'orario.
+   * Accende o spegne una delle due etichette della cella dell'Orario
+   * Generale: la "D" della disponibilità o la "P" del potenziamento. Stanno
+   * tutte e due nelle regole insieme ai giorni liberi, così vengono salvate e
+   * sincronizzate senza toccare la struttura dell'orario.
+   *
+   * Le due etichette si escludono: un'ora è a disposizione oppure è di
+   * potenziamento, non tutte e due insieme.
    */
-  const handleToggleDisponibilita = (
+  const handleToggleEtichettaOra = (
+    campo: 'teacherDisponibilita' | 'teacherPotenziamento',
     teacherId: string,
     day: number,
     hour: number,
@@ -5520,20 +5643,32 @@ export default function App() {
     timetableDaSalvare: any[] = timetable
   ) => {
     if (readOnlyMode) return;
+    const altro =
+      campo === 'teacherDisponibilita'
+        ? 'teacherPotenziamento'
+        : 'teacherDisponibilita';
     const chiave = hourOffKey(day, hour);
     const attuali: string[] =
-      (generationRules.teacherDisponibilita || {})[teacherId] || [];
+      (generationRules[campo] || {})[teacherId] || [];
     const nuove = attiva
       ? attuali.includes(chiave)
         ? attuali
         : [...attuali, chiave]
       : attuali.filter((k) => k !== chiave);
-    const mappa = { ...(generationRules.teacherDisponibilita || {}) };
+    const mappa = { ...(generationRules[campo] || {}) };
     if (nuove.length > 0) mappa[teacherId] = nuove;
     else delete mappa[teacherId];
+    // L'altra etichetta sulla stessa cella si spegne da sola.
+    const mappaAltro = { ...(generationRules[altro] || {}) };
+    const rimasteAltro = (mappaAltro[teacherId] || []).filter(
+      (k: string) => k !== chiave
+    );
+    if (rimasteAltro.length > 0) mappaAltro[teacherId] = rimasteAltro;
+    else delete mappaAltro[teacherId];
     const regoleAggiornate = {
       ...generationRules,
-      teacherDisponibilita: mappa,
+      [campo]: mappa,
+      [altro]: mappaAltro,
     };
     setGenerationRules(regoleAggiornate);
     setTimetable(timetableDaSalvare);
@@ -5561,10 +5696,13 @@ export default function App() {
     staffType: string
   ) => {
     if (readOnlyMode) return;
-    // La "D" non è una classe: libera la cella e ci lascia l'etichetta di
-    // disponibilità, che vive nelle regole e non nell'orario. Orario e
-    // regole si salvano insieme, in un solo giro.
-    if (newClassId === DISPONIBILITA_VALUE) {
+    // La "D" e la "P" non sono classi: liberano la cella e ci lasciano
+    // l'etichetta, che vive nelle regole e non nell'orario. Orario e regole
+    // si salvano insieme, in un solo giro.
+    if (
+      newClassId === DISPONIBILITA_VALUE ||
+      newClassId === POTENZIAMENTO_VALUE
+    ) {
       const ripulito = timetable.filter(
         (slot) =>
           !(
@@ -5573,7 +5711,16 @@ export default function App() {
             slot.hour === hour
           )
       );
-      handleToggleDisponibilita(teacherId, day, hour, true, ripulito);
+      handleToggleEtichettaOra(
+        newClassId === DISPONIBILITA_VALUE
+          ? 'teacherDisponibilita'
+          : 'teacherPotenziamento',
+        teacherId,
+        day,
+        hour,
+        true,
+        ripulito
+      );
       return;
     }
     if (newClassId === '') {
@@ -6049,6 +6196,7 @@ export default function App() {
     if (!newRules.teacherMaxGapHours) newRules.teacherMaxGapHours = {};
     if (!newRules.teacherHourPreference) newRules.teacherHourPreference = {};
     if (!newRules.teacherDisponibilita) newRules.teacherDisponibilita = {};
+    if (!newRules.teacherPotenziamento) newRules.teacherPotenziamento = {};
     if (teacherId) {
       if (field === 'teacherDaysOff')
         newRules.teacherDaysOff[teacherId] = value;
@@ -6059,6 +6207,12 @@ export default function App() {
         if (value.length > 0) next[teacherId] = value;
         else delete next[teacherId];
         newRules.teacherDisponibilita = next;
+      }
+      else if (field === 'teacherPotenziamento') {
+        const next = { ...newRules.teacherPotenziamento };
+        if (value.length > 0) next[teacherId] = value;
+        else delete next[teacherId];
+        newRules.teacherPotenziamento = next;
       }
       else if (field === 'teacherHourPreference') {
         // Stringa vuota = nessuna preferenza: si toglie la voce invece di
@@ -7534,6 +7688,22 @@ export default function App() {
     pushRooms(newRooms);
   };
 
+  /**
+   * Sposta un'aula di un posto su o giù. L'ordine dell'elenco è quello con
+   * cui le aule escono nel menu a tendina della cella: chi ne ha tante le
+   * vuole raggruppate a modo suo, non nell'ordine di creazione.
+   */
+  const handleMoveRoom = (roomId: string, verso: -1 | 1) => {
+    if (readOnlyMode) return;
+    const da = rooms.findIndex((r) => r.id === roomId);
+    const a = da + verso;
+    if (da < 0 || a < 0 || a >= rooms.length) return;
+    const newRooms = [...rooms];
+    [newRooms[da], newRooms[a]] = [newRooms[a], newRooms[da]];
+    setRooms(newRooms);
+    pushRooms(newRooms);
+  };
+
   const handleUpdateRoomCapacity = (roomId: string, value: string) => {
     if (readOnlyMode) return;
     const n = Math.max(1, Math.min(12, parseInt(value) || 1));
@@ -7845,6 +8015,9 @@ export default function App() {
           disponibile:
             !slot &&
             isDisponibilitaHour(generationRules, teacherId, day, h.index),
+          potenziamento:
+            !slot &&
+            isPotenziamentoHour(generationRules, teacherId, day, h.index),
           bloccata:
             !slot && isTeacherOff(generationRules, teacherId, day, h.index),
         };
@@ -9659,154 +9832,234 @@ export default function App() {
       contentHtml += `</tbody></table>`;
       }
       contentHtml += `<script>window.onload = function() { setTimeout(function() { window.print(); }, 300); }</script></body></html>`;
-    } else if (printType === 'single_class') {
-      const classObj = classes.find((c) => c.id === id);
-      // Giorni e righe della classe: quelli del suo modello, non piu' il
-      // sabato tolto a mano al modello B.
-      const classGrid = classObj
-        ? getSectionGrid(classObj.section)
-        : DEFAULT_MODEL_GRIDS.modelloB;
-      contentHtml = `<html><head><title>Orario Classe ${id}</title><style>@page { size: A4 portrait; margin: 15mm; } body { font-family: sans-serif; font-size: 12px; margin: 15mm; padding: 0; } table { width: 100%; border-collapse: collapse; page-break-inside: avoid; } th, td { border: 1px solid #ccc; padding: 8px; text-align: center; } th { background-color: #f0f0f0; } tr { page-break-inside: avoid; }</style></head><body><h2 style="text-align:center;">Orario Classe ${id}</h2><table><thead><tr><th>Ora</th>${DAYS_IN_USE.map(
-        (d, dIdx) => {
-          if (dIdx >= classGrid.days) return '';
-          return `<th>${d}</th>`;
-        }
-      ).join('')}</tr></thead><tbody>${gridHourRows
-        .slice(0, gridSlots(classGrid))
-        .map(
-          (dh) =>
-            `<tr><td style="font-weight:bold; width: 60px;">${
-              dh.label
-            }<br/><span style="font-size: 8px; font-weight:normal;">${
-              dh.time
-            }</span></td>${DAYS_IN_USE.map((_day, dIdx) => {
-              if (dIdx >= classGrid.days) return '';
-              const l = timetable.find(
-                (slot) =>
-                  slot.classId === id &&
-                  slot.day === dIdx &&
-                  slot.hour === dh.index &&
-                  slot.type === 'materia'
-              );
-              // Ore che quella classe quel giorno non fa: casella spenta.
-              if (
-                !l &&
-                dh.index >= curricularSlotsOn(classGrid, dIdx) &&
-                !(classGrid.rientro && dh.index === curricularSlots(classGrid))
-              )
-                return `<td style="background-color:#f1f5f9;"></td>`;
-              const deptColor = l ? getDeptColor(l.subject) : '#fff';
-              return `<td style="background-color: ${deptColor};">${
-                l
-                  ? `<b>${escapeXml(
-                      l.subject
-                    )}</b><br/><span style="font-size:10px;">${escapeXml(
-                      allStaff.find((s) => s.id === l.teacherId)?.name
-                    )}</span>${
-                      isNamedRoom(l.room)
-                        ? `<br/><span style="font-size:9px;color:#14425f;">📍 ${escapeXml(
-                            l.room
-                          )}</span>`
-                        : ''
-                    }`
-                  : '-'
-              }</td>`;
-            }).join('')}</tr>`
+    } else if (
+      printType === 'single_class' ||
+      printType === 'single_teacher' ||
+      printType === 'single_room' ||
+      printType === 'all_classes' ||
+      printType === 'all_teachers' ||
+      printType === 'all_rooms'
+    ) {
+      // Le schede A4 (classe, docente, laboratorio) hanno tutte lo stesso
+      // foglio di stile e lo stesso corpo: cambia solo chi le riempie. Così
+      // stamparne una sola o stamparle tutte in fila, una per pagina, dà
+      // fogli identici. Il browser non sa salvare tanti PDF separati, ma un
+      // file con una pagina per scheda si divide in un momento.
+      const cssScheda = `@page { size: A4 portrait; margin: 15mm; } body { font-family: sans-serif; font-size: 12px; margin: 15mm; padding: 0; } table { width: 100%; border-collapse: collapse; page-break-inside: avoid; } th, td { border: 1px solid #ccc; padding: 7px; text-align: center; vertical-align: middle; } th { background-color: #f0f0f0; } tr { page-break-inside: avoid; } .dayoff { background-color: ${DAY_OFF_COLOR}; color: #911a40; font-weight: bold; font-style: italic; } .cls { font-weight: bold; font-size: 13px; color: #3730a3; } .doc { font-size: 10px; } .mat { font-size: 9px; color: #555; text-transform: uppercase; } .sost { font-size: 9px; color: #48722c; } .scheda { page-break-after: always; } .scheda:last-child { page-break-after: auto; }`;
+
+      const corpoClasse = (classeId: string) => {
+        const classObj = classes.find((c) => c.id === classeId);
+        // Giorni e righe della classe: quelli del suo modello, non piu' il
+        // sabato tolto a mano al modello B.
+        const classGrid = classObj
+          ? getSectionGrid(classObj.section)
+          : DEFAULT_MODEL_GRIDS.modelloB;
+        return `<div class="scheda"><h2 style="text-align:center;">Orario Classe ${escapeXml(
+          classeId
+        )}</h2><table><thead><tr><th>Ora</th>${DAYS_IN_USE.map(
+          (d, dIdx) => {
+            if (dIdx >= classGrid.days) return '';
+            return `<th>${d}</th>`;
+          }
+        ).join('')}</tr></thead><tbody>${gridHourRows
+          .slice(0, gridSlots(classGrid))
+          .map(
+            (dh) =>
+              `<tr><td style="font-weight:bold; width: 60px;">${
+                dh.label
+              }<br/><span style="font-size: 8px; font-weight:normal;">${
+                dh.time
+              }</span></td>${DAYS_IN_USE.map((_day, dIdx) => {
+                if (dIdx >= classGrid.days) return '';
+                const l = timetable.find(
+                  (slot) =>
+                    slot.classId === classeId &&
+                    slot.day === dIdx &&
+                    slot.hour === dh.index &&
+                    slot.type === 'materia'
+                );
+                // Ore che quella classe quel giorno non fa: casella spenta.
+                if (
+                  !l &&
+                  dh.index >= curricularSlotsOn(classGrid, dIdx) &&
+                  !(
+                    classGrid.rientro &&
+                    dh.index === curricularSlots(classGrid)
+                  )
+                )
+                  return `<td style="background-color:#f1f5f9;"></td>`;
+                const deptColor = l ? getDeptColor(l.subject) : '#fff';
+                return `<td style="background-color: ${deptColor};">${
+                  l
+                    ? `<b>${escapeXml(
+                        l.subject
+                      )}</b><br/><span style="font-size:10px;">${escapeXml(
+                        allStaff.find((s) => s.id === l.teacherId)?.name
+                      )}</span>${
+                        isNamedRoom(l.room)
+                          ? `<br/><span style="font-size:9px;color:#14425f;">📍 ${escapeXml(
+                              l.room
+                            )}</span>`
+                          : ''
+                      }`
+                    : '-'
+                }</td>`;
+              }).join('')}</tr>`
+          )
+          .join('')}</tbody></table></div>`;
+      };
+
+      const corpoDocente = (staffId: string) => {
+        const staff = allStaff.find((s) => s.id === staffId);
+        if (!staff) return '';
+        const deptColor = getDeptColor(staff.subject);
+        return `<div class="scheda"><h2 style="text-align:center; background-color: ${deptColor}; padding: 10px; border-radius: 4px;">Orario: ${escapeXml(
+          staff.name
+        )}</h2><h3 style="text-align:center; color: #666;">${escapeXml(
+          staff.subject || ''
+        )}</h3><table><thead><tr><th>Ora</th>${DAYS_IN_USE.map(
+          (d) => `<th>${d}</th>`
+        ).join('')}</tr></thead><tbody>${(staff.staffType === 'strumento'
+          ? afternoonHours
+          : gridHourRows.slice(0, staffRowCount(staff.id))
         )
-        .join('')}</tbody></table></body></html>`;
-    } else if (printType === 'single_teacher') {
-      const staff = allStaff.find((s) => s.id === id);
-      const deptColor = getDeptColor(staff?.subject);
-      contentHtml = `<html><head><title>Orario ${
-        staff?.name
-      }</title><style>@page { size: A4 portrait; margin: 15mm; } body { font-family: sans-serif; font-size: 12px; margin: 15mm; padding: 0; } table { width: 100%; border-collapse: collapse; page-break-inside: avoid; } th, td { border: 1px solid #ccc; padding: 8px; text-align: center; } th { background-color: #f0f0f0; } .dayoff { background-color: ${DAY_OFF_COLOR}; color: #911a40; font-weight: bold; font-style: italic; } tr { page-break-inside: avoid; }</style></head><body><h2 style="text-align:center; background-color: ${deptColor}; padding: 10px; border-radius: 4px;">Orario: ${
-        staff?.name
-      }</h2><h3 style="text-align:center; color: #666;">${
-        staff?.subject
-      }</h3><table><thead><tr><th>Ora</th>${DAYS_IN_USE.map(
-        (d) => `<th>${d}</th>`
-      ).join('')}</tr></thead><tbody>${(staff?.staffType === 'strumento'
-        ? afternoonHours
-        : gridHourRows.slice(0, staffRowCount(staff?.id))
-      )
-        .map(
-          (dh) =>
-            `<tr><td style="font-weight:bold; width: 60px;">${
-              dh.label
-            }<br/><span style="font-size: 8px; font-weight:normal;">${
-              dh.time
-            }</span></td>${DAYS_IN_USE.map((_day, dIdx) => {
-              const isDayOff = (
-                generationRules.teacherDaysOff[staff?.id] || []
-              ).includes(dIdx);
-              if (isDayOff) return `<td class="dayoff">LIBERO</td>`;
-              if (isTeacherOff(generationRules, staff?.id, dIdx, dh.index))
-                return `<td class="dayoff">N.D.</td>`;
-              const l = timetable.find(
-                (slot) =>
-                  slot.teacherId === staff?.id &&
-                  slot.day === dIdx &&
-                  slot.hour === dh.index
-              );
-              return `<td style="${
-                l ? 'background-color: #e3eef5; font-weight: bold;' : ''
-              }">${
-                l
-                  ? `<b>Classe ${escapeXml(l.classId)}</b>${
-                      isNamedRoom(l.room)
-                        ? `<br/><span style="font-size:9px;font-weight:normal;color:#14425f;">📍 ${escapeXml(
-                            l.room
-                          )}</span>`
-                        : ''
-                    }`
-                  : '-'
-              }</td>`;
-            }).join('')}</tr>`
-        )
-        .join('')}</tbody></table></body></html>`;
-    } else if (printType === 'single_room') {
+          .map(
+            (dh) =>
+              `<tr><td style="font-weight:bold; width: 60px;">${
+                dh.label
+              }<br/><span style="font-size: 8px; font-weight:normal;">${
+                dh.time
+              }</span></td>${DAYS_IN_USE.map((_day, dIdx) => {
+                const isDayOff = (
+                  generationRules.teacherDaysOff[staff.id] || []
+                ).includes(dIdx);
+                if (isDayOff) return `<td class="dayoff">LIBERO</td>`;
+                if (isTeacherOff(generationRules, staff.id, dIdx, dh.index))
+                  return `<td class="dayoff">N.D.</td>`;
+                const l = timetable.find(
+                  (slot) =>
+                    slot.teacherId === staff.id &&
+                    slot.day === dIdx &&
+                    slot.hour === dh.index
+                );
+                // Per il sostegno la classe da sola non basta: serve sapere
+                // con quale collega si sta in aula e per quale materia. Il
+                // laboratorio si legge dalla lezione della classe, perché
+                // lo slot di sostegno resta attaccato all'aula normale.
+                const lezioneClasse =
+                  l && staff.staffType === 'sostegno'
+                    ? lezioneDiClasseA(l.classId, dIdx, dh.index)
+                    : null;
+                const aulaDaMostrare = isNamedRoom(l?.room)
+                  ? l.room
+                  : isNamedRoom(lezioneClasse?.room)
+                  ? lezioneClasse.room
+                  : '';
+                return `<td style="${
+                  l ? 'background-color: #e3eef5; font-weight: bold;' : ''
+                }">${
+                  l
+                    ? `<b>Classe ${escapeXml(l.classId)}</b>${
+                        lezioneClasse
+                          ? `<br/><span style="font-size:9px;font-weight:normal;color:#555;text-transform:uppercase;">${escapeXml(
+                              lezioneClasse.subject
+                            )}</span><br/><span style="font-size:9px;font-weight:normal;">${escapeXml(
+                              allStaff.find(
+                                (t) => t.id === lezioneClasse.teacherId
+                              )?.name || ''
+                            )}</span>`
+                          : ''
+                      }${
+                        aulaDaMostrare
+                          ? `<br/><span style="font-size:9px;font-weight:normal;color:#14425f;">📍 ${escapeXml(
+                              aulaDaMostrare
+                            )}</span>`
+                          : ''
+                      }`
+                    : '-'
+                }</td>`;
+              }).join('')}</tr>`
+          )
+          .join('')}</tbody></table></div>`;
+      };
+
       // Il foglio da attaccare dietro la porta del laboratorio: chi c'e',
       // con quale classe e per quale materia, ora per ora.
-      const nomeAula = id || '';
-      contentHtml = `<html><head><title>Orario ${escapeXml(
-        nomeAula
-      )}</title><style>@page { size: A4 portrait; margin: 15mm; } body { font-family: sans-serif; font-size: 12px; margin: 15mm; padding: 0; } table { width: 100%; border-collapse: collapse; page-break-inside: avoid; } th, td { border: 1px solid #ccc; padding: 6px; text-align: center; vertical-align: middle; } th { background-color: #f0f0f0; } tr { page-break-inside: avoid; } .cls { font-weight: bold; font-size: 13px; color: #3730a3; } .doc { font-size: 10px; } .mat { font-size: 9px; color: #555; text-transform: uppercase; }</style></head><body><h2 style="text-align:center;">📍 ${escapeXml(
-        nomeAula
-      )}</h2><table><thead><tr><th style="width:60px;">Ora</th>${DAYS_IN_USE.map(
-        (d) => `<th>${d}</th>`
-      ).join('')}</tr></thead><tbody>${gridHourRows
-        .map(
-          (dh: any) =>
-            `<tr><td style="font-weight:bold;">${
-              dh.label
-            }<br/><span style="font-size:8px;font-weight:normal;">${
-              dh.time
-            }</span></td>${DAYS_IN_USE.map((_day, dIdx) => {
-              const inAula = timetable.filter(
-                (slot: any) =>
-                  slot.room === nomeAula &&
-                  slot.day === dIdx &&
-                  slot.hour === dh.index &&
-                  (slot.type === 'materia' ||
-                    slot.type === 'pomeriggio_musica')
-              );
-              if (!inAula.length) return `<td>-</td>`;
-              return `<td style="background-color:#f2f7fa;">${inAula
-                .map(
-                  (l: any) =>
-                    `<span class="cls">${escapeXml(
-                      l.classId
-                    )}</span><br/><span class="doc">${escapeXml(
-                      allStaff.find((t: any) => t.id === l.teacherId)?.name ||
-                        ''
-                    )}</span><br/><span class="mat">${escapeXml(
-                      l.subject
-                    )}</span>`
-                )
-                .join('<hr style="border:0;border-top:1px dashed #c7deed;margin:3px 0;"/>')}</td>`;
-            }).join('')}</tr>`
-        )
-        .join('')}</tbody></table></body></html>`;
+      const corpoAula = (nomeAula: string) =>
+        `<div class="scheda"><h2 style="text-align:center;">📍 ${escapeXml(
+          nomeAula
+        )}</h2><table><thead><tr><th style="width:60px;">Ora</th>${DAYS_IN_USE.map(
+          (d) => `<th>${d}</th>`
+        ).join('')}</tr></thead><tbody>${gridHourRows
+          .map(
+            (dh: any) =>
+              `<tr><td style="font-weight:bold;">${
+                dh.label
+              }<br/><span style="font-size:8px;font-weight:normal;">${
+                dh.time
+              }</span></td>${DAYS_IN_USE.map((_day, dIdx) => {
+                const inAula = timetable.filter(
+                  (slot: any) =>
+                    slot.room === nomeAula &&
+                    slot.day === dIdx &&
+                    slot.hour === dh.index &&
+                    (slot.type === 'materia' ||
+                      slot.type === 'pomeriggio_musica')
+                );
+                if (!inAula.length) return `<td>-</td>`;
+                return `<td style="background-color:#f2f7fa;">${inAula
+                  .map(
+                    (l: any) =>
+                      `<span class="cls">${escapeXml(
+                        l.classId
+                      )}</span><br/><span class="doc">${escapeXml(
+                        allStaff.find((t: any) => t.id === l.teacherId)
+                          ?.name || ''
+                      )}</span><br/><span class="mat">${escapeXml(
+                        l.subject
+                      )}</span>${
+                        sostegnoOf(l).length
+                          ? `<br/><span class="sost">🤝 ${escapeXml(
+                              sostegnoOf(l).join(', ')
+                            )}</span>`
+                          : ''
+                      }`
+                  )
+                  .join(
+                    '<hr style="border:0;border-top:1px dashed #c7deed;margin:3px 0;"/>'
+                  )}</td>`;
+              }).join('')}</tr>`
+          )
+          .join('')}</tbody></table></div>`;
+
+      let titoloScheda = '';
+      let corpoSchede = '';
+      if (printType === 'single_class') {
+        titoloScheda = `Orario Classe ${id}`;
+        corpoSchede = corpoClasse(id || '');
+      } else if (printType === 'all_classes') {
+        titoloScheda = 'Orario di tutte le classi';
+        corpoSchede = classes.map((c) => corpoClasse(c.id)).join('');
+      } else if (printType === 'single_teacher') {
+        titoloScheda = `Orario ${
+          allStaff.find((s) => s.id === id)?.name || ''
+        }`;
+        corpoSchede = corpoDocente(id || '');
+      } else if (printType === 'all_teachers') {
+        titoloScheda = 'Orario di tutti i docenti';
+        corpoSchede = allStaff.map((s) => corpoDocente(s.id)).join('');
+      } else if (printType === 'single_room') {
+        titoloScheda = `Orario ${id}`;
+        corpoSchede = corpoAula(id || '');
+      } else {
+        titoloScheda = 'Orario di tutti i laboratori';
+        corpoSchede = namedRooms
+          .map((r: any) => corpoAula(r.name))
+          .join('');
+      }
+      contentHtml = `<html><head><title>${escapeXml(
+        titoloScheda
+      )}</title><style>${cssScheda}</style></head><body>${corpoSchede}</body></html>`;
     } else if (printType === 'equita') {
       // Il prospetto che si porta in riunione: quante ore buco, quante
       // entrate posticipate e quante uscite anticipate per ciascuno.
@@ -11399,6 +11652,15 @@ export default function App() {
                                       dIdx,
                                       currentHour
                                     );
+                                  const isPotenziamento =
+                                    !occupiedSlot &&
+                                    !isDisponibilita &&
+                                    isPotenziamentoHour(
+                                      generationRules,
+                                      staff.id,
+                                      dIdx,
+                                      currentHour
+                                    );
                                   return (
                                     <td
                                       key={`${dIdx}_${currentHour}`}
@@ -11419,6 +11681,8 @@ export default function App() {
                                               ? `Classe ${occupiedSlot.classId} — clicca per cambiarla`
                                               : isDisponibilita
                                               ? 'Ora di disponibilità (D): clicca per assegnare una classe o per toglierla'
+                                              : isPotenziamento
+                                              ? 'Ora di potenziamento (P): clicca per assegnare una classe o per toglierla'
                                               : 'Nessuna classe — clicca per assegnarla'
                                           }
                                           className={`w-full text-center text-xs font-bold rounded px-0.5 py-1 border truncate tracking-tight transition-all ${
@@ -11426,6 +11690,8 @@ export default function App() {
                                               ? 'bg-brand-600 text-white border-brand-700 shadow-xs'
                                               : isDisponibilita
                                               ? 'bg-bruciato-100 text-bruciato-800 border-bruciato-300'
+                                              : isPotenziamento
+                                              ? 'bg-salvia-100 text-salvia-800 border-salvia-300'
                                               : 'bg-white text-slate-400 border-slate-200'
                                           } ${
                                             readOnlyMode ? 'opacity-60' : ''
@@ -11435,6 +11701,8 @@ export default function App() {
                                             ? occupiedSlot.classId
                                             : isDisponibilita
                                             ? 'D'
+                                            : isPotenziamento
+                                            ? 'P'
                                             : '-'}
                                         </div>
                                         <select
@@ -11443,6 +11711,8 @@ export default function App() {
                                               ? occupiedSlot.classId
                                               : isDisponibilita
                                               ? DISPONIBILITA_VALUE
+                                              : isPotenziamento
+                                              ? POTENZIAMENTO_VALUE
                                               : ''
                                           }
                                           onChange={(e) =>
@@ -11470,6 +11740,14 @@ export default function App() {
                                               className="bg-white text-bruciato-700"
                                             >
                                               D (disponibilità)
+                                            </option>
+                                          )}
+                                          {staff.staffType === 'materia' && (
+                                            <option
+                                              value={POTENZIAMENTO_VALUE}
+                                              className="bg-white text-salvia-700"
+                                            >
+                                              P (potenziamento)
                                             </option>
                                           )}
                                           {classes.map((c) => (
@@ -11703,9 +11981,17 @@ export default function App() {
                       onClick={() =>
                         handlePrintBypass('single_class', selectedClass)
                       }
+                      title="Stampa l'orario di questa classe in A4"
                       className="ml-2 bg-brand-50 text-brand-600 hover:bg-brand-100 p-2 rounded-lg"
                     >
                       🖨️
+                    </button>
+                    <button
+                      onClick={() => handlePrintBypass('all_classes')}
+                      title="Stampa tutte le classi in un colpo solo, una per pagina"
+                      className="bg-brand-50 text-brand-600 hover:bg-brand-100 px-2 py-2 rounded-lg text-xs font-bold"
+                    >
+                      🖨️ Tutte
                     </button>
                   </>
                 )}
@@ -11727,9 +12013,17 @@ export default function App() {
                       onClick={() =>
                         handlePrintBypass('single_teacher', selectedTeacherId)
                       }
+                      title="Stampa l'orario di questo docente in A4"
                       className="ml-2 bg-brand-50 text-brand-600 hover:bg-brand-100 p-2 rounded-lg"
                     >
                       🖨️
+                    </button>
+                    <button
+                      onClick={() => handlePrintBypass('all_teachers')}
+                      title="Stampa tutti i docenti in un colpo solo, uno per pagina"
+                      className="bg-brand-50 text-brand-600 hover:bg-brand-100 px-2 py-2 rounded-lg text-xs font-bold"
+                    >
+                      🖨️ Tutti
                     </button>
                   </>
                 )}
@@ -11827,6 +12121,13 @@ export default function App() {
                       className="ml-2 bg-brand-50 text-brand-600 hover:bg-brand-100 p-2 rounded-lg"
                     >
                       🖨️
+                    </button>
+                    <button
+                      onClick={() => handlePrintBypass('all_rooms')}
+                      title="Stampa tutti i laboratori in un colpo solo, uno per pagina"
+                      className="bg-brand-50 text-brand-600 hover:bg-brand-100 px-2 py-2 rounded-lg text-xs font-bold"
+                    >
+                      🖨️ Tutti
                     </button>
                   </>
                 )}
@@ -11935,6 +12236,7 @@ export default function App() {
                                             (t: any) => t.id === l.teacherId
                                           )?.name || l.teacherId;
                                         const affianco = coTeachersOf(l);
+                                        const conSostegno = sostegnoOf(l);
                                         return (
                                           <div
                                             key={i}
@@ -11957,6 +12259,16 @@ export default function App() {
                                             {affianco.length > 0 && (
                                               <p className="text-[10px] text-sky-700 font-semibold truncate">
                                                 👥 {affianco.join(', ')}
+                                              </p>
+                                            )}
+                                            {conSostegno.length > 0 && (
+                                              <p
+                                                className="text-[10px] text-salvia-700 font-semibold truncate"
+                                                title={`Sostegno: ${conSostegno.join(
+                                                  ', '
+                                                )}`}
+                                              >
+                                                🤝 {conSostegno.join(', ')}
                                               </p>
                                             )}
                                           </div>
@@ -12589,14 +12901,55 @@ export default function App() {
                                     className="p-3 border-r border-slate-200 text-center h-24 align-middle bg-white"
                                   >
                                     {slotOccupied ? (
-                                      <div className="bg-brand-50 border border-brand-200 rounded-lg p-2 flex flex-col justify-center items-center h-full">
-                                        <span className="font-bold text-brand-700 text-sm">
-                                          Classe {slotOccupied.classId}
-                                        </span>
-                                        <span className="text-[10px] text-slate-500 italic mt-0.5">
-                                          Sostegno
-                                        </span>
-                                      </div>
+                                      (() => {
+                                        // Con chi e dove: la lezione che la
+                                        // classe sta facendo in quell'ora.
+                                        const lezione = lezioneDiClasseA(
+                                          slotOccupied.classId,
+                                          dIdx,
+                                          hIdx
+                                        );
+                                        const docenteMateria = lezione
+                                          ? allStaff.find(
+                                              (t: any) =>
+                                                t.id === lezione.teacherId
+                                            )?.name
+                                          : null;
+                                        return (
+                                          <div className="bg-brand-50 border border-brand-200 rounded-lg p-2 flex flex-col justify-center items-center h-full">
+                                            <span className="font-bold text-brand-700 text-sm">
+                                              Classe {slotOccupied.classId}
+                                            </span>
+                                            {lezione ? (
+                                              <>
+                                                <span className="text-[10px] text-slate-600 uppercase tracking-wider truncate max-w-full">
+                                                  {lezione.subject}
+                                                </span>
+                                                {docenteMateria && (
+                                                  <span
+                                                    className="text-[10px] text-slate-500 truncate max-w-full"
+                                                    title={`Docente della materia: ${docenteMateria}`}
+                                                  >
+                                                    👩‍🏫 {docenteMateria}
+                                                  </span>
+                                                )}
+                                              </>
+                                            ) : (
+                                              <span className="text-[10px] text-slate-500 italic mt-0.5">
+                                                Sostegno
+                                              </span>
+                                            )}
+                                            {isNamedRoom(lezione?.room) && (
+                                              <span
+                                                className="text-[10px] text-brand-700 font-semibold truncate max-w-full"
+                                                title={`Aula: ${lezione.room}`}
+                                              >
+                                                📍 {lezione.room}
+                                              </span>
+                                            )}
+                                          </div>
+                                        );
+                                      })()
                                     ) : (
                                       <span className="text-xs text-slate-200">
                                         Libero
@@ -15480,11 +15833,34 @@ export default function App() {
                 </button>
               </form>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {rooms.map((r) => (
+                {rooms.map((r, rIdx) => (
                   <div
                     key={r.id}
                     className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col gap-2 relative shadow-sm"
                   >
+                    {/*
+                      L'ordine di questo elenco è l'ordine del menu a tendina
+                      delle aule: chi ha dieci laboratori li vuole in fila come
+                      se li ricorda, non nell'ordine in cui li ha creati.
+                    */}
+                    <div className="absolute top-3 right-10 flex items-center gap-0.5">
+                      <button
+                        onClick={() => handleMoveRoom(r.id, -1)}
+                        disabled={readOnlyMode || rIdx === 0}
+                        className="text-slate-400 hover:text-brand-600 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed text-xs"
+                        title="Spostala più in alto nell'elenco e nel menu"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        onClick={() => handleMoveRoom(r.id, 1)}
+                        disabled={readOnlyMode || rIdx === rooms.length - 1}
+                        className="text-slate-400 hover:text-brand-600 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed text-xs"
+                        title="Spostala più in basso nell'elenco e nel menu"
+                      >
+                        ▼
+                      </button>
+                    </div>
                     <button
                       onClick={() => handleDeleteRoom(r.id)}
                       disabled={readOnlyMode}
@@ -17177,8 +17553,9 @@ export default function App() {
                 >
                   {rooms.map((r) => {
                     const occupanti = isNamedRoom(r.name)
-                      ? roomOccupantsAt(
+                      ? roomOccupantLabelsAt(
                           timetable,
+                          allStaff,
                           r.name,
                           editingCell.day,
                           editingCell.hour,
@@ -17201,8 +17578,9 @@ export default function App() {
                 </select>
                 {(() => {
                   const occupanti = isNamedRoom(tempRoom)
-                    ? roomOccupantsAt(
+                    ? roomOccupantLabelsAt(
                         timetable,
+                        allStaff,
                         tempRoom,
                         editingCell.day,
                         editingCell.hour,

@@ -28,7 +28,7 @@
  *   `Second Brain EduTime Pro/Conoscenza/Archivio delle novità (tutti i
  *   rilasci).md`: lì lo storico è completo e non si taglia mai.
  */
-export const NOVITA_VERSIONE = '2026-09-10c';
+export const NOVITA_VERSIONE = '2026-09-12';
 
 export type VoceNovita = {
   /** Data del rilascio, formato AAAA-MM-GG. */
@@ -40,6 +40,18 @@ export type VoceNovita = {
 };
 
 export const NOVITA: VoceNovita[] = [
+  {
+    versione: '2026-09-12',
+    data: '12 settembre 2026',
+    voci: [
+      'Le ore di potenziamento si segnano con la «P», come la disponibilità si segna con la «D». Nel menù della cella dell’Orario Generale, accanto a «D (disponibilità)», adesso c’è «P (potenziamento)»: chi ha otto ore di potenziamento in cattedra non deve più lasciarle vuote o inventarsi una classe finta per farle stare da qualche parte. La cella diventa verde con una «P» dentro, e la stessa «P» si rivede nella striscia della giornata in Sostituzioni. Segnalazione di una collega.',
+      'Nella vista del singolo docente di sostegno non c’è più scritta solo la classe. Adesso si legge anche la materia di quell’ora, il nome del collega con cui si sta in aula e il laboratorio dove la classe si sposta: erano le tre cose che servivano per consegnare quel foglio al docente, e ogni volta bisognava andarle a cercare nella vista della classe. Vale a video e nel foglio stampato.',
+      'Il foglio del laboratorio dice anche chi fa sostegno in quell’ora. Prima si leggevano classe, docente e materia: chi è dentro davvero, però, spesso è una persona in più. Adesso compare accanto agli altri, sia nella vista sia nella stampa da appendere alla porta.',
+      'Quando si sceglie un’aula già occupata, l’app dice adesso anche con quale docente. «Lab. Scienze — occupata da 2B» diventa «occupata da 2B (Bianchi)»: per liberare il laboratorio bisogna parlare con una persona, e il nome di quella persona era l’unica cosa che mancava.',
+      'I laboratori si possono mettere in ordine. Nel riquadro «Aule e Laboratori» ogni scheda ha due frecce, su e giù: l’ordine che si sceglie lì è quello con cui le aule escono nel menù della cella. Prima restavano nell’ordine in cui erano state create, che dopo il decimo laboratorio non è più l’ordine di nessuno.',
+      'Si possono stampare tutte le schede in un colpo solo. Accanto al pulsante di stampa, nelle viste per classe, per docente e per laboratorio, adesso c’è «🖨️ Tutte»: esce un unico documento con una pagina per ogni classe, per ogni docente o per ogni laboratorio, già impaginata come la scheda singola. Il browser non sa salvare tanti PDF separati da solo, ma un file fatto così si divide in un momento, invece di ristampare sessanta volte scegliendo un nome per volta.',
+    ],
+  },
   {
     versione: '2026-09-10c',
     data: '10 settembre 2026',
@@ -124,15 +136,6 @@ export const NOVITA: VoceNovita[] = [
     voci: [
       'La chat dell’assistente della Guida entra nell’abbonamento EduTime Pro AI, come le altre funzioni con l’intelligenza artificiale. Finora era rimasta aperta a tutti come prova: adesso, per farsi scrivere la risposta a parole tue, serve la chiave dell’abbonamento incollata in «🔑 Abbonamento IA».',
       'La ricerca nei capitoli della guida resta gratis per sempre e senza limiti: gira tutta dentro il tuo browser, non passa da nessun modello e non manda niente in rete. È quella che vedi aprendo «💬 Serve aiuto?», e continua a funzionare uguale anche senza chiave.',
-    ],
-  },
-  {
-    versione: '2026-09-09',
-    data: '9 settembre 2026',
-    voci: [
-      '«📥 Importa orario» adesso crea anche le classi e i docenti che nell’app non ci sono. Prima leggeva il PDF o il foglio dell’anno scorso, ma teneva solo le righe in cui il docente era già in archivio: chi arrivava con l’orario completo dell’istituto e l’app ancora vuota si vedeva scartare tutto, e per usare la funzione doveva prima ribattere a mano settanta nomi e tutte le sezioni. Era il contrario di quello che serviva. Adesso, dopo la lettura, compare la spunta «Crea quello che manca» con il conto di quante classi e quanti docenti nascerebbero: con la spunta entrano insieme all’orario, senza la spunta si importano solo le righe che stanno in piedi da sole, come prima.',
-      'I docenti creati così non arrivano vuoti: la cattedra viene contata dalle ore che hai importato, classe per classe, e la materia è quella scritta più volte accanto al loro nome nel documento. Restano da controllare, ma il registro non è più da riempire da zero.',
-      'Due cose l’app non le inventa mai. Un cognome che in archivio corrisponde già a due persone non viene abbinato e non viene creato, perché un terzo omonimo è peggio di una riga da sistemare a mano; e una sigla che non ha la forma di una classe (anno più sezione, tipo 1A) resta scartata, perché quasi sempre è l’intestazione di una colonna letta storta.',
     ],
   },
 ];

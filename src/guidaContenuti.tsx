@@ -369,6 +369,35 @@ export const chapters: Chapter[] = [
         ),
       },
       {
+        title: 'Le due lettere: D e P',
+        tag: 'ore senza classe',
+        body: (
+          <>
+            <p>
+              Nello stesso menu, sopra le classi, ci sono due voci che non sono
+              classi: <B>D (disponibilità)</B> e <B>P (potenziamento)</B>.
+              Servono alle ore in cui il docente è a scuola ma non ha una
+              classe sua.
+            </p>
+            <p className="mt-2">
+              La <B>D</B> è l'ora a disposizione per le supplenze, quella che
+              le scuole assegnano a inizio anno sulle ore buca: viene contata
+              nel prospetto «💰 Ore di disponibilità e supplenze per docente»
+              della segreteria. La <B>P</B> è l'ora di potenziamento: la cella
+              diventa verde e smette di sembrare un buco. Nessuna delle due
+              vincola l'auto-generazione: sono etichette sull'orario.
+            </p>
+            <p className="mt-2">
+              Le due si escludono: mettendo la P su una cella che aveva la D,
+              la D si spegne da sola. Assegnando una classe a quella cella
+              sparisce l'etichetta, perché in quell'ora il docente ha lezione.
+              Le stesse lettere si rivedono nella striscia della giornata,
+              nella scheda Sostituzioni.
+            </p>
+          </>
+        ),
+      },
+      {
         title: "Il pulsante dell'aula",
         tag: 'sotto ogni cella occupata',
         body: (
@@ -467,7 +496,9 @@ export const chapters: Chapter[] = [
                 liberi evidenziati e aula di ogni lezione.
               </>,
               <>
-                <B>Sostegno</B>: in quale classe è in compresenza ogni ora.
+                <B>Sostegno</B>: in quale classe è ogni ora, con la materia
+                di quell'ora, il docente curricolare con cui sta in aula e il
+                laboratorio dove la classe si sposta.
               </>,
               <>
                 <B>Strumento</B>: orario pomeridiano del docente di strumento.
@@ -478,8 +509,9 @@ export const chapters: Chapter[] = [
               </>,
               <>
                 <B>Laboratorio</B>: chi occupa un'aula speciale ora per ora,
-                con classe, docente e materia. È il foglio da attaccare dietro
-                la porta del laboratorio.
+                con classe, docente, materia e, se c'è, il docente di
+                sostegno. È il foglio da attaccare dietro la porta del
+                laboratorio.
               </>,
               <>
                 <B>Equità</B>: quante ore buco, quante entrate posticipate e
@@ -503,6 +535,11 @@ export const chapters: Chapter[] = [
         title: 'Stampa singola A4',
         tag: 'singolo elemento',
         body: "Accanto al selettore c'è il pulsante 🖨️: apre una finestra con l'orario di quell'elemento in A4 verticale e avvia la stampa. Nella vista «Sostegno» c'è in più il pulsante «🖨️ Tutti», che stampa un tabellone unico con l'orario di tutti i docenti di sostegno invece di un foglio per volta.",
+      },
+      {
+        title: 'Stampare tutte le schede insieme',
+        tag: 'una pagina per scheda',
+        body: "Nelle viste Classe, Docente e Laboratorio, accanto al 🖨️ c'è «🖨️ Tutte»: esce un documento unico con una pagina per ogni classe, per ogni docente o per ogni laboratorio, impaginata come la scheda singola. Serve a chi deve consegnare il foglio a tutti i colleghi e a tutte le classi senza rifare la stampa sessanta volte. Il browser non sa salvare tanti PDF separati da solo: il file esce intero, e si divide poi con qualsiasi lettore di PDF.",
       },
       {
         title: 'Modifica cella nella vista Classe',
@@ -1160,8 +1197,11 @@ export const chapters: Chapter[] = [
                 menu vale il laboratorio collegato alla materia; se lo scegli
                 tu, la tua scelta resta anche quando cambi il docente della
                 cella. Accanto a ogni voce compare chi la sta già usando in
-                quell'ora, e sotto un avviso quando lo spazio è pieno: l'app
-                non blocca, ma lo dice prima che tu salvi.
+                quell'ora, con il nome del docente accanto alla classe, e
+                sotto un avviso quando lo spazio è pieno: l'app non blocca, ma
+                lo dice prima che tu salvi. L'ordine delle aule in questo menu
+                è quello che decidi tu con le frecce ▲▼ nel riquadro «Aule e
+                Laboratori».
               </>,
               <>
                 <B>💾 Salva aula</B>: applica l'aula scelta alla lezione senza
@@ -1731,6 +1771,13 @@ export const chapters: Chapter[] = [
               non ci sta in nessun modo, «C.L.D.» sì. Sono al massimo sei
               caratteri, e tre o quattro si leggono meglio; lasciandolo vuoto
               l'app abbrevia da sola.
+            </p>
+            <p className="mt-2">
+              Le frecce <B>▲▼</B> in alto a ogni scheda spostano l'aula su e
+              giù nell'elenco. L'ordine che scegli qui è quello con cui le
+              aule compaiono nel menu «🏫 Aula / Laboratorio» della finestra
+              Modifica Cella: con dieci laboratori, l'ordine di creazione non è
+              più l'ordine di nessuno.
             </p>
             <p className="mt-2">
               <B>Se hai creato un laboratorio e non lo vedi da nessuna
